@@ -1,0 +1,284 @@
+{
+  "name": "日本旅行",
+  "tasks": [
+    {
+      "key": "osaka",
+      "name": "大阪",
+      "short": "大阪",
+      "place": "大阪府 · 关西",
+      "lat": 34.6937,
+      "lng": 135.5023,
+      "prerequisites": [
+        {
+          "action": "预订去程机票",
+          "urgency": "before"
+        },
+        {
+          "action": "预订大阪住宿",
+          "urgency": "before"
+        }
+      ],
+      "children": [
+        {
+          "key": "castle",
+          "name": "大阪城天守阁",
+          "short": "大阪城",
+          "place": "中央区 · 大阪城公园",
+          "lat": 34.6873,
+          "lng": 135.5262,
+          "prerequisites": [
+            {
+              "action": "购买天守阁门票",
+              "urgency": "onsite"
+            }
+          ],
+          "children": []
+        },
+        {
+          "key": "usj",
+          "name": "日本环球影城",
+          "short": "环球影城",
+          "place": "此花区 · 樱岛",
+          "lat": 34.6654,
+          "lng": 135.4323,
+          "prerequisites": [
+            {
+              "action": "购买指定日期入园门票",
+              "urgency": "before"
+            },
+            {
+              "action": "抢购快速通关券",
+              "urgency": "early"
+            }
+          ],
+          "children": []
+        },
+        {
+          "key": "dotonbori",
+          "name": "道顿堀",
+          "short": "道顿堀",
+          "place": "中央区 · 难波",
+          "lat": 34.6687,
+          "lng": 135.5013,
+          "prerequisites": [],
+          "children": []
+        },
+        {
+          "key": "kaiyukan",
+          "name": "海游馆",
+          "short": "海游馆",
+          "place": "港区 · 天保山",
+          "lat": 34.6545,
+          "lng": 135.429,
+          "prerequisites": [
+            {
+              "action": "网上预约入场时段",
+              "urgency": "before"
+            }
+          ],
+          "children": []
+        },
+        {
+          "key": "umeda",
+          "name": "梅田蓝天大厦空中庭园",
+          "short": "梅田空中庭园",
+          "place": "北区 · 梅田",
+          "lat": 34.7053,
+          "lng": 135.4903,
+          "prerequisites": [
+            {
+              "action": "购买展望台门票",
+              "urgency": "onsite"
+            }
+          ],
+          "children": []
+        },
+        {
+          "key": "tsutenkaku",
+          "name": "通天阁",
+          "short": "通天阁",
+          "place": "浪速区 · 新世界",
+          "lat": 34.6525,
+          "lng": 135.5063,
+          "prerequisites": [
+            {
+              "action": "购买展望台门票",
+              "urgency": "onsite"
+            }
+          ],
+          "children": []
+        }
+      ]
+    },
+    {
+      "key": "tokyo",
+      "name": "东京",
+      "short": "东京",
+      "place": "东京都 · 关东",
+      "lat": 35.6812,
+      "lng": 139.7671,
+      "prerequisites": [
+        {
+          "action": "预订东京住宿",
+          "urgency": "before"
+        },
+        {
+          "action": "购买大阪→东京新干线车票",
+          "urgency": "onsite"
+        }
+      ],
+      "children": [
+        {
+          "key": "ghibli",
+          "name": "三鹰之森吉卜力美术馆",
+          "short": "吉卜力",
+          "place": "三鹰市 · 井之头公园",
+          "lat": 35.6962,
+          "lng": 139.5704,
+          "prerequisites": [
+            {
+              "action": "抢购指定日期时段门票",
+              "urgency": "early"
+            }
+          ],
+          "children": []
+        },
+        {
+          "key": "shibuyasky",
+          "name": "涩谷 SKY",
+          "short": "涩谷 SKY",
+          "place": "涩谷区 · 涩谷站",
+          "lat": 35.6585,
+          "lng": 139.7022,
+          "prerequisites": [
+            {
+              "action": "预约指定时段门票",
+              "urgency": "before"
+            }
+          ],
+          "children": []
+        },
+        {
+          "key": "teamlab",
+          "name": "teamLab Planets",
+          "short": "teamLab",
+          "place": "江东区 · 丰洲",
+          "lat": 35.6491,
+          "lng": 139.7898,
+          "prerequisites": [
+            {
+              "action": "预约指定时段门票",
+              "urgency": "before"
+            }
+          ],
+          "children": []
+        },
+        {
+          "key": "sensoji",
+          "name": "浅草寺",
+          "short": "浅草寺",
+          "place": "台东区 · 浅草",
+          "lat": 35.7148,
+          "lng": 139.7967,
+          "prerequisites": [],
+          "children": []
+        },
+        {
+          "key": "tokyotower",
+          "name": "东京塔",
+          "short": "东京塔",
+          "place": "港区 · 芝公园",
+          "lat": 35.6586,
+          "lng": 139.7454,
+          "prerequisites": [
+            {
+              "action": "购买展望台门票",
+              "urgency": "onsite"
+            }
+          ],
+          "children": []
+        }
+      ]
+    },
+    {
+      "key": "hokkaido",
+      "name": "北海道",
+      "short": "北海道",
+      "place": "札幌 · 北海道",
+      "lat": 43.0618,
+      "lng": 141.3545,
+      "prerequisites": [
+        {
+          "action": "预订东京→札幌机票",
+          "urgency": "before"
+        },
+        {
+          "action": "预订回程机票",
+          "urgency": "before"
+        }
+      ],
+      "children": [
+        {
+          "key": "odori",
+          "name": "大通公园",
+          "short": "大通公园",
+          "place": "札幌市 · 中央区",
+          "lat": 43.06,
+          "lng": 141.3478,
+          "prerequisites": [],
+          "children": []
+        },
+        {
+          "key": "otaru",
+          "name": "小樽运河",
+          "short": "小樽",
+          "place": "小樽市",
+          "lat": 43.1984,
+          "lng": 141.002,
+          "prerequisites": [],
+          "children": []
+        },
+        {
+          "key": "noboribetsu",
+          "name": "登别地狱谷",
+          "short": "登别",
+          "place": "登别市 · 登别温泉",
+          "lat": 42.4977,
+          "lng": 141.1466,
+          "prerequisites": [
+            {
+              "action": "预订温泉旅馆",
+              "urgency": "before"
+            }
+          ],
+          "children": []
+        },
+        {
+          "key": "toya",
+          "name": "洞爷湖",
+          "short": "洞爷湖",
+          "place": "洞爷湖町",
+          "lat": 42.6,
+          "lng": 140.85,
+          "prerequisites": [],
+          "children": []
+        },
+        {
+          "key": "hakodate",
+          "name": "函馆山夜景",
+          "short": "函馆山",
+          "place": "函馆市",
+          "lat": 41.759,
+          "lng": 140.7044,
+          "prerequisites": [
+            {
+              "action": "购买缆车票",
+              "urgency": "onsite"
+            }
+          ],
+          "children": []
+        }
+      ]
+    }
+  ]
+}

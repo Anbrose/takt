@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>TAKT 开屏（深色）</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit}
+a{color:inherit}a:hover{color:inherit}
+.t-light{--bg:#FAF7F8;--surface:#FFFFFF;--text:#1A1A1D;--muted:#5F5660;--line:#EAD8E0;--accent:#E6397C;--fill:#C2185B;--onfill:#FFFFFF}
+.t-dark{--bg:#1A1A1D;--surface:#25252A;--text:#F4F1F3;--muted:#B4ADB3;--line:#3A3A41;--accent:#E6397C;--fill:#F272A3;--onfill:#1A1A1D}
+.seg{fill:none;stroke-linecap:round}
+.node{opacity:0;transform-box:fill-box;transform-origin:center}
+.fade{opacity:0}
+.ra .seg{animation:drawA 170ms linear both}
+.rb .seg{animation:drawB 170ms linear both}
+.ra .node{animation:popA 280ms cubic-bezier(.2,1.5,.4,1) both}
+.rb .node{animation:popB 280ms cubic-bezier(.2,1.5,.4,1) both}
+.ra .fade{animation:fadeA 520ms ease both}
+.rb .fade{animation:fadeB 520ms ease both}
+@keyframes drawA{to{stroke-dashoffset:0}}
+@keyframes drawB{to{stroke-dashoffset:0}}
+@keyframes popA{from{opacity:0;transform:scale(0)}to{opacity:1;transform:scale(1)}}
+@keyframes popB{from{opacity:0;transform:scale(0)}to{opacity:1;transform:scale(1)}}
+@keyframes fadeA{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes fadeB{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.seg{animation:none !important;stroke-dashoffset:0 !important}.node,.fade{animation:none !important;opacity:1 !important}}
+</style>
+</helmet>
+<div class="{{cls}}" style="position: relative; width: 390px; height: 844px; box-sizing: border-box; overflow: hidden; background: var(--bg); color: var(--text); font-family: Inter, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; padding: 0 32px">
+  <svg viewBox="0 0 305 120" role="img" aria-label="TAKT" style="width: 270px; height: auto; overflow: visible">
+      <path class="seg" d="M10 20 L40 20" style="stroke: var(--text); stroke-width: 7; opacity: 1; stroke-dasharray: 31.0; stroke-dashoffset: 31.0; animation-delay: 200ms"></path>
+      <path class="seg" d="M40 20 L70 20" style="stroke: var(--text); stroke-width: 7; opacity: 1; stroke-dasharray: 31.0; stroke-dashoffset: 31.0; animation-delay: 370ms"></path>
+      <path class="seg" d="M40 20 L40 100" style="stroke: var(--text); stroke-width: 7; opacity: 1; stroke-dasharray: 81.0; stroke-dashoffset: 81.0; animation-delay: 370ms"></path>
+      <path class="seg" d="M40 100 L90 100" style="stroke: var(--muted); stroke-width: 2; opacity: 0.55; stroke-dasharray: 51.0; stroke-dashoffset: 51.0; animation-delay: 540ms"></path>
+      <path class="seg" d="M90 100 L120 20" style="stroke: var(--text); stroke-width: 7; opacity: 1; stroke-dasharray: 86.4; stroke-dashoffset: 86.4; animation-delay: 710ms"></path>
+      <path class="seg" d="M120 20 L150 100" style="stroke: var(--text); stroke-width: 7; opacity: 1; stroke-dasharray: 86.4; stroke-dashoffset: 86.4; animation-delay: 880ms"></path>
+      <path class="seg" d="M102 68 L138 68" style="stroke: var(--text); stroke-width: 7; opacity: 1; stroke-dasharray: 37.0; stroke-dashoffset: 37.0; animation-delay: 1050ms"></path>
+      <path class="seg" d="M150 100 L170 100" style="stroke: var(--muted); stroke-width: 2; opacity: 0.55; stroke-dasharray: 21.0; stroke-dashoffset: 21.0; animation-delay: 1220ms"></path>
+      <path class="seg" d="M170 100 L170 60" style="stroke: var(--text); stroke-width: 7; opacity: 1; stroke-dasharray: 41.0; stroke-dashoffset: 41.0; animation-delay: 1390ms"></path>
+      <path class="seg" d="M170 60 L170 20" style="stroke: var(--text); stroke-width: 7; opacity: 1; stroke-dasharray: 41.0; stroke-dashoffset: 41.0; animation-delay: 1560ms"></path>
+      <path class="seg" d="M170 60 L215 100" style="stroke: var(--text); stroke-width: 7; opacity: 1; stroke-dasharray: 61.2; stroke-dashoffset: 61.2; animation-delay: 1730ms"></path>
+      <path class="seg" d="M170 60 L215 20" style="stroke: var(--text); stroke-width: 7; opacity: 1; stroke-dasharray: 61.2; stroke-dashoffset: 61.2; animation-delay: 1730ms"></path>
+      <path class="seg" d="M215 20 L235 20" style="stroke: var(--muted); stroke-width: 2; opacity: 0.55; stroke-dasharray: 21.0; stroke-dashoffset: 21.0; animation-delay: 1900ms"></path>
+      <path class="seg" d="M235 20 L265 20" style="stroke: var(--text); stroke-width: 7; opacity: 1; stroke-dasharray: 31.0; stroke-dashoffset: 31.0; animation-delay: 2070ms"></path>
+      <path class="seg" d="M265 20 L295 20" style="stroke: var(--text); stroke-width: 7; opacity: 1; stroke-dasharray: 31.0; stroke-dashoffset: 31.0; animation-delay: 2240ms"></path>
+      <path class="seg" d="M265 20 L265 100" style="stroke: var(--text); stroke-width: 7; opacity: 1; stroke-dasharray: 81.0; stroke-dashoffset: 81.0; animation-delay: 2410ms"></path>
+      <circle class="node" cx="10" cy="20" r="7" style="fill: var(--accent); stroke: var(--accent); stroke-width: 3; animation-delay: 0ms"></circle>
+      <circle class="node" cx="40" cy="20" r="5.5" style="fill: var(--bg); stroke: var(--accent); stroke-width: 3; animation-delay: 330ms"></circle>
+      <circle class="node" cx="70" cy="20" r="5.5" style="fill: var(--bg); stroke: var(--accent); stroke-width: 3; animation-delay: 500ms"></circle>
+      <circle class="node" cx="40" cy="100" r="5.5" style="fill: var(--bg); stroke: var(--accent); stroke-width: 3; animation-delay: 500ms"></circle>
+      <circle class="node" cx="90" cy="100" r="5.5" style="fill: var(--bg); stroke: var(--accent); stroke-width: 3; animation-delay: 670ms"></circle>
+      <circle class="node" cx="120" cy="20" r="5.5" style="fill: var(--bg); stroke: var(--accent); stroke-width: 3; animation-delay: 840ms"></circle>
+      <circle class="node" cx="150" cy="100" r="5.5" style="fill: var(--bg); stroke: var(--accent); stroke-width: 3; animation-delay: 1010ms"></circle>
+      <circle class="node" cx="170" cy="100" r="5.5" style="fill: var(--bg); stroke: var(--accent); stroke-width: 3; animation-delay: 1350ms"></circle>
+      <circle class="node" cx="170" cy="60" r="5.5" style="fill: var(--bg); stroke: var(--accent); stroke-width: 3; animation-delay: 1520ms"></circle>
+      <circle class="node" cx="170" cy="20" r="5.5" style="fill: var(--bg); stroke: var(--accent); stroke-width: 3; animation-delay: 1690ms"></circle>
+      <circle class="node" cx="215" cy="100" r="5.5" style="fill: var(--bg); stroke: var(--accent); stroke-width: 3; animation-delay: 1860ms"></circle>
+      <circle class="node" cx="215" cy="20" r="5.5" style="fill: var(--bg); stroke: var(--accent); stroke-width: 3; animation-delay: 1860ms"></circle>
+      <circle class="node" cx="235" cy="20" r="5.5" style="fill: var(--bg); stroke: var(--accent); stroke-width: 3; animation-delay: 2030ms"></circle>
+      <circle class="node" cx="265" cy="20" r="5.5" style="fill: var(--bg); stroke: var(--accent); stroke-width: 3; animation-delay: 2200ms"></circle>
+      <circle class="node" cx="295" cy="20" r="5.5" style="fill: var(--bg); stroke: var(--accent); stroke-width: 3; animation-delay: 2370ms"></circle>
+      <circle class="node" cx="265" cy="100" r="7" style="fill: var(--accent); stroke: var(--accent); stroke-width: 3; animation-delay: 2540ms"></circle>
+  </svg>
+  <p class="fade" style="margin: 0; font-size: 16px; color: var(--muted); letter-spacing: 0.08em; animation-delay: 2730ms">规划每一步</p>
+  <div class="fade" style="position: absolute; left: 32px; right: 32px; bottom: 48px; display: flex; gap: 10px; animation-delay: 3030ms">
+    <button type="button" onClick="{{replay}}" aria-label="重播动画" style="flex: 0 0 48px; height: 48px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; display: flex; align-items: center; justify-content: center">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9a6 6 0 1 0 2-4.5"></path><path d="M3 3v3.5h3.5"></path></svg>
+    </button>
+    <a href="PhoneDark.dc.html" style="flex: 1; height: 48px; border-radius: 14px; background: var(--fill); color: var(--onfill); font-size: 16px; font-weight: 700; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 6px">
+      <span>开始</span>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"></path></svg>
+    </a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"dark"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var self = this;
+    var st = this.state || {};
+    var theme = this.props.theme || 'dark';
+    var seq = st.seq || 0;
+    return {
+      cls: (theme === 'dark' ? 't-dark' : 't-light') + (seq % 2 ? ' rb' : ' ra'),
+      replay: function () { self.setState({ seq: seq + 1 }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

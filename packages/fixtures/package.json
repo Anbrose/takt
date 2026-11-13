@@ -1,0 +1,14 @@
+{
+  "name": "@takt/fixtures",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./japan-trip.json": "./data/japan-trip.json",
+    "./cases.json": "./data/cases.json"
+  },
+  "scripts": {
+    "test": "true",
+    "typecheck": "true"
+  }
+}
