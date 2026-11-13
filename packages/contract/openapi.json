@@ -642,28 +642,20 @@
             "maxLength": 200
           },
           "lat": {
-            "anyOf": [
-              {
-                "type": "number",
-                "minimum": -90,
-                "maximum": 90
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -90,
+            "maximum": 90
           },
           "lng": {
-            "anyOf": [
-              {
-                "type": "number",
-                "minimum": -180,
-                "maximum": 180
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -180,
+            "maximum": 180
           },
           "prerequisites": {
             "maxItems": 50,
@@ -822,19 +814,15 @@
                 ]
               },
               "optimizedOrder": {
-                "anyOf": [
-                  {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    }
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
               }
             },
             "required": [
@@ -917,41 +905,20 @@
             ]
           },
           "stage": {
-            "anyOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "from": {
-                    "anyOf": [
-                      {
-                        "$ref": "#/components/schemas/Crumb"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "to": {
-                    "anyOf": [
-                      {
-                        "$ref": "#/components/schemas/Crumb"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  }
-                },
-                "required": [
-                  "from",
-                  "to"
-                ],
-                "additionalProperties": false
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "from": {
+                "$ref": "#/components/schemas/Crumb"
               },
-              {
-                "type": "null"
+              "to": {
+                "$ref": "#/components/schemas/Crumb"
               }
-            ]
+            },
+            "required": [],
+            "additionalProperties": false
           },
           "prerequisites": {
             "type": "array",
@@ -1095,24 +1062,10 @@
             "type": "boolean"
           },
           "current": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RunStep"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/RunStep"
           },
           "next": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/NextStep"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/NextStep"
           },
           "later": {
             "type": "array",
@@ -1121,16 +1074,12 @@
             }
           },
           "previousTaskId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           }
         },
         "required": [
@@ -1138,8 +1087,6 @@
           "total",
           "index",
           "finished",
-          "current",
-          "next",
           "later",
           "previousTaskId"
         ],
@@ -1181,28 +1128,20 @@
             "type": "string"
           },
           "lat": {
-            "anyOf": [
-              {
-                "type": "number",
-                "minimum": -90,
-                "maximum": 90
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -90,
+            "maximum": 90
           },
           "lng": {
-            "anyOf": [
-              {
-                "type": "number",
-                "minimum": -180,
-                "maximum": 180
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -180,
+            "maximum": 180
           },
           "prerequisites": {
             "type": "array",
@@ -1261,28 +1200,20 @@
             "type": "string"
           },
           "lat": {
-            "anyOf": [
-              {
-                "type": "number",
-                "minimum": -90,
-                "maximum": 90
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -90,
+            "maximum": 90
           },
           "lng": {
-            "anyOf": [
-              {
-                "type": "number",
-                "minimum": -180,
-                "maximum": 180
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -180,
+            "maximum": 180
           },
           "completed": {
             "type": "boolean"

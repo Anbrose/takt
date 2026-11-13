@@ -7,3 +7,6 @@ dist/
 # Xcode
 apps/ios/**/xcuserdata/
 apps/ios/**/DerivedData/
+# SwiftPM
+apps/ios/TaktKit/.build/
+apps/ios/TaktKit/.swiftpm/

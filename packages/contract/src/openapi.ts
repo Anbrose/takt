@@ -14,7 +14,46 @@ function clean(s: Record<string, unknown>) {
   const rest = { ...s };
   delete rest.$schema;
   delete rest.$id;
-  return rest;
+  return nullables(rest) as Record<string, unknown>;
+}
+
+type Json = Record<string, unknown>;
+const isNullSchema = (s: unknown) => (s as Json)?.type === 'null' && Object.keys(s as Json).length === 1;
+
+/**
+ * Zod emits `anyOf: [X, { type: 'null' }]` for nullable fields; swift-openapi-generator skips
+ * `{ type: 'null' }`. Rewrite to forms it understands:
+ *  - inline schema with a `type` → `type: [X.type, 'null']`
+ *  - `$ref` → the bare ref, and the property is dropped from `required` (Swift: Optional; a JSON
+ *    null decodes to nil). The server still always sends the key.
+ */
+function nullables(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(nullables);
+  if (!node || typeof node !== 'object') return node;
+  const out: Json = {};
+  for (const [k, v] of Object.entries(node as Json)) out[k] = nullables(v);
+
+  const props = out.properties as Json | undefined;
+  if (props && typeof props === 'object') {
+    const loosen = new Set<string>();
+    for (const [name, p] of Object.entries(props)) {
+      const anyOf = (p as Json).anyOf as unknown[] | undefined;
+      if (!anyOf || anyOf.length !== 2 || !anyOf.some(isNullSchema)) continue;
+      const other = anyOf.find((s) => !isNullSchema(s)) as Json;
+      const { anyOf: _drop, ...meta } = p as Json;
+      void _drop;
+      if (typeof other.$ref === 'string') {
+        props[name] = { ...meta, $ref: other.$ref };
+        loosen.add(name);
+      } else if (typeof other.type === 'string') {
+        props[name] = { ...meta, ...other, type: [other.type, 'null'] };
+      }
+    }
+    if (loosen.size && Array.isArray(out.required)) {
+      out.required = (out.required as string[]).filter((r) => !loosen.has(r));
+    }
+  }
+  return out;
 }
 
 function parameters(where: 'path' | 'query', obj: z.ZodObject | undefined) {
