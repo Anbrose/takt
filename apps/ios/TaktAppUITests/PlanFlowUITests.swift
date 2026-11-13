@@ -8,12 +8,13 @@ final class PlanFlowUITests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
         app = XCUIApplication()
+        app.launchArguments = ["-skip-splash"]
         // TAKT_UITEST_SERVER=<url> (pass as TEST_RUNNER_TAKT_UITEST_SERVER to xcodebuild) runs against
         // a real API server instead of the in-memory demo data. It mutates that server's data.
         if let server = ProcessInfo.processInfo.environment["TAKT_UITEST_SERVER"] {
             app.launchEnvironment["TAKT_API_URL"] = server
         } else {
-            app.launchArguments = ["-demo"]
+            app.launchArguments.append("-demo")
         }
         app.launch()
     }
@@ -94,5 +95,84 @@ final class PlanFlowUITests: XCTestCase {
 
         XCTAssertTrue(row("黑门市场").waitForExistence(timeout: 5))
         snap("after create")
+    }
+}
+
+/// 地图: pins + dotted line, status, 重排 (demo data uses straight-line routes, so numbers are stable).
+final class MapUITests: XCTestCase {
+    private var app: XCUIApplication!
+    private var live: Bool { ProcessInfo.processInfo.environment["TAKT_UITEST_SERVER"] != nil }
+
+    override func setUp() {
+        continueAfterFailure = false
+        app = XCUIApplication()
+        app.launchArguments = ["-skip-splash"]
+        if let server = ProcessInfo.processInfo.environment["TAKT_UITEST_SERVER"] {
+            app.launchEnvironment["TAKT_API_URL"] = server
+        } else {
+            app.launchArguments.append("-demo")
+        }
+        app.launch()
+        let open = app.buttons["进入 大阪，6 项"]
+        XCTAssertTrue(open.waitForExistence(timeout: 5))
+        open.tap()
+        XCTAssertTrue(app.buttons["地图"].waitForExistence(timeout: 5))
+    }
+
+    private func snap(_ name: String) {
+        let a = XCTAttachment(screenshot: app.screenshot())
+        a.name = name
+        a.lifetime = .keepAlways
+        add(a)
+    }
+
+    private func staticText(containing s: String) -> XCUIElement {
+        app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", s)).firstMatch
+    }
+
+    func testMapShowsDetourAndOptimizeFixesIt() throws {
+        try XCTSkipIf(live, "demo-only: 重排 would reorder the live server's data")
+        app.buttons["地图"].tap()
+        XCTAssertTrue(app.staticTexts["起点"].waitForExistence(timeout: 3), "rows compress and show legs")
+        XCTAssertTrue(staticText(containing: "多").waitForExistence(timeout: 3))
+        snap("map · detour")
+        let optimize = app.buttons["重排"]
+        XCTAssertTrue(optimize.isHittable)
+        optimize.tap()
+        XCTAssertTrue(app.staticTexts["不绕路"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["保存"].exists, "重排 saves directly, no 取消/保存 bar")
+        app.buttons["距离"].tap()
+        XCTAssertTrue(staticText(containing: "km").waitForExistence(timeout: 2))
+        snap("map · optimized · distance")
+    }
+
+    func testLiveMapKitRoutes() throws {
+        try XCTSkipUnless(live, "needs TAKT_UITEST_SERVER")
+        app.buttons["地图"].tap()
+        XCTAssertTrue(app.staticTexts["起点"].waitForExistence(timeout: 5))
+        sleep(8) // let MapKit ETAs arrive
+        snap("live map · transit · time")
+        app.buttons["自驾"].tap()
+        sleep(6)
+        snap("live map · drive")
+    }
+}
+
+/// The splash itself (first launch: 重播 / 开始).
+final class SplashUITests: XCTestCase {
+    func testFirstLaunchSplashThenStart() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo", "-splash.seen", "NO"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["TAKT，规划每一步"].waitForExistence(timeout: 3)
+            || app.otherElements["TAKT，规划每一步"].exists)
+        let start = app.buttons["开始"]
+        XCTAssertTrue(start.waitForExistence(timeout: 6))
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "splash end"
+        shot.lifetime = .keepAlways
+        add(shot)
+        start.tap()
+        XCTAssertTrue(app.buttons["进入 大阪，6 项"].waitForExistence(timeout: 5))
     }
 }

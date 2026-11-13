@@ -21,7 +21,7 @@ public struct PlanScreen: View {
         VStack(spacing: 0) {
             header
             ZStack {
-                LevelList(model: level, adding: $adding, onOpen: open)
+                LevelList(model: level, plan: plan, adding: $adding, onOpen: open)
                     .id(level.taskId)
                     .transition(navTransition)
             }
@@ -115,15 +115,48 @@ public enum ThemeChoice: String, Sendable {
 
 struct LevelList: View {
     @Bindable var model: LevelModel
+    @Bindable var plan: PlanModel
     @Binding var adding: Bool
     let onOpen: (String) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(RouteMatrix.self) private var matrix
+
+    /// Tasks in the order a release would give (live drag preview → 预览中 numbers).
+    private var previewTasks: [TaskSummary] {
+        let byId = Dictionary(uniqueKeysWithValues: model.items.map { ($0.id, $0) })
+        return model.liveOrder.compactMap { byId[$0] }
+    }
+
+    private var summary: RouteSummary {
+        RouteSummary.make(
+            tasks: previewTasks, selected: model.selection, editing: model.isEditing,
+            objective: plan.objective, mode: plan.travel, matrix: matrix
+        )
+    }
+
+    /// In-scope located points; what the route matrix needs for this level.
+    private var routePoints: [GeoPoint] {
+        model.items.compactMap { t in
+            guard model.scopeAll || model.isSelected(t.id), let lat = t.lat, let lng = t.lng else { return nil }
+            return GeoPoint(lat: lat, lng: lng)
+        }
+    }
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     toolbar
+                        .id("top")
+                    if plan.mapOn {
+                        MapPanel(
+                            tasks: previewTasks, scope: model.selection, summary: summary,
+                            scopeLabel: model.scopeLabel, loading: matrix.pending > 0,
+                            objective: $plan.objective, travel: $plan.travel,
+                            onOptimize: { order in Task { await model.applyOrder(order) } }
+                        )
+                        .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: -12)))
+                    }
                     HStack(alignment: .top, spacing: 0) {
                         OrderRail(model: model)
                         rows
@@ -134,6 +167,12 @@ struct LevelList: View {
                 .padding(.bottom, model.isEditing ? 96 : 16)
             }
             .scrollDisabled(model.drag != nil)
+            .task(id: plan.mapOn ? "\(routePoints)|\(plan.travel)" : "off") {
+                if plan.mapOn { matrix.prefetch(routePoints, mode: plan.travel) }
+            }
+            .onChange(of: plan.mapOn) { _, on in
+                if on { Motion.with(Motion.settle, reduce: reduce) { proxy.scrollTo("top", anchor: .top) } }
+            }
             .sensoryFeedback(.selection, trigger: model.drag?.to)
             .onChange(of: model.lastAdded) { _, id in
                 guard let id else { return }
@@ -147,6 +186,10 @@ struct LevelList: View {
 
     private var toolbar: some View {
         HStack(spacing: 12) {
+            ToolButton(icon: "point.topleft.down.to.point.bottomright.curvepath", title: "地图", pressed: plan.mapOn) {
+                Motion.with(Motion.settle, reduce: reduce) { plan.mapOn.toggle() }
+            }
+            .accessibilityAddTraits(plan.mapOn ? .isSelected : [])
             ToolButton(icon: "plus", title: "新建") {
                 Motion.with(Motion.sheet, reduce: reduce) { adding = true }
             }
@@ -170,7 +213,8 @@ struct LevelList: View {
     }
 
     private var rows: some View {
-        VStack(spacing: LevelModel.rowGap) {
+        let legs = plan.mapOn ? summary.legText : [:]
+        return VStack(spacing: LevelModel.rowGap) {
             ForEach(Array(model.items.enumerated()), id: \.element.id) { index, task in
                 let dragged = model.drag?.id == task.id
                 TaskRow(
@@ -178,6 +222,8 @@ struct LevelList: View {
                     number: index + 1,
                     selected: model.isSelected(task.id),
                     dragging: dragged,
+                    compact: plan.mapOn,
+                    leg: legs[task.id] ?? "",
                     onToggle: { Motion.with(Motion.fade, reduce: reduce) { model.toggle(task.id) } },
                     onOpen: { onOpen(task.id) },
                     onDragChanged: { dy in
@@ -198,6 +244,8 @@ struct LevelList: View {
             }
         }
         .frame(maxWidth: .infinity)
+        // Order changes not driven by a gesture (重排, 保存 result, reload) slide rows into place.
+        .motion(Motion.settle, value: model.items.map(\.id), reduce: reduce)
     }
 }
 

@@ -156,6 +156,29 @@ public final class LevelModel {
         }
     }
 
+    /// 重排: adopt the shortest-route order and save it right away (as in the prototype — no
+    /// 取消 / 保存 step). Optimistic: the list reorders at once and rolls back if saving fails.
+    public func applyOrder(_ ids: [String]) async {
+        guard drag == nil, draft == nil, var current = level,
+              ids.count == current.children.count, Set(ids) == Set(current.children.map(\.id))
+        else { return }
+        let before = current
+        let byId = Dictionary(uniqueKeysWithValues: current.children.map { ($0.id, $0) })
+        current.children = ids.compactMap { byId[$0] }
+        level = current
+        status = .saving
+        defer { status = .idle }
+        do {
+            level = try await backend.reorder(taskId, ids: ids, version: before.version)
+        } catch let e as BackendError where e.isVersionConflict || e.code == "not_a_permutation" {
+            notice = "已在别处修改"
+            await load()
+        } catch {
+            level = before
+            notice = "保存失败"
+        }
+    }
+
     // MARK: 新建
 
     /// Appends a task to this level. Prerequisites default to 行前订.

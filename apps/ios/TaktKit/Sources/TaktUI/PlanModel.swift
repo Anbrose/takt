@@ -20,6 +20,11 @@ public final class PlanModel {
     public private(set) var path: [String]
     public private(set) var direction: Direction = .forward
 
+    /// 地图 on/off (closes when moving between levels), 优化目标, 出行方式 — shared by all levels.
+    public var mapOn = false
+    public var objective: Objective = .time
+    public var travel: TravelMode = .transit
+
     public init(project: Project, backend: any TaktBackend) {
         self.project = project
         self.backend = backend
@@ -43,6 +48,7 @@ public final class PlanModel {
     /// Enter a child task's level ("N 项 ›"). Unsaved drags on the level being left are dropped.
     public func open(_ taskId: String) {
         current.cancel()
+        mapOn = false
         direction = .forward
         path.append(taskId)
     }
@@ -50,6 +56,7 @@ public final class PlanModel {
     public func back() {
         guard !isRoot else { return }
         current.cancel()
+        mapOn = false
         direction = .back
         path.removeLast()
     }

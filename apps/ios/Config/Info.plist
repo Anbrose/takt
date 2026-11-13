@@ -2,7 +2,16 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- API server baked in at build time: xcodebuild … TAKT_API_URL=http://192.168.x.y:3000 -->
+	<key>TaktAPIURL</key>
+	<string>$(TAKT_API_URL)</string>
 	<!-- Plain HTTP only to local addresses (dev server on the Mac / LAN). Everything else stays HTTPS. -->
+	<!-- System launch screen: just the splash background, so the animated splash starts seamlessly. -->
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

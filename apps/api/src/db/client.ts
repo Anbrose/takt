@@ -1,3 +1,4 @@
+import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
 import * as schema from './schema.ts';
@@ -29,6 +30,7 @@ export async function openDb(opts: { url?: string; dataDir?: string } = {}): Pro
   const { PGlite } = await import('@electric-sql/pglite');
   const { drizzle } = await import('drizzle-orm/pglite');
   const { migrate } = await import('drizzle-orm/pglite/migrator');
+  if (opts.dataDir) mkdirSync(opts.dataDir, { recursive: true });
   const client = opts.dataDir ? new PGlite(opts.dataDir) : new PGlite();
   const db = drizzle(client, { schema });
   await migrate(db, { migrationsFolder });

@@ -7,6 +7,10 @@ struct TaskRow: View {
     let number: Int
     let selected: Bool
     let dragging: Bool
+    /// 地图 mode: the card compresses in place to check box · number · name · leg · handle.
+    var compact = false
+    /// "起点" / "+2.4 km" / "未定位" — shown only when compact.
+    var leg = ""
     let onToggle: () -> Void
     let onOpen: () -> Void
     /// Drag handle callbacks; `offset` is the finger's vertical travel since touch-down.
@@ -22,11 +26,46 @@ struct TaskRow: View {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("\(number).").foregroundStyle(Palette.muted).fontWeight(.medium)
                     Text(task.name).frame(maxWidth: .infinity, alignment: .leading)
+                    Text(leg)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Palette.muted)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .opacity(compact ? 1 : 0)
+                        .contentTransition(.numericText())
                 }
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Palette.text)
                 .frame(minHeight: 24)
 
+                if !compact {
+                    details.transition(.opacity)
+                }
+            }
+            .padding(.vertical, 10)
+
+            DragHandle(
+                label: task.name,
+                onChanged: onDragChanged,
+                onEnded: onDragEnded,
+                onMove: onMove
+            )
+        }
+        .padding(EdgeInsets(top: 4, leading: 2, bottom: 4, trailing: 4))
+        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Metrics.cardRadius))
+        .overlay(
+            RoundedRectangle(cornerRadius: Metrics.cardRadius)
+                .strokeBorder(selected ? Palette.accent : Palette.line, lineWidth: 1.5)
+        )
+        .shadow(color: .black.opacity(dragging ? 0.22 : 0), radius: dragging ? 12 : 0, y: dragging ? 10 : 0)
+        .opacity(compact && leg == "未定位" ? 0.45 : 1)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("row.\(task.name)")
+    }
+
+    /// 地点 · 前置条件 · "N 项 ›" — folded away in 地图 mode.
+    @ViewBuilder private var details: some View {
+        VStack(alignment: .leading, spacing: 6) {
                 if !task.place.isEmpty {
                     Label {
                         Text(task.place)
@@ -60,25 +99,7 @@ struct TaskRow: View {
                     .padding(.bottom, -10)
                     .accessibilityLabel("进入 \(task.name)，\(task.childCount) 项")
                 }
-            }
-            .padding(.vertical, 10)
-
-            DragHandle(
-                label: task.name,
-                onChanged: onDragChanged,
-                onEnded: onDragEnded,
-                onMove: onMove
-            )
         }
-        .padding(EdgeInsets(top: 4, leading: 2, bottom: 4, trailing: 4))
-        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Metrics.cardRadius))
-        .overlay(
-            RoundedRectangle(cornerRadius: Metrics.cardRadius)
-                .strokeBorder(selected ? Palette.accent : Palette.line, lineWidth: 1.5)
-        )
-        .shadow(color: .black.opacity(dragging ? 0.22 : 0), radius: dragging ? 12 : 0, y: dragging ? 10 : 0)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("row.\(task.name)")
     }
 }
 
