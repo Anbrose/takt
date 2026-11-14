@@ -204,6 +204,56 @@
         }
       }
     },
+    "/tasks/{taskId}": {
+      "delete": {
+        "operationId": "deleteTask",
+        "summary": "左滑删除: delete a task (and everything under it); returns its parent level",
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Level"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks/{taskId}/children/order": {
       "put": {
         "operationId": "reorderLevel",
@@ -640,6 +690,10 @@
           "place": {
             "type": "string",
             "maxLength": 200
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 300
           },
           "lat": {
             "type": [
@@ -1127,6 +1181,9 @@
           "place": {
             "type": "string"
           },
+          "address": {
+            "type": "string"
+          },
           "lat": {
             "type": [
               "number",
@@ -1154,6 +1211,7 @@
           "id",
           "name",
           "place",
+          "address",
           "lat",
           "lng",
           "prerequisites"
@@ -1199,6 +1257,9 @@
           "place": {
             "type": "string"
           },
+          "address": {
+            "type": "string"
+          },
           "lat": {
             "type": [
               "number",
@@ -1235,6 +1296,7 @@
           "name",
           "short",
           "place",
+          "address",
           "lat",
           "lng",
           "completed",
@@ -1242,7 +1304,7 @@
           "childCount"
         ],
         "additionalProperties": false,
-        "description": "One row of a level list. lat/lng null = 未定位."
+        "description": "One row of a level list. lat/lng null = 未定位. place + address identify the spot for map apps."
       },
       "Travel": {
         "type": "string",

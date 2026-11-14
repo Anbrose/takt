@@ -51,49 +51,35 @@ a{color:#C2185B}a:hover{color:#E6397C}
 <div style="flex: 0 0 50%; min-width: 0; height: 100%; display: flex; flex-direction: column; visibility: {{planPane.vis}}; transition: {{planPane.tr}}">
   <div style="flex: 1; min-height: 0; overflow: hidden">
   <div style="width: 200%; height: 100%; display: flex; transform: {{tabX}}; transition: transform 320ms ease">
-<div data-pane="main" style="flex: 0 0 50%; min-width: 0; height: 100%; box-sizing: border-box; overflow-y: auto; padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 12px; visibility: {{mainPane.vis}}; transition: {{mainPane.tr}}">
-<div style="flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px">
-  <button type="button" onClick="{{toggleMap}}" aria-pressed="{{mapBtn.pressed}}" style="min-height: 44px; padding: 0 14px 0 12px; border-radius: 12px; border: 1px solid {{mapBtn.border}}; background: {{mapBtn.bg}}; color: var(--accent-text); font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="4.5" cy="15" r="2"></circle><circle cx="15.5" cy="5" r="2"></circle><path d="M6.5 15H12a2.5 2.5 0 0 0 0-5H8a2.5 2.5 0 0 1 0-5h5.5"></path></svg><span>地图</span></button>
-  <button type="button" onClick="{{add.open}}" style="min-height: 44px; padding: 0 14px 0 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--accent-text); font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg><span>新建</span></button>
-  <span style="flex: 1"></span>
-  <button type="button" onClick="{{toggleAll}}" style="min-height: 44px; padding: 0 4px; border: none; background: transparent; color: var(--accent-text); font-size: 14px; font-weight: 600; cursor: pointer">{{allLabel}}</button>
+<div data-pane="main" style="flex: 0 0 50%; min-width: 0; height: 100%; box-sizing: border-box; overflow-y: auto; padding: 4px 16px 88px; display: flex; flex-direction: column; gap: 12px; visibility: {{mainPane.vis}}; transition: {{mainPane.tr}}">
+<div style="flex: 0 0 auto; display: flex">
+  <button type="button" onClick="{{toggleMap}}" aria-pressed="{{mapBtn.pressed}}" style="flex: 1; justify-content: center; min-height: 44px; padding: 0 14px 0 12px; border-radius: 12px; border: 1px solid {{mapBtn.border}}; background: {{mapBtn.bg}}; color: var(--accent-text); font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="4.5" cy="15" r="2"></circle><circle cx="15.5" cy="5" r="2"></circle><path d="M6.5 15H12a2.5 2.5 0 0 0 0-5H8a2.5 2.5 0 0 1 0-5h5.5"></path></svg><span>地图</span></button>
 </div>
 <div style="flex: 0 0 auto; display: grid; grid-template-rows: {{mapWrap.rows}}; margin-bottom: {{mapWrap.mb}}; opacity: {{mapWrap.o}}; visibility: {{mapWrap.vis}}; transition: grid-template-rows 380ms ease, margin-bottom 380ms ease, opacity 380ms ease, {{mapWrap.visTr}}">
   <div style="min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 12px">
 <div style="position: relative; flex: 0 0 auto; aspect-ratio: 600 / 440; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background-color: var(--map); background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 32px 32px">
-  <div style="position: absolute; inset: 0; animation: {{navAnim}}">
-    <svg viewBox="0 0 600 440" preserveAspectRatio="none" aria-hidden="true" style="position: absolute; inset: 0; width: 100%; height: 100%">
-      <polyline points="{{routePts}}" style="fill: none; stroke: #E6397C; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1 12"></polyline>
-    </svg>
+  <div onClick="{{mapFx.clear}}" style="position: absolute; inset: 0; animation: {{navAnim}}">
+    <sc-for list="{{segs}}" as="seg" hint-placeholder-count="5">
+      <svg viewBox="0 0 600 440" preserveAspectRatio="none" aria-hidden="true" style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: {{seg.o}}; transition: opacity 220ms ease">
+        <path d="{{seg.d}}" style="fill: none; stroke: {{seg.color}}; stroke-width: {{seg.w}}; stroke-linecap: round; stroke-dasharray: {{seg.dash}}; transition: stroke-width 220ms ease"></path>
+        <path d="{{seg.arrow}}" style="fill: none; stroke: {{seg.color}}; stroke-width: {{seg.aw}}; stroke-linecap: round; stroke-linejoin: round"></path>
+      </svg>
+    </sc-for>
     <sc-for list="{{pins}}" as="pin" hint-placeholder-count="6">
-      <div style="position: absolute; left: {{pin.left}}; top: {{pin.top}}; width: {{pin.size}}; height: {{pin.size}}; margin: {{pin.offset}}; box-sizing: border-box; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; background: {{pin.bg}}; color: var(--onfill); border: 2px solid {{pin.border}}; transition: width 220ms ease, height 220ms ease, margin 220ms ease, background-color 220ms ease, border-color 220ms ease">
+      <button type="button" onClick="{{pin.tap}}" aria-label="{{pin.aria}}" aria-pressed="{{pin.pressed}}" style="position: absolute; left: {{pin.left}}; top: {{pin.top}}; width: {{pin.size}}; height: {{pin.size}}; margin: {{pin.offset}}; padding: 0; box-sizing: border-box; border-radius: 50%; display: flex; align-items: center; justify-content: center; font: inherit; font-size: 13px; font-weight: 700; background: {{pin.bg}}; color: var(--onfill); border: 2px solid {{pin.border}}; box-shadow: {{pin.ring}}; opacity: {{pin.o}}; cursor: {{pin.cursor}}; transition: width 220ms ease, height 220ms ease, margin 220ms ease, background-color 220ms ease, border-color 220ms ease, box-shadow 220ms ease, opacity 220ms ease">
         <span>{{pin.num}}</span>
-        <span style="position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 2px; white-space: nowrap; font-size: 11px; font-weight: {{pin.weight}}; color: {{pin.labelFg}}">{{pin.name}}</span>
-      </div>
+        <span style="position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 2px; white-space: nowrap; font-size: 11px; font-weight: {{pin.weight}}; color: {{pin.labelFg}}; opacity: {{pin.labelO}}; transition: opacity 220ms ease">{{pin.name}}</span>
+      </button>
     </sc-for>
   </div>
 </div>
 <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px">
   <span style="display: flex; align-items: baseline; gap: 8px; font-size: 14px">
-    <span style="font-weight: 700">{{statusText}}</span>
-    <span style="color: var(--muted)">{{scopeLabel}} · {{distLabel}}</span>
+    <span style="font-weight: 700">{{distLabel}}</span>
   </span>
   <button type="button" onClick="{{optimize}}" disabled="{{opt.off}}" style="min-height: 44px; padding: 0 14px; border-radius: 10px; border: none; background: var(--fill); color: var(--onfill); font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; opacity: {{opt.o}}"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13V3M2.5 5.5L5 3l2.5 2.5M11 3v10M8.5 10.5L11 13l2.5-2.5"></path></svg><span>重排</span></button>
 </div>
-<div style="display: flex; gap: 8px">
-  <div style="flex: 2; min-width: 0"><div style="position: relative; display: flex; padding: 4px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line)">
-  <span aria-hidden="true" style="position: absolute; top: 4px; bottom: 4px; left: 4px; width: {{obj.w}}; border-radius: 9px; background: var(--fill); transform: translateX({{obj.x}}); transition: transform 260ms ease"></span>
-  <sc-for list="{{obj.items}}" as="g" hint-placeholder-count="2">
-    <button type="button" onClick="{{g.pick}}" aria-pressed="{{g.pressed}}" style="position: relative; flex: 1; min-height: 44px; padding: 0 4px; border: none; border-radius: 9px; background: transparent; color: {{g.fg}}; font-size: 14px; font-weight: 600; cursor: pointer">{{g.label}}</button>
-  </sc-for>
-</div></div>
-  <div style="flex: 3; min-width: 0"><div style="position: relative; display: flex; padding: 4px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line)">
-  <span aria-hidden="true" style="position: absolute; top: 4px; bottom: 4px; left: 4px; width: {{trav.w}}; border-radius: 9px; background: var(--fill); transform: translateX({{trav.x}}); transition: transform 260ms ease"></span>
-  <sc-for list="{{trav.items}}" as="g" hint-placeholder-count="3">
-    <button type="button" onClick="{{g.pick}}" aria-pressed="{{g.pressed}}" style="position: relative; flex: 1; min-height: 44px; padding: 0 4px; border: none; border-radius: 9px; background: transparent; color: {{g.fg}}; font-size: 14px; font-weight: 600; cursor: pointer">{{g.label}}</button>
-  </sc-for>
-</div></div>
-</div>
+<a href="{{gm.url}}" target="_blank" rel="noopener" aria-disabled="{{gm.ariaOff}}" style="min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--accent-text); font-size: 15px; font-weight: 700; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 8px; opacity: {{gm.o}}; pointer-events: {{gm.pe}}"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h4v4M13 3L7.5 8.5M11 9.5V12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2.5"></path></svg><span>Google 地图</span></a>
   </div>
 </div>
 <div style="display: flex; align-items: flex-start">
@@ -110,7 +96,7 @@ a{color:#C2185B}a:hover{color:#E6397C}
   <div style="flex: 1; min-width: 0">
 <div data-list="rows" style="display: flex; flex-direction: column; gap: 10px; animation: {{navAnim}}">
   <sc-for list="{{rows}}" as="item" hint-placeholder-count="5">
-    <div data-row="{{item.id}}" style="position: relative; z-index: {{item.z}}; transform: {{item.tf}}; transition: {{item.tr}}; box-shadow: {{item.shadow}}; opacity: {{item.dim}}; animation: {{item.enter}}; display: flex; align-items: flex-start; gap: 2px; padding: 4px 4px 4px 2px; border-radius: 14px; background: var(--surface); border: 1.5px solid {{item.border}}">
+    <div data-row="{{item.id}}" onPointerDown="{{item.sw.down}}" onPointerMove="{{item.sw.move}}" onPointerUp="{{item.sw.up}}" onPointerCancel="{{item.sw.up}}" style="position: relative; overflow: hidden; touch-action: pan-y; z-index: {{item.z}}; transform: {{item.tf}}; transition: {{item.tr}}; box-shadow: {{item.shadow}}; opacity: {{item.dim}}; animation: {{item.enter}}; display: flex; align-items: flex-start; gap: 2px; padding: 4px 4px 4px 2px; border-radius: 14px; background: var(--surface); border: 1.5px solid {{item.border}}">
       <button type="button" onClick="{{item.toggle}}" aria-pressed="{{item.pressed}}" aria-label="{{item.checkAria}}" style="flex: 0 0 44px; height: 44px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center">
         <span style="width: 22px; height: 22px; box-sizing: border-box; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; background: {{item.boxBg}}; color: var(--onfill); border: 1.5px solid {{item.boxBorder}}">{{item.check}}</span>
       </button>
@@ -138,6 +124,7 @@ a{color:#C2185B}a:hover{color:#E6397C}
         </div>
       </div>
       <button type="button" data-handle="1" onPointerDown="{{item.down}}" onPointerMove="{{item.move}}" onPointerUp="{{item.up}}" onPointerCancel="{{item.up}}" onKeyDown="{{item.key}}" aria-label="{{item.dragAria}}" style="flex: 0 0 44px; width: 44px; height: 44px; border: none; background: transparent; color: var(--muted); cursor: grab; touch-action: none; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3.5 5h11M3.5 9h11M3.5 13h11"></path></svg></button>
+      <button type="button" onClick="{{item.del}}" aria-label="{{item.delAria}}" disabled="{{item.delOff}}" style="position: absolute; top: 0; right: 0; bottom: 0; width: 64px; border: none; border-radius: 0 12px 12px 0; background: #C62828; color: #FFFFFF; cursor: pointer; display: flex; align-items: center; justify-content: center; transform: {{item.delTf}}; visibility: {{item.delVis}}; transition: transform 220ms ease, {{item.delVisTr}}"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 5.5h13M8 5.5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M5.5 5.5l.8 10.6a1 1 0 0 0 1 .9h5.4a1 1 0 0 0 1-.9l.8-10.6M8.5 8.5v5.5M11.5 8.5v5.5"></path></svg></button>
     </div>
   </sc-for>
 </div>
@@ -225,6 +212,9 @@ a{color:#C2185B}a:hover{color:#E6397C}
         </div>
         <h3 style="margin: 0; font-size: 18px; font-weight: 700">{{run.nextName}}</h3>
         <span style="display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--muted)"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 13s4.5-4 4.5-7.5a4.5 4.5 0 0 0-9 0C2.5 9 7 13 7 13z"></path><circle cx="7" cy="5.5" r="1.5"></circle></svg><span>{{run.nextInfo}}</span></span>
+        <sc-if value="{{run.canNav}}" hint-placeholder-val="{{true}}">
+          <a href="{{run.navUrl}}" target="_blank" rel="noopener" style="align-self: stretch; min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--accent-text); font-size: 14px; font-weight: 700; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 8px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h4v4M13 3L7.5 8.5M11 9.5V12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2.5"></path></svg><span>导航</span></a>
+        </sc-if>
         <sc-if value="{{run.stageChange}}" hint-placeholder-val="{{false}}">
           <span style="align-self: flex-start; padding: 4px 10px; border-radius: 8px; background: var(--soft); color: var(--accent-text); font-size: 13px; font-weight: 600">{{run.stageLabel}}</span>
         </sc-if>
@@ -269,6 +259,7 @@ a{color:#C2185B}a:hover{color:#E6397C}
   <button type="button" onClick="{{bar.cancel}}" disabled="{{bar.off}}" style="flex: 1; min-width: 96px; min-height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); font-size: 15px; font-weight: 600; cursor: pointer">取消</button>
   <button type="button" onClick="{{bar.confirm}}" disabled="{{bar.off}}" style="flex: 1; min-width: 96px; min-height: 44px; padding: 0 16px; border-radius: 12px; border: none; background: var(--fill); color: var(--onfill); font-size: 15px; font-weight: 700; cursor: pointer">保存</button>
 </div>
+<button type="button" onClick="{{add.open}}" aria-label="新建" disabled="{{fab.off}}" style="position: absolute; right: 16px; bottom: 90px; z-index: 4; width: 56px; height: 56px; border-radius: 50%; border: none; background: var(--fill); color: var(--onfill); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: {{fab.o}}; transform: {{fab.tf}}; visibility: {{fab.vis}}; transition: opacity 220ms ease, transform 220ms ease, {{fab.visTr}}"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg></button>
 <button type="button" aria-label="关闭" onClick="{{add.close}}" disabled="{{add.off}}" style="position: absolute; inset: 0; z-index: 6; border: none; padding: 0; background: rgba(0, 0, 0, 0.4); opacity: {{add.scrimO}}; visibility: {{add.vis}}; transition: opacity 320ms ease, {{add.visTr}}"></button>
 <form data-add="1" onSubmit="{{add.submit}}" style="position: absolute; left: 0; right: 0; bottom: 0; border-radius: 20px 20px 0 0; transform: {{add.y}}; z-index: 7; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 20px 16px 20px; background: var(--surface); box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18); visibility: {{add.vis}}; transition: transform 320ms ease, {{add.visTr}}">
     <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
@@ -279,10 +270,30 @@ a{color:#C2185B}a:hover{color:#E6397C}
       <span>名称</span>
       <input data-f="name" type="text" disabled="{{add.off}}" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 16px; font-weight: 400">
     </label>
-    <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted)">
-      <span>地点</span>
-      <input data-f="place" type="text" disabled="{{add.off}}" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 16px; font-weight: 400">
-    </label>
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted)">
+        <span>地点</span>
+        <span style="position: relative; display: flex">
+          <input data-f="place" type="text" autocomplete="off" onInput="{{add.placeInput}}" disabled="{{add.off}}" style="flex: 1; min-width: 0; height: 48px; box-sizing: border-box; padding: 0 44px 0 14px; border-radius: 12px; border: 1px solid {{add.placeBorder}}; background: var(--bg); color: var(--text); font: inherit; font-size: 16px; font-weight: 400">
+          <span aria-hidden="true" style="position: absolute; right: 14px; top: 16px; color: var(--accent-text); display: flex; opacity: {{add.pinO}}; transition: opacity 200ms ease"><svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 13s4.5-4 4.5-7.5a4.5 4.5 0 0 0-9 0C2.5 9 7 13 7 13z"></path><circle cx="7" cy="5.5" r="1.5"></circle></svg></span>
+        </span>
+      </label>
+      <sc-if value="{{add.hasSug}}" hint-placeholder-val="{{false}}">
+        <ul role="listbox" aria-label="地点候选" style="list-style: none; margin: 0; padding: 4px 0; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); display: flex; flex-direction: column; animation: inRA 200ms ease">
+          <sc-for list="{{add.sug}}" as="o" hint-placeholder-count="3">
+            <li>
+              <button type="button" onClick="{{o.pick}}" style="width: 100%; min-height: 52px; padding: 6px 14px; border: none; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 10px">
+                <span style="flex: 0 0 auto; color: var(--muted); display: flex"><svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 13s4.5-4 4.5-7.5a4.5 4.5 0 0 0-9 0C2.5 9 7 13 7 13z"></path><circle cx="7" cy="5.5" r="1.5"></circle></svg></span>
+                <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+                  <span style="font-size: 15px; font-weight: 600">{{o.name}}</span>
+                  <span style="font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{o.addr}}</span>
+                </span>
+              </button>
+            </li>
+          </sc-for>
+        </ul>
+      </sc-if>
+    </div>
     <div style="display: flex; flex-direction: column">
       <div style="height: {{add.preH}}; overflow: hidden; display: flex; flex-direction: column; transition: height 260ms ease">
         <sc-for list="{{add.pres}}" as="q" hint-placeholder-count="0">
@@ -310,29 +321,46 @@ a{color:#C2185B}a:hover{color:#E6397C}
 class Component extends DCLogic {
   tree() {
     return { id: 'root', name: '日本旅行', children: [
-      { id: 'osaka', name: '大阪', short: '大阪', place: '大阪府 · 关西', lat: 34.6937, lng: 135.5023, pre: [{ action: '预订去程机票', rank: 2 }, { action: '预订大阪住宿', rank: 2 }], children: [
-        { id: 'castle', name: '大阪城天守阁', short: '大阪城', place: '中央区 · 大阪城公园', lat: 34.6873, lng: 135.5262, pre: [{ action: '购买天守阁门票', rank: 3 }] },
-        { id: 'usj', name: '日本环球影城', short: '环球影城', place: '此花区 · 樱岛', lat: 34.6654, lng: 135.4323, pre: [{ action: '购买指定日期入园门票', rank: 2 }, { action: '抢购快速通关券', rank: 1 }] },
-        { id: 'dotonbori', name: '道顿堀', short: '道顿堀', place: '中央区 · 难波', lat: 34.6687, lng: 135.5013, pre: [] },
-        { id: 'kaiyukan', name: '海游馆', short: '海游馆', place: '港区 · 天保山', lat: 34.6545, lng: 135.4290, pre: [{ action: '网上预约入场时段', rank: 2 }] },
-        { id: 'umeda', name: '梅田蓝天大厦空中庭园', short: '梅田空中庭园', place: '北区 · 梅田', lat: 34.7053, lng: 135.4903, pre: [{ action: '购买展望台门票', rank: 3 }] },
-        { id: 'tsutenkaku', name: '通天阁', short: '通天阁', place: '浪速区 · 新世界', lat: 34.6525, lng: 135.5063, pre: [{ action: '购买展望台门票', rank: 3 }] }
+      { id: 'osaka', gq: '大阪駅', name: '大阪', short: '大阪', place: '大阪府 · 关西', lat: 34.6937, lng: 135.5023, pre: [{ action: '预订去程机票', rank: 2 }, { action: '预订大阪住宿', rank: 2 }], children: [
+        { id: 'castle', gq: '大阪城天守閣 大阪', name: '大阪城天守阁', short: '大阪城', place: '中央区 · 大阪城公园', lat: 34.6873, lng: 135.5262, pre: [{ action: '购买天守阁门票', rank: 3 }] },
+        { id: 'usj', gq: 'ユニバーサル・スタジオ・ジャパン 大阪', name: '日本环球影城', short: '环球影城', place: '此花区 · 樱岛', lat: 34.6654, lng: 135.4323, pre: [{ action: '购买指定日期入园门票', rank: 2 }, { action: '抢购快速通关券', rank: 1 }] },
+        { id: 'dotonbori', gq: '道頓堀 大阪', name: '道顿堀', short: '道顿堀', place: '中央区 · 难波', lat: 34.6687, lng: 135.5013, pre: [] },
+        { id: 'kaiyukan', gq: '海遊館 大阪', name: '海游馆', short: '海游馆', place: '港区 · 天保山', lat: 34.6545, lng: 135.4290, pre: [{ action: '网上预约入场时段', rank: 2 }] },
+        { id: 'umeda', gq: '梅田スカイビル 空中庭園展望台 大阪', name: '梅田蓝天大厦空中庭园', short: '梅田空中庭园', place: '北区 · 梅田', lat: 34.7053, lng: 135.4903, pre: [{ action: '购买展望台门票', rank: 3 }] },
+        { id: 'tsutenkaku', gq: '通天閣 大阪', name: '通天阁', short: '通天阁', place: '浪速区 · 新世界', lat: 34.6525, lng: 135.5063, pre: [{ action: '购买展望台门票', rank: 3 }] }
       ] },
-      { id: 'tokyo', name: '东京', short: '东京', place: '东京都 · 关东', lat: 35.6812, lng: 139.7671, pre: [{ action: '预订东京住宿', rank: 2 }, { action: '购买大阪→东京新干线车票', rank: 3 }], children: [
-        { id: 'ghibli', name: '三鹰之森吉卜力美术馆', short: '吉卜力', place: '三鹰市 · 井之头公园', lat: 35.6962, lng: 139.5704, pre: [{ action: '抢购指定日期时段门票', rank: 1 }] },
-        { id: 'shibuyasky', name: '涩谷 SKY', short: '涩谷 SKY', place: '涩谷区 · 涩谷站', lat: 35.6585, lng: 139.7022, pre: [{ action: '预约指定时段门票', rank: 2 }] },
-        { id: 'teamlab', name: 'teamLab Planets', short: 'teamLab', place: '江东区 · 丰洲', lat: 35.6491, lng: 139.7898, pre: [{ action: '预约指定时段门票', rank: 2 }] },
-        { id: 'sensoji', name: '浅草寺', short: '浅草寺', place: '台东区 · 浅草', lat: 35.7148, lng: 139.7967, pre: [] },
-        { id: 'tokyotower', name: '东京塔', short: '东京塔', place: '港区 · 芝公园', lat: 35.6586, lng: 139.7454, pre: [{ action: '购买展望台门票', rank: 3 }] }
+      { id: 'tokyo', gq: '東京駅', name: '东京', short: '东京', place: '东京都 · 关东', lat: 35.6812, lng: 139.7671, pre: [{ action: '预订东京住宿', rank: 2 }, { action: '购买大阪→东京新干线车票', rank: 3 }], children: [
+        { id: 'ghibli', gq: '三鷹の森ジブリ美術館', name: '三鹰之森吉卜力美术馆', short: '吉卜力', place: '三鹰市 · 井之头公园', lat: 35.6962, lng: 139.5704, pre: [{ action: '抢购指定日期时段门票', rank: 1 }] },
+        { id: 'shibuyasky', gq: '渋谷スカイ', name: '涩谷 SKY', short: '涩谷 SKY', place: '涩谷区 · 涩谷站', lat: 35.6585, lng: 139.7022, pre: [{ action: '预约指定时段门票', rank: 2 }] },
+        { id: 'teamlab', gq: 'チームラボプラネッツ TOKYO', name: 'teamLab Planets', short: 'teamLab', place: '江东区 · 丰洲', lat: 35.6491, lng: 139.7898, pre: [{ action: '预约指定时段门票', rank: 2 }] },
+        { id: 'sensoji', gq: '浅草寺 東京', name: '浅草寺', short: '浅草寺', place: '台东区 · 浅草', lat: 35.7148, lng: 139.7967, pre: [] },
+        { id: 'tokyotower', gq: '東京タワー', name: '东京塔', short: '东京塔', place: '港区 · 芝公园', lat: 35.6586, lng: 139.7454, pre: [{ action: '购买展望台门票', rank: 3 }] }
       ] },
-      { id: 'hokkaido', name: '北海道', short: '北海道', place: '札幌 · 北海道', lat: 43.0618, lng: 141.3545, pre: [{ action: '预订东京→札幌机票', rank: 2 }, { action: '预订回程机票', rank: 2 }], children: [
-        { id: 'odori', name: '大通公园', short: '大通公园', place: '札幌市 · 中央区', lat: 43.0600, lng: 141.3478, pre: [] },
-        { id: 'otaru', name: '小樽运河', short: '小樽', place: '小樽市', lat: 43.1984, lng: 141.0020, pre: [] },
-        { id: 'noboribetsu', name: '登别地狱谷', short: '登别', place: '登别市 · 登别温泉', lat: 42.4977, lng: 141.1466, pre: [{ action: '预订温泉旅馆', rank: 2 }] },
-        { id: 'toya', name: '洞爷湖', short: '洞爷湖', place: '洞爷湖町', lat: 42.6000, lng: 140.8500, pre: [] },
-        { id: 'hakodate', name: '函馆山夜景', short: '函馆山', place: '函馆市', lat: 41.7590, lng: 140.7044, pre: [{ action: '购买缆车票', rank: 3 }] }
+      { id: 'hokkaido', gq: '札幌駅', name: '北海道', short: '北海道', place: '札幌 · 北海道', lat: 43.0618, lng: 141.3545, pre: [{ action: '预订东京→札幌机票', rank: 2 }, { action: '预订回程机票', rank: 2 }], children: [
+        { id: 'odori', gq: '大通公園 札幌', name: '大通公园', short: '大通公园', place: '札幌市 · 中央区', lat: 43.0600, lng: 141.3478, pre: [] },
+        { id: 'otaru', gq: '小樽運河', name: '小樽运河', short: '小樽', place: '小樽市', lat: 43.1984, lng: 141.0020, pre: [] },
+        { id: 'noboribetsu', gq: '登別地獄谷', name: '登别地狱谷', short: '登别', place: '登别市 · 登别温泉', lat: 42.4977, lng: 141.1466, pre: [{ action: '预订温泉旅馆', rank: 2 }] },
+        { id: 'toya', gq: '洞爺湖', name: '洞爷湖', short: '洞爷湖', place: '洞爷湖町', lat: 42.6000, lng: 140.8500, pre: [] },
+        { id: 'hakodate', gq: '函館山', name: '函馆山夜景', short: '函馆山', place: '函馆市', lat: 41.7590, lng: 140.7044, pre: [{ action: '购买缆车票', rank: 3 }] }
       ] }
     ] };
+  }
+
+  // 画布里代替 MKLocalSearchCompleter 的示例候选（真机由 MapKit 返回）。
+  places() {
+    return [
+      { name: '日本环球影城', addr: '日本大阪府大阪市此花区桜島2丁目1-33', lat: 34.6654, lng: 135.4323, gq: 'ユニバーサル・スタジオ・ジャパン 大阪府大阪市此花区桜島2丁目1-33' },
+      { name: '环球城站', addr: '日本大阪府大阪市此花区島屋1丁目', lat: 34.6680, lng: 135.4373, gq: 'ユニバーサルシティ駅 大阪府大阪市此花区島屋1丁目' },
+      { name: '黑门市场', addr: '日本大阪府大阪市中央区日本橋2丁目4-1', lat: 34.6654, lng: 135.5063, gq: '黒門市場 大阪府大阪市中央区日本橋2丁目4-1' },
+      { name: '心斋桥筋商店街', addr: '日本大阪府大阪市中央区心斎橋筋1丁目', lat: 34.6748, lng: 135.5012, gq: '心斎橋筋商店街 大阪府大阪市中央区心斎橋筋1丁目' },
+      { name: '大阪城公园', addr: '日本大阪府大阪市中央区大阪城', lat: 34.6863, lng: 135.5300, gq: '大阪城公園 大阪府大阪市中央区大阪城' },
+      { name: '天王寺动物园', addr: '日本大阪府大阪市天王寺区茶臼山町1-108', lat: 34.6510, lng: 135.5085, gq: '天王寺動物園 大阪府大阪市天王寺区茶臼山町1-108' },
+      { name: '大阪站', addr: '日本大阪府大阪市北区梅田3丁目1-1', lat: 34.7025, lng: 135.4959, gq: '大阪駅 大阪府大阪市北区梅田3丁目1-1' },
+      { name: '浅草寺', addr: '日本东京都台东区浅草2丁目3-1', lat: 35.7148, lng: 139.7967, gq: '浅草寺 東京都台東区浅草2丁目3-1' },
+      { name: '东京晴空塔', addr: '日本东京都墨田区押上1丁目1-2', lat: 35.7101, lng: 139.8107, gq: '東京スカイツリー 東京都墨田区押上1丁目1-2' },
+      { name: '筑地场外市场', addr: '日本东京都中央区築地4丁目16-2', lat: 35.6655, lng: 139.7707, gq: '築地場外市場 東京都中央区築地4丁目16-2' },
+      { name: '二条市场', addr: '日本北海道札幌市中央区南3条東1丁目', lat: 43.0573, lng: 141.3577, gq: '二条市場 北海道札幌市中央区南3条東1丁目' }
+    ];
   }
 
   km(a, b) {
@@ -423,6 +451,9 @@ class Component extends DCLogic {
       var c = {}; Object.keys(t).forEach(function (k) { c[k] = t[k]; }); c.children = []; return c;
     }));
     root.children.forEach(function (c) { c.children = c.children.concat(added[c.id] || []); });
+    var removed = st.removed || {};
+    root.children = root.children.filter(function (c) { return !removed[c.id]; });
+    root.children.forEach(function (c) { c.children = c.children.filter(function (k) { return !removed[k.id]; }); });
     function hasGeo(t) { return typeof t.lat === 'number'; }
     var theme = st.theme || this.props.theme || 'light';
     var dark = theme === 'dark';
@@ -433,14 +464,12 @@ class Component extends DCLogic {
     var tab = st.tab || 'tasks';
     var plan = (st.mode || 'plan') === 'plan';
     var mapOn = tab === 'map';
-    var objective = st.objective || 'dist';
-    var travel = st.travel || 'transit';
 
     function ordered(node) {
       var ids = orders[node.id] || node.children.map(function (c) { return c.id; });
       var map = {};
       node.children.forEach(function (c) { map[c.id] = c; });
-      return ids.map(function (id) { return map[id]; });
+      return ids.map(function (id) { return map[id]; }).filter(Boolean);
     }
     function patch(obj, key, val) {
       var copy = {};
@@ -454,18 +483,20 @@ class Component extends DCLogic {
     var draft = st.draft && st.draft.level === levelId ? st.draft : null;
     var drag = st.drag || null;
     var editing = !!(drag || draft);
-    var ids = draft ? draft.ids : ordered(level).map(function (t) { return t.id; });
     var childMap = {};
     level.children.forEach(function (c) { childMap[c.id] = c; });
+    var ids = (draft ? draft.ids : ordered(level).map(function (t) { return t.id; })).filter(function (id) { return childMap[id]; });
     var items = ids.map(function (id) { return childMap[id]; });
-    var selIds = sels[levelId] || [];
+    var selIds = (sels[levelId] || []).filter(function (id) { return childMap[id]; });
+    var swiped = !editing && st.swiped && childMap[st.swiped] ? st.swiped : null;
+    function swJust() { return Date.now() - (self._swAt || 0) < 450; }
     var scopeAll = selIds.length === 0;
     var scoped = scopeAll ? items : items.filter(function (t) { return selIds.indexOf(t.id) >= 0; });
     var geo = scoped.filter(hasGeo);
 
     function setOrder(next) { self.setState({ order: patch(orders, levelId, next) }); }
     function setSel(next) { self.setState({ sel: patch(sels, levelId, next) }); }
-    function go(id) { self._drag = null; self.setState({ level: id, tab: 'tasks', draft: null, drag: null, navSeq: (st.navSeq || 0) + 1, navDir: id === 'root' ? 'L' : 'R' }); }
+    function go(id) { self._drag = null; self.setState({ level: id, tab: 'tasks', draft: null, drag: null, focus: null, swiped: null, navSeq: (st.navSeq || 0) + 1, navDir: id === 'root' ? 'L' : 'R' }); }
 
     function navVals(node, indent, count) {
       var active = node.id === levelId;
@@ -621,9 +652,39 @@ class Component extends DCLogic {
           var ts = self.tagStyle(p.rank);
           return { action: p.action, tagBg: ts.tagBg, tagFg: ts.tagFg, tagBorder: ts.tagBorder };
         }),
-        toggle: function () { setSel(on ? selIds.filter(function (id) { return id !== t.id; }) : selIds.concat([t.id])); },
+        toggle: function () {
+          if (swJust()) return;
+          if (swiped) { self.setState({ swiped: null }); return; }
+          setSel(on ? selIds.filter(function (id) { return id !== t.id; }) : selIds.concat([t.id]));
+        },
         hasKids: !!t.children, kidsLabel: kids + ' 项',
-        open: function () { go(t.id); }
+        open: function () { if (swJust()) return; if (swiped) { self.setState({ swiped: null }); return; } go(t.id); },
+        sw: {
+          down: function (e) {
+            if (editing || (e.target.closest && e.target.closest('[data-handle]'))) return;
+            self._sw = { id: t.id, x: e.clientX, y: e.clientY, fired: false };
+          },
+          move: function (e) {
+            var s = self._sw;
+            if (!s || s.id !== t.id || s.fired) return;
+            var dx = e.clientX - s.x, dy = e.clientY - s.y;
+            if (Math.abs(dx) < 28 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+            s.fired = true;
+            self._swAt = Date.now();
+            self.setState({ swiped: dx < 0 ? t.id : null });
+          },
+          up: function () { self._sw = null; }
+        },
+        del: function () {
+          self.setState({
+            removed: patch(removed, t.id, true), swiped: null,
+            sel: patch(sels, levelId, selIds.filter(function (id) { return id !== t.id; }))
+          });
+        },
+        delAria: '删除：' + t.name, delOff: swiped !== t.id,
+        delTf: swiped === t.id ? 'translateX(0%)' : 'translateX(101%)',
+        delVis: swiped === t.id ? 'visible' : 'hidden',
+        delVisTr: swiped === t.id ? 'visibility 0s' : 'visibility 0s linear 220ms'
       };
     });
 
@@ -639,11 +700,29 @@ class Component extends DCLogic {
       return { x: 300 + (t.lng - midLng) * kx * scale, y: 210 - (t.lat - midLat) * scale };
     }
 
+    // 地图线新样式：每段单独一根弧线 + 方向箭头；点一个地点只突出它前后两段。
+    var gi = geo.map(function (t) { return t.id; });
+    var focus = st.focus && gi.indexOf(st.focus) >= 0 ? st.focus : null;
+    var fi = focus ? gi.indexOf(focus) : -1;
+    function related(id) { var k = gi.indexOf(id); return k >= 0 && Math.abs(k - fi) <= 1; }
     var pins = located.map(function (t) {
       var i = ids.indexOf(t.id);
       var on = geo.indexOf(t) >= 0;
       var p = xy(t);
+      var near = !focus || related(t.id);
+      var isFocus = focus === t.id;
       return {
+        tap: function (e) {
+          if (e && e.stopPropagation) e.stopPropagation();
+          if (!on) return;
+          self.setState({ focus: isFocus ? null : t.id });
+        },
+        aria: on ? (isFocus ? '取消突出：' : '突出前后路段：') + t.name : t.name + '（不在范围内）',
+        pressed: isFocus ? 'true' : 'false',
+        ring: isFocus ? '0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent)' : 'none',
+        o: near ? '1' : '0.35',
+        cursor: on ? 'pointer' : 'default',
+        labelO: on && near ? '1' : '0',
         name: t.short, num: on ? String(i + 1) : '',
         left: (p.x / 600 * 100).toFixed(2) + '%', top: (p.y / 440 * 100).toFixed(2) + '%',
         size: on ? '28px' : '12px', offset: on ? '-14px 0 0 -14px' : '-6px 0 0 -6px',
@@ -655,6 +734,41 @@ class Component extends DCLogic {
     });
 
     var routePts = geo.map(function (t) { var p = xy(t); return p.x.toFixed(1) + ',' + p.y.toFixed(1); }).join(' ');
+    // 地图线：直线虚线 = 示意（实际路线交给 Google 地图）；方向箭头 + 按顺序深浅；点地点只突出前后两段。
+    var segs = [];
+    for (var k = 0; k + 1 < geo.length; k++) {
+      var A = xy(geo[k]), B = xy(geo[k + 1]);
+      var dx = B.x - A.x, dy = B.y - A.y, len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 1) continue;
+      var tx = dx / len, ty = dy / len;
+      var P = { x: A.x + dx * 0.55, y: A.y + dy * 0.55 };
+      var hot = focus && (k === fi || k + 1 === fi);
+      var L = hot ? 13 : 10, W = hot ? 8 : 6;
+      var f1 = function (v) { return v.toFixed(1); };
+      var ramp = geo.length > 2 ? 1 - 0.55 * k / (geo.length - 2) : 1;
+      segs.push({
+        d: 'M' + f1(A.x) + ' ' + f1(A.y) + ' L' + f1(B.x) + ' ' + f1(B.y),
+        arrow: 'M' + f1(P.x - tx * L - ty * W) + ' ' + f1(P.y - ty * L + tx * W) + ' L' + f1(P.x) + ' ' + f1(P.y) + ' L' + f1(P.x - tx * L + ty * W) + ' ' + f1(P.y - ty * L - tx * W),
+        color: focus && !hot ? 'var(--muted)' : 'var(--accent)',
+        w: hot ? '7' : '4', aw: hot ? '5' : '3.5', dash: hot ? 'none' : '10 9',
+        o: focus ? (hot ? '1' : '0.25') : ramp.toFixed(2)
+      });
+    }
+    var mapFx = {
+      clear: function () { if (focus) self.setState({ focus: null }); },
+    };
+    // 执行页「导航」：起点留空 = 当前位置；单段才能用公交。
+    function gmUrl(dest) {
+      return 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(dest.gq || dest.name) + '&travelmode=transit';
+    }
+    // 传地名而不是坐标：坐标会被 Google 对应到附近的别的地点。
+    function ll(t) { return encodeURIComponent(t.gq || t.name); }
+    var gmRoute = geo.length >= 2 ? 'https://www.google.com/maps/dir/?api=1&origin=' + ll(geo[0]) +
+      '&destination=' + ll(geo[geo.length - 1]) +
+      (geo.length > 2 ? '&waypoints=' + geo.slice(1, -1).map(ll).join('%7C') : '') + '&travelmode=driving' : '';
+    var gm = {
+      url: gmRoute, o: gmRoute ? '1' : '0.5', pe: gmRoute ? 'auto' : 'none', ariaOff: gmRoute ? 'false' : 'true'
+    };
     var curKm = this.routeKm(geo);
     var best = this.bestOrder(geo);
     var extra = curKm - this.routeKm(best);
@@ -717,13 +831,6 @@ class Component extends DCLogic {
       seg('规划', plan, function () { self.setState({ mode: 'plan' }); }),
       seg('进行中', !plan, function () { self.setState({ mode: 'run' }); })
     ];
-    var objSegs = [
-      seg('距离', objective === 'dist', function () { self.setState({ objective: 'dist' }); }),
-      seg('耗时', objective === 'time', function () { self.setState({ objective: 'time' }); })
-    ];
-    var travelSegs = [['walk', '步行'], ['transit', '公交'], ['drive', '自驾']].map(function (m) {
-      return seg(m[1], travel === m[0], function () { self.setState({ travel: m[0] }); });
-    });
 
     function checkVals(t, p, i) {
       var key = t.id + ':' + i;
@@ -772,6 +879,8 @@ class Component extends DCLogic {
       if (change) nextPre = nxt.parent.pre.map(function (p, i) { return checkVals(nxt.parent, p, i); }).concat(nextPre);
       run.nextName = nxt.task.name;
       run.nextInfo = nxt.parent.name + ' · ' + nxt.task.place;
+      run.canNav = hasGeo(nxt.task);
+      run.navUrl = hasGeo(nxt.task) ? gmUrl(nxt.task) : '';
       run.nextDist = hasGeo(cur.task) && hasGeo(nxt.task) ? '约 ' + self.fmt(self.km(cur.task, nxt.task)) + ' km' : '';
       run.stageChange = change;
       run.stageLabel = cur.parent.name + ' → ' + nxt.parent.name;
@@ -788,6 +897,20 @@ class Component extends DCLogic {
     var aiOn = tab === 'tasks';
 
     var addOpen = !!st.addOpen;
+    var placeQ = (st.placeQ || '').trim();
+    var placePick = st.placePick || null;
+    var sug = !addOpen || placePick || !placeQ ? [] : this.places().filter(function (o) {
+      return o.name.indexOf(placeQ) >= 0 || o.addr.indexOf(placeQ) >= 0;
+    }).slice(0, 4).map(function (o) {
+      return {
+        name: o.name, addr: o.addr,
+        pick: function (e) {
+          var form = e.currentTarget.closest('[data-add]');
+          try { form.querySelector('[data-f="place"]').value = o.name; } catch (err) {}
+          self.setState({ placePick: o, placeQ: o.name });
+        }
+      };
+    });
     var preCount = st.preCount || 0;
     var preRows = [];
     for (var pi = 0; pi < preCount; pi++) {
@@ -809,6 +932,9 @@ class Component extends DCLogic {
       desk: addOpen ? 'translate(-50%, 0%)' : 'translate(-50%, 130%)',
       scrimO: addOpen ? '1' : '0', off: !addOpen, level: level.name,
       pres: preRows, preH: (preCount * 56) + 'px',
+      sug: sug, hasSug: sug.length > 0,
+      pinO: placePick ? '1' : '0', placeBorder: placePick ? 'var(--accent)' : 'var(--line)',
+      placeInput: function (e) { self.setState({ placeQ: e.currentTarget.value, placePick: null }); },
       addPre: function (e) {
         var form = e.currentTarget.closest('[data-add]');
         self.setState({ preCount: preCount + 1 });
@@ -820,16 +946,17 @@ class Component extends DCLogic {
         self.setState({ addOpen: true });
         setTimeout(function () { try { app.querySelector('[data-add] input').focus(); } catch (err) {} }, 340);
       },
-      close: function () { self.setState({ addOpen: false }); },
+      close: function () { self.setState({ addOpen: false, placeQ: '', placePick: null }); },
       submit: function (e) {
         e.preventDefault();
         var form = e.currentTarget;
         function val(k) { var el = form.querySelector('[data-f="' + k + '"]'); return el ? el.value.trim() : ''; }
         var name = val('name');
         if (!name) { try { form.querySelector('[data-f="name"]').focus(); } catch (err) {} return; }
-        var task = { id: 'n' + Date.now(), name: name, short: name, place: val('place') || '未填地点', lat: null, lng: null, pre: Array.prototype.map.call(form.querySelectorAll('[data-f="pre"]'), function (el) { return el.value.trim(); })
+        var pk = placePick && placePick.name === val('place') ? placePick : null;
+        var task = { id: 'n' + Date.now(), name: name, short: name, place: pk ? pk.addr : (val('place') || '未填地点'), lat: pk ? pk.lat : null, lng: pk ? pk.lng : null, gq: pk ? pk.gq : null, pre: Array.prototype.map.call(form.querySelectorAll('[data-f="pre"]'), function (el) { return el.value.trim(); })
             .filter(function (x) { return x; }).map(function (x) { return { action: x, rank: 2 }; }) };
-        var next = { added: patch(added, levelId, (added[levelId] || []).concat([task])), addOpen: false, lastAdded: task.id, preCount: 0 };
+        var next = { added: patch(added, levelId, (added[levelId] || []).concat([task])), addOpen: false, lastAdded: task.id, preCount: 0, placeQ: '', placePick: null };
         if (orders[levelId]) next.order = patch(orders, levelId, orders[levelId].concat([task.id]));
         if (draft) next.draft = { level: levelId, ids: draft.ids.concat([task.id]) };
         Array.prototype.forEach.call(form.querySelectorAll('input'), function (el) { el.value = ''; });
@@ -845,8 +972,6 @@ class Component extends DCLogic {
       add: addVals,
       navAnim: anim(st.navSeq, st.navDir), runAnim: anim(st.runSeq, st.runDir),
       mode: { items: modeSegs, w: 'calc((100% - 8px) / 2)', x: plan ? '0%' : '100%' },
-      obj: { items: objSegs, w: 'calc((100% - 8px) / 2)', x: objective === 'dist' ? '0%' : '100%' },
-      trav: { items: travelSegs, w: 'calc((100% - 8px) / 3)', x: (travel === 'walk' ? 0 : travel === 'transit' ? 100 : 200) + '%' },
       modeX: plan ? 'translateX(0%)' : 'translateX(-50%)',
       planPane: pane(plan), runPane: pane(!plan),
       tabX: tabIdx === 2 ? 'translateX(-50%)' : 'translateX(0%)', tabIndX: (tabIdx * 100) + '%',
@@ -862,7 +987,7 @@ class Component extends DCLogic {
       backBtn: { w: showBackBtn ? '44px' : '0px', o: showBackBtn ? '1' : '0', off: !showBackBtn },
       statusText: editing ? '预览中' : geo.length < 2 ? '至少 2 项' : showDetour ? '多绕 ' + this.fmt(extra) + ' km' : '不绕路',
       opt: { o: canOpt ? '1' : '0', off: !canOpt },
-      modeSegs: modeSegs, objSegs: objSegs, travelSegs: travelSegs, run: run,
+      modeSegs: modeSegs, run: run,
       planMode: plan, showRun: !plan,
       
       title: plan ? level.name : root.name,
@@ -876,14 +1001,17 @@ class Component extends DCLogic {
       crumb: isRoot ? 'Flow · ' + items.length + ' 个任务' : root.name + ' / ' + level.name,
       back: function () { go('root'); },
       rows: rows,
-      allLabel: scopeAll ? '全选' : '清空',
-      toggleAll: function () { setSel(scopeAll ? ids.slice() : []); },
+      fab: (function () {
+        var on = plan && tab !== 'prep' && !editing && !addOpen;
+        return { off: !on, o: on ? '1' : '0', tf: on ? 'scale(1)' : 'scale(0.6)',
+          vis: on ? 'visible' : 'hidden', visTr: on ? 'visibility 0s' : 'visibility 0s linear 220ms' };
+      })(),
       scopeLabel: scopeAll ? items.length + ' 项' : '已选 ' + scoped.length + ' 项',
       openMap: function () { self.setState({ tab: 'map' }); },
       tabTasks: tabVals('tasks', selIds.length), tabMap: tabVals('map', 0), tabPrep: tabVals('prep', left),
       showTasks: plan && tab === 'tasks', showMap: plan && tab === 'map', showPrep: plan && tab === 'prep',
-      pins: pins, routePts: routePts, legs: legs,
-      distLabel: geo.length >= 2 ? '约 ' + this.fmt(curKm) + ' km' : '—',
+      pins: pins, routePts: routePts, segs: segs, mapFx: mapFx, gm: gm, legs: legs,
+      distLabel: geo.length >= 2 ? this.fmt(curKm) + ' km' : '—',
       showDetour: showDetour && !editing,
       showOptimal: geo.length >= 2 && !showDetour && !editing,
       rail: makeRail('rows', items, function (list) { return list; }),

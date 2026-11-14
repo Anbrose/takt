@@ -51,7 +51,7 @@ public actor InMemoryBackend: TaktBackend {
         guard nodes[parentId] != nil else { throw notFound }
         let id = add(
             parent: parentId, name: body.name, short: body.short, place: body.place ?? "",
-            lat: body.lat, lng: body.lng,
+            address: body.address ?? "", lat: body.lat, lng: body.lng,
             prerequisites: (body.prerequisites ?? []).map { ($0.action, $0.urgency ?? .before) }
         )
         return nodes[id]!.summary
@@ -71,6 +71,22 @@ public actor InMemoryBackend: TaktBackend {
         return try levelOf(parentId)
     }
 
+    public func deleteTask(_ id: String) async throws -> Level {
+        try check("deleteTask \(id)")
+        guard let node = nodes[id] else { throw notFound }
+        guard let parent = node.parent else {
+            throw BackendError.api(status: 400, code: "cannot_delete_root", message: "root")
+        }
+        func drop(_ id: String) {
+            for c in nodes[id]?.children ?? [] { drop(c) }
+            nodes[id] = nil
+        }
+        drop(id)
+        nodes[parent]!.children.removeAll { $0 == id }
+        nodes[parent]!.version += 1
+        return try levelOf(parent)
+    }
+
     public func setPrerequisite(_ id: String, done: Bool) async throws -> Prerequisite {
         try check("setPrerequisite \(id)")
         for (key, n) in nodes {
@@ -87,14 +103,14 @@ public actor InMemoryBackend: TaktBackend {
     /// Adds a task (or a root when `parent` is nil); returns its id.
     @discardableResult
     public func add(
-        parent: String?, name: String, short: String? = nil, place: String = "",
+        parent: String?, name: String, short: String? = nil, place: String = "", address: String = "",
         lat: Double? = nil, lng: Double? = nil, prerequisites: [(String, Urgency)] = []
     ) -> String {
         let id = newId()
         let pres = prerequisites.map { Prerequisite(id: newId(), action: $0.0, urgency: $0.1, done: false) }
         nodes[id] = Node(
             summary: TaskSummary(
-                id: id, name: name, short: short ?? name, place: place, lat: lat, lng: lng,
+                id: id, name: name, short: short ?? name, place: place, address: address, lat: lat, lng: lng,
                 completed: false, prerequisites: pres, childCount: 0
             ),
             parent: parent
@@ -150,38 +166,55 @@ extension InMemoryBackend {
         let b = InMemoryBackend()
         let p = try! await b.createProject(name: "日本旅行")
         let osaka = await b.add(
-            parent: p.rootTaskId, name: "大阪", place: "大阪府 · 关西", lat: 34.6937, lng: 135.5023,
+            parent: p.rootTaskId, name: "大阪", place: "大阪府 · 关西", address: "大阪府大阪市北区梅田3丁目1-1",
+                    lat: 34.6937, lng: 135.5023,
             prerequisites: [("预订去程机票", .before), ("预订大阪住宿", .before)])
         await b.add(parent: osaka, name: "大阪城天守阁", short: "大阪城", place: "中央区 · 大阪城公园",
+                    address: "大阪府大阪市中央区大阪城1-1",
                     lat: 34.6873, lng: 135.5262, prerequisites: [("购买天守阁门票", .onsite)])
         await b.add(parent: osaka, name: "日本环球影城", short: "环球影城", place: "此花区 · 樱岛",
+                    address: "大阪府大阪市此花区桜島2丁目1-33",
                     lat: 34.6654, lng: 135.4323,
                     prerequisites: [("购买指定日期入园门票", .before), ("抢购快速通关券", .early)])
-        await b.add(parent: osaka, name: "道顿堀", place: "中央区 · 难波", lat: 34.6687, lng: 135.5013)
-        await b.add(parent: osaka, name: "海游馆", place: "港区 · 天保山", lat: 34.6545, lng: 135.4290,
+        await b.add(parent: osaka, name: "道顿堀", place: "中央区 · 难波", address: "大阪府大阪市中央区道頓堀1丁目",
+                    lat: 34.6687, lng: 135.5013)
+        await b.add(parent: osaka, name: "海游馆", place: "港区 · 天保山", address: "大阪府大阪市港区海岸通1丁目1-10",
+                    lat: 34.6545, lng: 135.4290,
                     prerequisites: [("网上预约入场时段", .before)])
         await b.add(parent: osaka, name: "梅田蓝天大厦空中庭园", short: "梅田空中庭园", place: "北区 · 梅田",
+                    address: "大阪府大阪市北区大淀中1丁目1-88",
                     lat: 34.7053, lng: 135.4903, prerequisites: [("购买展望台门票", .onsite)])
-        await b.add(parent: osaka, name: "通天阁", place: "浪速区 · 新世界", lat: 34.6525, lng: 135.5063,
+        await b.add(parent: osaka, name: "通天阁", place: "浪速区 · 新世界", address: "大阪府大阪市浪速区恵美須東1丁目18-6",
+                    lat: 34.6525, lng: 135.5063,
                     prerequisites: [("购买展望台门票", .onsite)])
         let tokyo = await b.add(
-            parent: p.rootTaskId, name: "东京", place: "东京都 · 关东", lat: 35.6812, lng: 139.7671,
+            parent: p.rootTaskId, name: "东京", place: "东京都 · 关东", address: "東京都千代田区丸の内1丁目",
+                    lat: 35.6812, lng: 139.7671,
             prerequisites: [("预订东京住宿", .before), ("购买大阪→东京新干线车票", .onsite)])
         await b.add(parent: tokyo, name: "三鹰之森吉卜力美术馆", short: "吉卜力", place: "三鹰市 · 井之头公园",
+                    address: "東京都三鷹市下連雀1丁目1-83",
                     lat: 35.6962, lng: 139.5704, prerequisites: [("抢购指定日期时段门票", .early)])
-        await b.add(parent: tokyo, name: "涩谷 SKY", place: "涩谷区 · 涩谷站", lat: 35.6585, lng: 139.7022,
+        await b.add(parent: tokyo, name: "涩谷 SKY", place: "涩谷区 · 涩谷站", address: "東京都渋谷区渋谷2丁目24-12",
+                    lat: 35.6585, lng: 139.7022,
                     prerequisites: [("预约指定时段门票", .before)])
         await b.add(parent: tokyo, name: "teamLab Planets", short: "teamLab", place: "江东区 · 丰洲",
+                    address: "東京都江東区豊洲6丁目1-16",
                     lat: 35.6491, lng: 139.7898, prerequisites: [("预约指定时段门票", .before)])
-        await b.add(parent: tokyo, name: "浅草寺", place: "台东区 · 浅草", lat: 35.7148, lng: 139.7967)
-        await b.add(parent: tokyo, name: "东京塔", place: "港区 · 芝公园", lat: 35.6586, lng: 139.7454,
+        await b.add(parent: tokyo, name: "浅草寺", place: "台东区 · 浅草", address: "東京都台東区浅草2丁目3-1",
+                    lat: 35.7148, lng: 139.7967)
+        await b.add(parent: tokyo, name: "东京塔", place: "港区 · 芝公园", address: "東京都港区芝公園4丁目2-8",
+                    lat: 35.6586, lng: 139.7454,
                     prerequisites: [("购买展望台门票", .onsite)])
         let hokkaido = await b.add(
-            parent: p.rootTaskId, name: "北海道", place: "札幌 · 北海道", lat: 43.0618, lng: 141.3545,
+            parent: p.rootTaskId, name: "北海道", place: "札幌 · 北海道", address: "北海道札幌市北区北6条西4丁目",
+                    lat: 43.0618, lng: 141.3545,
             prerequisites: [("预订东京→札幌机票", .before), ("预订回程机票", .before)])
-        await b.add(parent: hokkaido, name: "大通公园", place: "札幌市 · 中央区", lat: 43.0600, lng: 141.3478)
-        await b.add(parent: hokkaido, name: "小樽运河", short: "小樽", place: "小樽市", lat: 43.1984, lng: 141.0020)
-        await b.add(parent: hokkaido, name: "函馆山夜景", short: "函馆山", place: "函馆市", lat: 41.7590,
+        await b.add(parent: hokkaido, name: "大通公园", place: "札幌市 · 中央区", address: "北海道札幌市中央区大通西7丁目",
+                    lat: 43.0600, lng: 141.3478)
+        await b.add(parent: hokkaido, name: "小樽运河", short: "小樽", place: "小樽市", address: "北海道小樽市港町5",
+                    lat: 43.1984, lng: 141.0020)
+        await b.add(parent: hokkaido, name: "函馆山夜景", short: "函馆山", place: "函馆市", address: "北海道函館市元町19-7",
+                    lat: 41.7590,
                     lng: 140.7044, prerequisites: [("购买缆车票", .onsite)])
         return b
     }

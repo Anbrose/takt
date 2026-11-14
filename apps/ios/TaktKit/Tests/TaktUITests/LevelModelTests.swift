@@ -24,7 +24,6 @@ private func names(_ m: LevelModel) -> [String] { m.items.map(\.name) }
         #expect(m.name == "大阪")
         #expect(m.breadcrumb.map(\.name) == ["日本旅行", "大阪"])
         #expect(names(m).first == "大阪城天守阁")
-        #expect(m.scopeLabel == "6 项")
         #expect(!m.isEditing)
     }
 
@@ -33,13 +32,40 @@ private func names(_ m: LevelModel) -> [String] { m.items.map(\.name) }
         let before = names(m)
         m.toggle(m.items[3].id)
         m.toggle(m.items[1].id)
-        #expect(m.scopeLabel == "已选 2 项")
-        #expect(m.allLabel == "清空")
+        #expect(m.selection.count == 2)
         #expect(names(m) == before)
-        m.toggleAll()
-        #expect(m.selection.isEmpty && m.allLabel == "全选")
-        m.toggleAll()
-        #expect(m.selection.count == 6)
+    }
+
+    @Test func deleteRemovesTheRowAndItsSelection() async throws {
+        let (m, backend) = try await osakaModel()
+        let usj = m.items[1].id
+        m.toggle(usj)
+        await m.delete(usj)
+        #expect(!names(m).contains("日本环球影城"))
+        #expect(m.items.count == 5)
+        #expect(m.selection.isEmpty)
+        #expect(try await backend.level(m.taskId).children.count == 5)
+        // The returned level carries the new version, so saving an order still works.
+        m.move(m.items[0].id, by: 1)
+        await m.save()
+        #expect(m.notice == nil)
+    }
+
+    @Test func deleteRollsBackWhenTheServerFails() async throws {
+        let (m, backend) = try await osakaModel()
+        let before = names(m)
+        await backend.failNextCall(with: BackendError.unexpected(status: 500))
+        await m.delete(m.items[2].id)
+        #expect(names(m) == before)
+        #expect(m.notice == "删除失败")
+    }
+
+    @Test func deleteIsNotOfferedWhileReordering() async throws {
+        let (m, backend) = try await osakaModel()
+        m.move(m.items[0].id, by: 1)
+        await m.delete(m.items[0].id)
+        #expect(m.items.count == 6)
+        #expect(await backend.calls.contains { $0.hasPrefix("deleteTask") } == false)
     }
 
     @Test func dragMakesADraftAndNeighboursMakeRoom() async throws {

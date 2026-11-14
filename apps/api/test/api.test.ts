@@ -123,6 +123,54 @@ describe('新建', () => {
   });
 });
 
+describe('地点', () => {
+  it('stores the address picked in the place search and returns it everywhere', async () => {
+    const r = await call('POST', `/tasks/${id('osaka')}/children`, {
+      name: '吃螃蟹',
+      place: '黑门市场',
+      address: '大阪府大阪市中央区日本橋2丁目4-1',
+      lat: 34.6654,
+      lng: 135.5063,
+    });
+    expect(r.body).toMatchObject({ place: '黑门市场', address: '大阪府大阪市中央区日本橋2丁目4-1' });
+    expect((await level(id('osaka'))).body.children.at(-1).address).toBe('大阪府大阪市中央区日本橋2丁目4-1');
+    expect((await level(id('osaka'))).body.children[1].address).toBe('大阪府大阪市此花区桜島2丁目1-33');
+    const plain = await call('POST', `/tasks/${id('osaka')}/children`, { name: '随便逛逛' });
+    expect(plain.body.address).toBe('');
+  });
+});
+
+describe('删除', () => {
+  it('removes a task with everything under it and renumbers the level', async () => {
+    const before = await level(id('osaka'));
+    const r = await call('DELETE', `/tasks/${id('usj')}`);
+    expect(r.status).toBe(200);
+    expect(r.body.task.id).toBe(id('osaka'));
+    expect(names(r)).toEqual(['大阪城天守阁', '道顿堀', '海游馆', '梅田蓝天大厦空中庭园', '通天阁']);
+    expect(r.body.version).toBe(before.body.version + 1);
+    expect((await level(id('usj'))).status).toBe(404);
+
+    // Positions stay dense: a reorder with the new version and ids works.
+    const ids2 = r.body.children.map((c: { id: string }) => c.id).reverse();
+    const saved = await call('PUT', `/tasks/${id('osaka')}/children/order`, {
+      ids: ids2,
+      version: r.body.version,
+    });
+    expect(saved.status).toBe(200);
+
+    const stage = await call('DELETE', `/tasks/${id('tokyo')}`);
+    expect(names(stage)).toEqual(['大阪', '北海道']);
+    expect((await level(id('sensoji'))).status).toBe(404);
+  });
+
+  it('refuses the root, unknown ids and other owners', async () => {
+    expect((await call('DELETE', `/tasks/${project.rootTaskId}`)).body.error).toBe('cannot_delete_root');
+    expect((await call('DELETE', '/tasks/00000000-0000-4000-8000-000000000000')).status).toBe(404);
+    expect((await call('DELETE', `/tasks/${id('usj')}`, undefined, 'someone-else')).status).toBe(404);
+    expect(names(await level(id('osaka')))).toContain('日本环球影城');
+  });
+});
+
 describe('保存顺序', () => {
   it('replaces the order of one level', async () => {
     const l = await level(id('osaka'));

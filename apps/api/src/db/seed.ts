@@ -9,6 +9,7 @@ interface FixtureTask {
   name: string;
   short: string;
   place: string;
+  address: string;
   lat: number | null;
   lng: number | null;
   prerequisites: { action: string; urgency: string }[];
@@ -25,6 +26,7 @@ export async function seedTrip(db: Db, owner: string) {
         name: t.name,
         short: t.short,
         place: t.place,
+        address: t.address,
         lat: t.lat,
         lng: t.lng,
         prerequisites: t.prerequisites.map((p) => ({ action: p.action, urgency: p.urgency as Urgency })),

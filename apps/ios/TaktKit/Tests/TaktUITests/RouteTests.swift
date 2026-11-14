@@ -4,24 +4,6 @@ import TaktAPI
 import TaktCore
 @testable import TaktUI
 
-/// Counts requests; fails for pairs listed in `failing`; returns 2× straight-line metres as "real".
-private actor FakeRoutes: RouteProvider {
-    var calls = 0
-    var failing: Set<String> = []
-    func fail(_ a: GeoPoint) { failing.insert("\(a.lat)") }
-    func cost(from: GeoPoint, to: GeoPoint, mode: TravelMode) async throws -> LegCost {
-        calls += 1
-        if failing.contains("\(from.lat)") || failing.contains("\(to.lat)") { throw URLError(.cannotFindHost) }
-        let s = LegCost.straightLine(from, to, mode: mode)
-        return LegCost(meters: s.meters * 2, seconds: s.seconds * 2, estimated: false)
-    }
-}
-
-@MainActor
-private func waitIdle(_ m: RouteMatrix) async {
-    for _ in 0..<200 where m.pending > 0 { try? await Task.sleep(for: .milliseconds(5)) }
-}
-
 @MainActor
 private func osaka() async throws -> (LevelModel, InMemoryBackend) {
     let backend = await InMemoryBackend.sample()
@@ -32,105 +14,74 @@ private func osaka() async throws -> (LevelModel, InMemoryBackend) {
 }
 
 @MainActor
-@Suite struct RouteMatrixTests {
-    let a = GeoPoint(lat: 34.6873, lng: 135.5262)
-    let b = GeoPoint(lat: 34.6654, lng: 135.4323)
-    let c = GeoPoint(lat: 34.6687, lng: 135.5013)
-
-    @Test func estimatesUntilRealCostsArriveThenCachesSymmetrically() async {
-        let fake = FakeRoutes()
-        let m = RouteMatrix(provider: fake, cacheURL: nil)
-        #expect(m.cost(a, b, mode: .walk).estimated)
-        m.prefetch([a, b, c], mode: .walk)
-        await waitIdle(m)
-        #expect(await fake.calls == 3) // 3 unordered pairs, not 6
-        let ab = m.cost(a, b, mode: .walk)
-        #expect(!ab.estimated)
-        #expect(m.cost(b, a, mode: .walk) == ab)
-        m.prefetch([a, b, c], mode: .walk)
-        await waitIdle(m)
-        #expect(await fake.calls == 3) // cached
-        m.prefetch([a, b], mode: .drive)
-        await waitIdle(m)
-        #expect(await fake.calls == 4) // per travel mode
-    }
-
-    @Test func unavailableRoutesFallBackToEstimates() async {
-        let fake = FakeRoutes()
-        await fake.fail(c)
-        let m = RouteMatrix(provider: fake, cacheURL: nil)
-        m.prefetch([a, c], mode: .transit)
-        await waitIdle(m)
-        #expect(m.cost(a, c, mode: .transit).estimated)
-    }
-
-    @Test func largeLevelsOnlyFetchConsecutiveLegs() async {
-        let fake = FakeRoutes()
-        let m = RouteMatrix(provider: fake, cacheURL: nil)
-        let pts = (0..<12).map { GeoPoint(lat: 35 + Double($0) / 100, lng: 139) }
-        m.prefetch(pts, mode: .walk)
-        await waitIdle(m)
-        #expect(await fake.calls == 11)
-    }
-
-    @Test func diskCacheKeepsOnlyRealRoutes() async throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("rc-\(UUID()).json")
-        let fake = FakeRoutes()
-        await fake.fail(c)
-        let m = RouteMatrix(provider: fake, cacheURL: url)
-        m.prefetch([a, b, c], mode: .walk)
-        await waitIdle(m)
-        try? await Task.sleep(for: .milliseconds(20))
-        let reopened = RouteMatrix(provider: FakeRoutes(), cacheURL: url)
-        #expect(!reopened.cost(a, b, mode: .walk).estimated)
-        #expect(reopened.cost(a, c, mode: .walk).estimated)
-    }
-}
-
-@MainActor
 @Suite struct RouteSummaryTests {
     @Test func straightLineSummaryMatchesTheSharedRules() async throws {
         let (m, _) = try await osaka()
-        let matrix = RouteMatrix(provider: StraightLineProvider(), cacheURL: nil)
-        let s = RouteSummary.make(tasks: m.items, selected: [], editing: false, objective: .distance,
-                                  mode: .walk, matrix: matrix)
+        let s = RouteSummary.make(tasks: m.items, selected: [], editing: false)
         #expect(s.status == .detour)
-        #expect(s.statusText == "多绕 18.0 km") // golden: 36.05 − 18.06
-        #expect(s.totalText == "约 36.1 km")
+        #expect(s.totalText == "36.1 km") // golden: 36.05
         #expect(s.legText[m.items[0].id] == "起点")
+        #expect(s.legText[m.items[1].id]?.hasPrefix("+") == true)
         #expect(s.optimizedOrder?.count == 6)
-        #expect(s.estimated)
     }
 
     @Test func dragPreviewAndScope() async throws {
         let (m, _) = try await osaka()
-        let matrix = RouteMatrix(provider: StraightLineProvider(), cacheURL: nil)
-        let editing = RouteSummary.make(tasks: m.items, selected: [], editing: true, objective: .distance,
-                                        mode: .walk, matrix: matrix)
-        #expect(editing.statusText == "预览中")
+        let editing = RouteSummary.make(tasks: m.items, selected: [], editing: true)
+        #expect(editing.status == .preview)
         #expect(editing.optimizedOrder == nil) // 重排 hidden during unsaved drags
-        let one = RouteSummary.make(tasks: m.items, selected: [m.items[0].id], editing: false,
-                                    objective: .distance, mode: .walk, matrix: matrix)
-        #expect(one.statusText == "至少 2 项")
+        let one = RouteSummary.make(tasks: m.items, selected: [m.items[0].id], editing: false)
+        #expect(one.status == .needMore)
+        #expect(one.totalText == "—")
         #expect(one.legText[m.items[1].id] == "")
-    }
-
-    @Test func timeObjectiveFormatsMinutes() {
-        #expect(RouteSummary.format(59, .time) == "1 分钟")
-        #expect(RouteSummary.format(18 * 60, .time) == "18 分钟")
-        #expect(RouteSummary.format(3600, .time) == "1 小时")
-        #expect(RouteSummary.format(3900, .time) == "1 小时 5 分")
-        #expect(RouteSummary.format(2450, .distance) == "2.5 km")
     }
 
     @Test func unlocatedTasksAreMarked() async throws {
         let (m, _) = try await osaka()
         _ = await m.create(name: "黑门市场", place: "", prerequisites: [])
-        let matrix = RouteMatrix(provider: StraightLineProvider(), cacheURL: nil)
-        let s = RouteSummary.make(tasks: m.items, selected: [], editing: false, objective: .time,
-                                  mode: .transit, matrix: matrix)
+        let s = RouteSummary.make(tasks: m.items, selected: [], editing: false)
         #expect(s.legText[m.items.last!.id] == "未定位")
         #expect(!s.routeIds.contains(m.items.last!.id))
+    }
+}
+
+@MainActor
+@Suite struct MapsLinkTests {
+    @Test func wholeRouteGoesByNameAndAddressInDrivingMode() async throws {
+        let (m, _) = try await osaka()
+        let url = try #require(MapsLink.route(m.items)).absoluteString
+        #expect(url.hasPrefix("https://www.google.com/maps/dir/?api=1&origin="))
+        #expect(url.hasSuffix("&travelmode=driving"))
+        // 6 stops: origin, destination and 4 waypoints separated by an encoded "|".
+        #expect(url.components(separatedBy: "%7C").count == 4)
+        let origin = try #require(MapsLink.query(m.items[0]))
+        #expect(origin == "中央区 · 大阪城公园 大阪府大阪市中央区大阪城1-1")
+        #expect(!url.contains("34.6873")) // no bare coordinates when an address is known
+        let decoded = try #require(url.removingPercentEncoding)
+        #expect(decoded.contains("origin=中央区 · 大阪城公园 大阪府大阪市中央区大阪城1-1&destination="))
+    }
+
+    @Test func unlocatedTasksAreSkippedAndOneStopIsNotARoute() async throws {
+        let (m, _) = try await osaka()
+        _ = await m.create(name: "随便逛逛", place: "心斋桥", prerequisites: [])
+        #expect(MapsLink.query(m.items.last!) == nil)
+        #expect(MapsLink.route(m.items)?.absoluteString.contains("%E5%BF%83%E6%96%8B%E6%A1%A5") == false)
+        #expect(MapsLink.route([m.items[0]]) == nil)
+    }
+
+    @Test func placesWithoutAnAddressFallBackToCoordinates() {
+        let t = TaskSummary(id: "x", name: "x", short: "x", place: "某处", address: "", lat: 34.5, lng: 135.25,
+                            completed: false, prerequisites: [], childCount: 0)
+        #expect(MapsLink.query(t) == "34.5,135.25")
+    }
+
+    @Test func pickedPlacesKeepTheirNameAndAddress() async throws {
+        let (m, _) = try await osaka()
+        let pick = PlaceChoice(name: "黑门市场", address: "日本大阪府大阪市中央区日本橋2丁目4-1", lat: 34.6654, lng: 135.5063)
+        #expect(await m.create(name: "吃螃蟹", place: "黑门", location: pick, prerequisites: []))
+        let t = m.items.last!
+        #expect(t.place == "黑门市场" && t.address == pick.address && t.lat == 34.6654)
+        #expect(MapsLink.query(t) == "黑门市场 日本大阪府大阪市中央区日本橋2丁目4-1")
     }
 }
 

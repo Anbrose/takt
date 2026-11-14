@@ -40,6 +40,8 @@ export const tasks = pgTable(
     name: text().notNull(),
     short: text().notNull(),
     place: text().notNull().default(''),
+    /** Full postal address from the place search; with `place` it identifies the spot for map apps. */
+    address: text().notNull().default(''),
     lat: doublePrecision(),
     lng: doublePrecision(),
     completedAt: timestamp('completed_at', { withTimezone: true }),

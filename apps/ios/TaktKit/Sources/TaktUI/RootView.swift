@@ -4,14 +4,11 @@ import TaktAPI
 /// App root: loads the first project and shows 规划模式, or a minimal empty / error state.
 public struct RootView: View {
     @State private var app: AppModel
-    @State private var matrix: RouteMatrix
     @AppStorage("theme") private var themeRaw = ThemeChoice.system.rawValue
     @State private var newName = ""
 
-    public init(backend: any TaktBackend, routes: any RouteProvider = MapKitRouteProvider()) {
+    public init(backend: any TaktBackend) {
         _app = State(initialValue: AppModel(backend: backend))
-        _matrix = State(initialValue: RouteMatrix(
-            provider: routes, cacheURL: routes is MapKitRouteProvider ? RouteMatrix.defaultCacheURL : nil))
     }
 
     private var theme: Binding<ThemeChoice> {
@@ -39,7 +36,6 @@ public struct RootView: View {
             }
         }
         .background(Palette.bg.ignoresSafeArea())
-        .environment(matrix)
         .preferredColorScheme(theme.wrappedValue.colorScheme)
         .task { await app.start() }
     }
@@ -67,7 +63,7 @@ private struct PreviewHost: View {
     @State private var backend: InMemoryBackend?
     var body: some View {
         Group {
-            if let backend { RootView(backend: backend, routes: StraightLineProvider()) } else { Color.clear }
+            if let backend { RootView(backend: backend) } else { Color.clear }
         }
         .task { backend = await InMemoryBackend.sample() }
     }

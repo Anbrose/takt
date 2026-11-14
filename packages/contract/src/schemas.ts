@@ -21,13 +21,18 @@ export const TaskSummary = z
     name: z.string(),
     short: z.string(),
     place: z.string(),
+    address: z.string(),
     lat: Lat.nullable(),
     lng: Lng.nullable(),
     completed: z.boolean(),
     prerequisites: z.array(Prerequisite),
     childCount: z.int().min(0),
   })
-  .meta({ id: 'TaskSummary', description: 'One row of a level list. lat/lng null = 未定位.' });
+  .meta({
+    id: 'TaskSummary',
+    description:
+      'One row of a level list. lat/lng null = 未定位. place + address identify the spot for map apps.',
+  });
 
 export const Crumb = z.object({ id: z.uuid(), name: z.string() }).meta({ id: 'Crumb' });
 
@@ -65,6 +70,7 @@ export const CreateTask = z
     name: z.string().trim().min(1).max(200),
     short: z.string().trim().min(1).max(40).optional(),
     place: z.string().trim().max(200).optional(),
+    address: z.string().trim().max(300).optional(),
     lat: Lat.nullable().optional(),
     lng: Lng.nullable().optional(),
     prerequisites: z.array(NewPrerequisite).max(50).optional(),
@@ -126,6 +132,7 @@ export const RunTask = z
     id: z.uuid(),
     name: z.string(),
     place: z.string(),
+    address: z.string(),
     lat: Lat.nullable(),
     lng: Lng.nullable(),
     prerequisites: z.array(Prerequisite),

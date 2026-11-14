@@ -12,7 +12,15 @@ const crumb = (t: TaskNode) => ({ id: t.id, name: t.name });
 function step(s: RunStep) {
   const t = s.task;
   return {
-    task: { id: t.id, name: t.name, place: t.place, lat: t.lat, lng: t.lng, prerequisites: t.prerequisites },
+    task: {
+      id: t.id,
+      name: t.name,
+      place: t.place,
+      address: t.address,
+      lat: t.lat,
+      lng: t.lng,
+      prerequisites: t.prerequisites,
+    },
     path: s.ancestors.map(crumb),
   };
 }

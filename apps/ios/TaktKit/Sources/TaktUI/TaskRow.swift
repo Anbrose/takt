@@ -11,8 +11,13 @@ struct TaskRow: View {
     var compact = false
     /// "起点" / "+2.4 km" / "未定位" — shown only when compact.
     var leg = ""
+    /// 左滑: the red 删除 button is showing over the handle.
+    var revealed = false
     let onToggle: () -> Void
     let onOpen: () -> Void
+    /// Horizontal swipe on the card: left (true) shows 删除, right (false) hides it.
+    var onSwipe: (_ open: Bool) -> Void = { _ in }
+    var onDelete: () -> Void = {}
     /// Drag handle callbacks; `offset` is the finger's vertical travel since touch-down.
     let onDragChanged: (_ offset: CGFloat) -> Void
     let onDragEnded: () -> Void
@@ -53,14 +58,47 @@ struct TaskRow: View {
         }
         .padding(EdgeInsets(top: 4, leading: 2, bottom: 4, trailing: 4))
         .background(Palette.surface, in: RoundedRectangle(cornerRadius: Metrics.cardRadius))
+        .overlay(alignment: .trailing) { deleteButton }
+        .clipShape(RoundedRectangle(cornerRadius: Metrics.cardRadius))
         .overlay(
             RoundedRectangle(cornerRadius: Metrics.cardRadius)
                 .strokeBorder(selected ? Palette.accent : Palette.line, lineWidth: 1.5)
+        )
+        // Simultaneous, so vertical scrolling and the handle's own drag keep working;
+        // only a clearly horizontal swipe counts.
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 24)
+                .onEnded { v in
+                    let dx = v.translation.width, dy = v.translation.height
+                    guard !dragging, abs(dx) > 40, abs(dx) > abs(dy) * 1.5 else { return }
+                    onSwipe(dx < 0)
+                }
         )
         .shadow(color: .black.opacity(dragging ? 0.22 : 0), radius: dragging ? 12 : 0, y: dragging ? 10 : 0)
         .opacity(compact && leg == "未定位" ? 0.45 : 1)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("row.\(task.name)")
+        .accessibilityAction(named: "删除") { onDelete() }
+    }
+
+    /// Slides in from the right edge and covers the drag handle. Hidden = not in the hierarchy at
+    /// all (as with the sheets), so VoiceOver and UI tests never find it; VoiceOver users get the
+    /// row's 删除 action instead.
+    @ViewBuilder private var deleteButton: some View {
+        if revealed {
+            Button(action: onDelete) {
+                Image(systemName: "trash")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 64)
+                    .frame(maxHeight: .infinity)
+                    .background(Palette.danger)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("删除：\(task.name)")
+            .transition(.move(edge: .trailing))
+        }
     }
 
     /// 地点 · 前置条件 · "N 项 ›" — folded away in 地图 mode.

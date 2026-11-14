@@ -10,7 +10,6 @@ import TaktAPI
 /// - otherwise http://127.0.0.1:3000 (the simulator reaches the Mac's localhost)
 public struct AppRoot: View {
     @State private var backend: (any TaktBackend)?
-    @State private var routes: any RouteProvider = MapKitRouteProvider()
     @State private var splash = true
     /// First launch shows 重播 / 开始; afterwards the splash plays and hands over by itself.
     @AppStorage("splash.seen") private var splashSeen = false
@@ -27,7 +26,7 @@ public struct AppRoot: View {
         ZStack {
             // Loads underneath while the splash plays.
             if let backend {
-                RootView(backend: backend, routes: routes)
+                RootView(backend: backend)
             } else {
                 Palette.bg.ignoresSafeArea()
             }
@@ -42,9 +41,8 @@ public struct AppRoot: View {
         }
         .task {
             guard backend == nil else { return }
-            // -demo: offline sample data and straight-line routes (deterministic for UI tests).
+            // -demo: offline sample data (deterministic for UI tests).
             if info.arguments.contains("-demo") {
-                routes = StraightLineProvider()
                 backend = await InMemoryBackend.sample()
             } else {
                 let fromEnv = info.environment["TAKT_API_URL"].flatMap(URL.init(string:))

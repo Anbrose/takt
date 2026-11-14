@@ -28,6 +28,7 @@ public struct PlanScreen: View {
             .clipped()
         }
         .background(Palette.bg.ignoresSafeArea())
+        .overlay(alignment: .bottomTrailing) { AddButton(hidden: level.isEditing || adding) { add() } }
         .overlay(alignment: .bottom) { SaveBar(model: level) }
         .overlay { NewTaskSheet(model: level, isPresented: $adding) }
         .overlay(alignment: .top) { NoticeToast(model: level) }
@@ -90,6 +91,10 @@ public struct PlanScreen: View {
         return .asymmetric(insertion: .offset(x: dx).combined(with: .opacity), removal: .opacity)
     }
 
+    private func add() {
+        Motion.with(Motion.sheet, reduce: reduce) { adding = true }
+    }
+
     private func open(_ id: String) {
         Motion.with(Motion.nav, reduce: reduce) { plan.open(id) }
     }
@@ -119,7 +124,8 @@ struct LevelList: View {
     @Binding var adding: Bool
     let onOpen: (String) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduce
-    @Environment(RouteMatrix.self) private var matrix
+    /// Row whose 删除 button is showing (左滑); one at a time.
+    @State private var swiped: String?
 
     /// Tasks in the order a release would give (live drag preview → 预览中 numbers).
     private var previewTasks: [TaskSummary] {
@@ -128,18 +134,7 @@ struct LevelList: View {
     }
 
     private var summary: RouteSummary {
-        RouteSummary.make(
-            tasks: previewTasks, selected: model.selection, editing: model.isEditing,
-            objective: plan.objective, mode: plan.travel, matrix: matrix
-        )
-    }
-
-    /// In-scope located points; what the route matrix needs for this level.
-    private var routePoints: [GeoPoint] {
-        model.items.compactMap { t in
-            guard model.scopeAll || model.isSelected(t.id), let lat = t.lat, let lng = t.lng else { return nil }
-            return GeoPoint(lat: lat, lng: lng)
-        }
+        RouteSummary.make(tasks: previewTasks, selected: model.selection, editing: model.isEditing)
     }
 
     var body: some View {
@@ -151,8 +146,6 @@ struct LevelList: View {
                     if plan.mapOn {
                         MapPanel(
                             tasks: previewTasks, scope: model.selection, summary: summary,
-                            scopeLabel: model.scopeLabel, loading: matrix.pending > 0,
-                            objective: $plan.objective, travel: $plan.travel,
                             onOptimize: { order in Task { await model.applyOrder(order) } }
                         )
                         .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: -12)))
@@ -164,12 +157,10 @@ struct LevelList: View {
                 }
                 .padding(.horizontal, Metrics.gutter)
                 .padding(.top, 4)
-                .padding(.bottom, model.isEditing ? 96 : 16)
+                // Room for the 取消 / 保存 bar, or for the floating + over the last row's handle.
+                .padding(.bottom, model.isEditing ? 96 : 88)
             }
             .scrollDisabled(model.drag != nil)
-            .task(id: plan.mapOn ? "\(routePoints)|\(plan.travel)" : "off") {
-                if plan.mapOn { matrix.prefetch(routePoints, mode: plan.travel) }
-            }
             .onChange(of: plan.mapOn) { _, on in
                 if on { Motion.with(Motion.settle, reduce: reduce) { proxy.scrollTo("top", anchor: .top) } }
             }
@@ -184,32 +175,27 @@ struct LevelList: View {
         }
     }
 
+    /// Just 地图, full width (新建 is the floating +).
     private var toolbar: some View {
-        HStack(spacing: 12) {
-            ToolButton(icon: "point.topleft.down.to.point.bottomright.curvepath", title: "地图", pressed: plan.mapOn) {
-                Motion.with(Motion.settle, reduce: reduce) { plan.mapOn.toggle() }
-            }
-            .accessibilityAddTraits(plan.mapOn ? .isSelected : [])
-            ToolButton(icon: "plus", title: "新建") {
-                Motion.with(Motion.sheet, reduce: reduce) { adding = true }
-            }
-            Spacer(minLength: 0)
-            Text(model.scopeLabel)
-                .font(.system(size: 13))
-                .foregroundStyle(Palette.muted)
-                .contentTransition(.numericText())
-            Button {
-                Motion.with(Motion.fade, reduce: reduce) { model.toggleAll() }
-            } label: {
-                Text(model.allLabel)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Palette.accentText)
-                    .frame(minWidth: Metrics.hit, minHeight: Metrics.hit)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .disabled(model.items.isEmpty)
+        ToolButton(
+            icon: "point.topleft.down.to.point.bottomright.curvepath", title: "地图", pressed: plan.mapOn, wide: true
+        ) {
+            swiped = nil
+            Motion.with(Motion.settle, reduce: reduce) { plan.mapOn.toggle() }
         }
+        .accessibilityAddTraits(plan.mapOn ? .isSelected : [])
+    }
+
+    private func delete(_ id: String) {
+        swiped = nil
+        Task { await model.delete(id) }
+    }
+
+    /// While a 删除 button is showing, the next tap on a card just closes it.
+    private func closeSwipe() -> Bool {
+        guard swiped != nil else { return false }
+        Motion.with(Motion.settle, reduce: reduce) { swiped = nil }
+        return true
     }
 
     private var rows: some View {
@@ -224,9 +210,19 @@ struct LevelList: View {
                     dragging: dragged,
                     compact: plan.mapOn,
                     leg: legs[task.id] ?? "",
-                    onToggle: { Motion.with(Motion.fade, reduce: reduce) { model.toggle(task.id) } },
-                    onOpen: { onOpen(task.id) },
+                    revealed: swiped == task.id,
+                    onToggle: {
+                        if closeSwipe() { return }
+                        Motion.with(Motion.fade, reduce: reduce) { model.toggle(task.id) }
+                    },
+                    onOpen: { if !closeSwipe() { onOpen(task.id) } },
+                    onSwipe: { open in
+                        guard !model.isEditing else { return }
+                        Motion.with(Motion.settle, reduce: reduce) { swiped = open ? task.id : nil }
+                    },
+                    onDelete: { delete(task.id) },
                     onDragChanged: { dy in
+                        if swiped != nil { swiped = nil }
                         if model.drag == nil { Motion.with(Motion.sheet, reduce: reduce) { model.beginDrag(task.id) } }
                         model.updateDrag(offset: dy)
                     },
@@ -286,6 +282,35 @@ struct OrderRail: View {
         .clipped()
         .motion(Motion.settle, value: on, reduce: reduce)
         .accessibilityHidden(true)
+    }
+}
+
+// MARK: - 新建
+
+/// Floating + (bottom right); hidden while the 取消 / 保存 bar or the 新建 sheet is up.
+struct AddButton: View {
+    let hidden: Bool
+    let action: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduce
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "plus")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Palette.onFill)
+                .frame(width: 56, height: 56)
+                .background(Palette.fill, in: Circle())
+                .shadow(color: .black.opacity(0.22), radius: 9, y: 6)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("新建")
+        .padding(.trailing, Metrics.gutter)
+        .padding(.bottom, 16)
+        .scaleEffect(hidden ? 0.6 : 1)
+        .opacity(hidden ? 0 : 1)
+        .allowsHitTesting(!hidden)
+        .accessibilityHidden(hidden)
+        .motion(Motion.fade, value: hidden, reduce: reduce)
     }
 }
 

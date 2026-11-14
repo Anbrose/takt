@@ -29,7 +29,7 @@ private func backend(_ json: String, status: HTTPResponse.Status = .ok) -> LiveB
 }
 
 @Test func decodesNullCoordinatesAsNil() async throws {
-    let b = backend(#"{"projectId":"p","task":{"id":"t","name":"大阪"},"breadcrumb":[{"id":"t","name":"大阪"}],"version":3,"children":[{"id":"c","name":"新","short":"新","place":"","lat":null,"lng":null,"completed":false,"prerequisites":[],"childCount":0}]}"#)
+    let b = backend(#"{"projectId":"p","task":{"id":"t","name":"大阪"},"breadcrumb":[{"id":"t","name":"大阪"}],"version":3,"children":[{"id":"c","name":"新","short":"新","place":"","address":"","lat":null,"lng":null,"completed":false,"prerequisites":[],"childCount":0}]}"#)
     let level = try await b.level("t")
     #expect(level.children.first?.lat == nil)
     #expect(level.version == 3)

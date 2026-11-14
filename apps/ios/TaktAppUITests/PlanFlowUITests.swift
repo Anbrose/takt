@@ -83,9 +83,10 @@ final class PlanFlowUITests: XCTestCase {
     func testSelectAndCreate() {
         enterOsaka()
         app.buttons["勾选：道顿堀"].tap()
-        XCTAssertTrue(app.staticTexts["已选 1 项"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["取消勾选：道顿堀"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.buttons["全选"].exists, "全选 is gone")
 
-        app.buttons["新建"].tap()
+        app.buttons["新建"].tap() // the floating +
         let field = app.textFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 2))
         field.tap()
@@ -96,9 +97,29 @@ final class PlanFlowUITests: XCTestCase {
         XCTAssertTrue(row("黑门市场").waitForExistence(timeout: 5))
         snap("after create")
     }
+
+    func testSwipeLeftToDelete() throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["TAKT_UITEST_SERVER"] != nil,
+                      "demo-only: would delete the live server's data")
+        enterOsaka()
+        let delete = app.buttons["删除：道顿堀"]
+        XCTAssertFalse(delete.exists, "hidden until swiped")
+        row("道顿堀").swipeLeft()
+        XCTAssertTrue(delete.waitForExistence(timeout: 2))
+        snap("swiped")
+        row("海游馆").swipeLeft() // only one open at a time
+        XCTAssertTrue(app.buttons["删除：海游馆"].waitForExistence(timeout: 2))
+        row("海游馆").swipeRight()
+        row("道顿堀").swipeLeft()
+        app.buttons["删除：道顿堀"].tap()
+        let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: row("道顿堀"))
+        wait(for: [gone], timeout: 3)
+        XCTAssertTrue(row("海游馆").exists)
+        snap("after delete")
+    }
 }
 
-/// 地图: pins + dotted line, status, 重排 (demo data uses straight-line routes, so numbers are stable).
+/// 地图: pins + dashed legs, distance, 重排, Google 地图 (straight-line distances, so numbers are stable).
 final class MapUITests: XCTestCase {
     private var app: XCUIApplication!
     private var live: Bool { ProcessInfo.processInfo.environment["TAKT_UITEST_SERVER"] != nil }
@@ -134,27 +155,28 @@ final class MapUITests: XCTestCase {
         try XCTSkipIf(live, "demo-only: 重排 would reorder the live server's data")
         app.buttons["地图"].tap()
         XCTAssertTrue(app.staticTexts["起点"].waitForExistence(timeout: 3), "rows compress and show legs")
-        XCTAssertTrue(staticText(containing: "多").waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["36.1 km"].waitForExistence(timeout: 3), "only the distance, no status words")
+        XCTAssertFalse(app.buttons["公交"].exists, "no 出行方式 picker any more")
+        XCTAssertTrue(app.links["Google 地图"].exists || app.buttons["Google 地图"].exists)
         snap("map · detour")
         let optimize = app.buttons["重排"]
         XCTAssertTrue(optimize.isHittable)
         optimize.tap()
-        XCTAssertTrue(app.staticTexts["不绕路"].waitForExistence(timeout: 3))
+        let hidden = expectation(for: NSPredicate(format: "hittable == false"), evaluatedWith: optimize)
+        wait(for: [hidden], timeout: 3)
         XCTAssertFalse(app.buttons["保存"].exists, "重排 saves directly, no 取消/保存 bar")
-        app.buttons["距离"].tap()
-        XCTAssertTrue(staticText(containing: "km").waitForExistence(timeout: 2))
-        snap("map · optimized · distance")
+        XCTAssertTrue(staticText(containing: "km").exists)
+        snap("map · optimized")
     }
 
-    func testLiveMapKitRoutes() throws {
-        try XCTSkipUnless(live, "needs TAKT_UITEST_SERVER")
+    func testTapAPinHighlightsItsLegs() {
         app.buttons["地图"].tap()
-        XCTAssertTrue(app.staticTexts["起点"].waitForExistence(timeout: 5))
-        sleep(8) // let MapKit ETAs arrive
-        snap("live map · transit · time")
-        app.buttons["自驾"].tap()
-        sleep(6)
-        snap("live map · drive")
+        let pin = app.buttons["3 道顿堀"]
+        XCTAssertTrue(pin.waitForExistence(timeout: 5))
+        pin.tap()
+        snap("map · focus 3")
+        pin.tap()
+        snap("map · whole route again")
     }
 }
 

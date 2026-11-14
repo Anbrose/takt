@@ -1,7 +1,10 @@
+import MapKit
 import SwiftUI
+import TaktAPI
 
 /// 新建任务: slides up from the bottom over a scrim. Creates at the end of the current level.
-/// Fields: 名称, 地点; 前置条件 are folded until "+ 前置条件" adds a row.
+/// Fields: 名称, 地点 (with 地点联想); 前置条件 are folded until "+ 前置条件" adds a row.
+/// Only a place picked from the suggestions is located; free text stays 未定位.
 struct NewTaskSheet: View {
     let model: LevelModel
     @Binding var isPresented: Bool
@@ -12,6 +15,9 @@ struct NewTaskSheet: View {
 
     @State private var name = ""
     @State private var place = ""
+    /// The suggestion picked for 地点; cleared as soon as the text is edited again.
+    @State private var picked: PlaceChoice?
+    @State private var search = PlaceSearch()
     @State private var pres: [Entry] = []
     @State private var submitting = false
     @FocusState private var focus: Field?
@@ -57,10 +63,7 @@ struct NewTaskSheet: View {
                 .focused($focus, equals: .name)
                 .submitLabel(.next)
                 .onSubmit { focus = .place }
-            LabeledField(label: "地点", text: $place)
-                .focused($focus, equals: .place)
-                .submitLabel(.done)
-                .onSubmit(submit)
+            placeField
 
             VStack(alignment: .leading, spacing: 8) {
                 ForEach($pres) { $entry in
@@ -110,6 +113,95 @@ struct NewTaskSheet: View {
         }
     }
 
+    /// 地点 + suggestions (title, grey address). A pick fills the field and shows the pin.
+    private var placeField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("地点").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.muted)
+            TextField("", text: $place)
+                .font(.system(size: 16))
+                .foregroundStyle(Palette.text)
+                .padding(.leading, 14)
+                .padding(.trailing, 44)
+                .frame(height: 48)
+                .background(Palette.bg, in: RoundedRectangle(cornerRadius: Metrics.controlRadius))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Metrics.controlRadius)
+                        .strokeBorder(picked == nil ? Palette.line : Palette.accent, lineWidth: 1)
+                )
+                .overlay(alignment: .trailing) {
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Palette.accentText)
+                        .padding(.trailing, 14)
+                        .opacity(picked == nil ? 0 : 1)
+                        .accessibilityHidden(true)
+                }
+                .focused($focus, equals: .place)
+                .submitLabel(.done)
+                .onSubmit(submit)
+                .accessibilityLabel(picked == nil ? "地点" : "地点，已定位")
+                .onChange(of: place) { _, text in
+                    if let p = picked, p.name != text { picked = nil }
+                    if picked == nil { search.update(text) }
+                }
+
+            if showSuggestions {
+                VStack(spacing: 0) {
+                    ForEach(search.suggestions) { s in
+                        Button { pick(s) } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "mappin")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(Palette.muted)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(s.title)
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(Palette.text)
+                                    if !s.subtitle.isEmpty {
+                                        Text(s.subtitle)
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(Palette.muted)
+                                    }
+                                }
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(.horizontal, 14)
+                            .frame(minHeight: 52)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(s.title)，\(s.subtitle)")
+                    }
+                }
+                .padding(.vertical, 4)
+                .background(Palette.bg, in: RoundedRectangle(cornerRadius: Metrics.controlRadius))
+                .overlay(RoundedRectangle(cornerRadius: Metrics.controlRadius).strokeBorder(Palette.line, lineWidth: 1))
+                .transition(.opacity)
+            }
+        }
+        .motion(Motion.fade, value: showSuggestions, reduce: reduce)
+        .onAppear { search.bias(to: model.items.compactMap(Self.coordinate)) }
+    }
+
+    private var showSuggestions: Bool {
+        focus == .place && picked == nil && !place.isEmpty && !search.suggestions.isEmpty
+    }
+
+    private static func coordinate(_ t: TaskSummary) -> CLLocationCoordinate2D? {
+        guard let lat = t.lat, let lng = t.lng else { return nil }
+        return CLLocationCoordinate2D(latitude: lat, longitude: lng)
+    }
+
+    private func pick(_ s: PlaceSearch.Suggestion) {
+        Task {
+            guard let choice = await search.resolve(s) else { return }
+            picked = choice
+            place = choice.name
+            search.clear()
+        }
+    }
+
     private func index(of id: UUID) -> Int { pres.firstIndex { $0.id == id } ?? 0 }
 
     private func addPrerequisite() {
@@ -130,12 +222,15 @@ struct NewTaskSheet: View {
         }
         submitting = true
         Task {
-            let ok = await model.create(name: name, place: place, prerequisites: pres.map(\.text))
+            let ok = await model.create(
+                name: name, place: place, location: picked, prerequisites: pres.map(\.text))
             submitting = false
             if ok {
                 close()
                 name = ""
                 place = ""
+                picked = nil
+                search.clear()
                 pres = []
             }
         }

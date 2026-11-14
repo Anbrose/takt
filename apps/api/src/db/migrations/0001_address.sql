@@ -1,0 +1,1 @@
+ALTER TABLE "tasks" ADD COLUMN "address" text DEFAULT '' NOT NULL;

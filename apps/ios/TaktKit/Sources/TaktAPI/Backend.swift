@@ -36,6 +36,8 @@ public protocol TaktBackend: Sendable {
     func level(_ taskId: String) async throws -> Level
     func createTask(in parentId: String, _ body: CreateTaskBody) async throws -> TaskSummary
     func reorder(_ parentId: String, ids: [String], version: Int) async throws -> Level
+    /// 左滑删除: removes the task and everything under it; returns the parent level.
+    func deleteTask(_ id: String) async throws -> Level
     func setPrerequisite(_ id: String, done: Bool) async throws -> Prerequisite
 }
 
@@ -91,6 +93,15 @@ public struct LiveBackend: TaktBackend {
         case .badRequest(let r): throw err(400, try r.body.json)
         case .notFound(let r): throw err(404, try r.body.json)
         case .conflict(let r): throw err(409, try r.body.json)
+        case .undocumented(let s, _): throw BackendError.unexpected(status: s)
+        }
+    }
+
+    public func deleteTask(_ id: String) async throws -> Level {
+        switch try await client.deleteTask(path: .init(taskId: id)) {
+        case .ok(let r): return try r.body.json
+        case .badRequest(let r): throw err(400, try r.body.json)
+        case .notFound(let r): throw err(404, try r.body.json)
         case .undocumented(let s, _): throw BackendError.unexpected(status: s)
         }
     }

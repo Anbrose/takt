@@ -26,6 +26,8 @@ export interface TaskNode {
   name: string;
   short: string;
   place: string;
+  /** Full postal address of the place (from the place search); '' when unknown. */
+  address: string;
   lat: number | null;
   lng: number | null;
   completed: boolean;

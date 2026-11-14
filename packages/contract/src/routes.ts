@@ -67,6 +67,16 @@ export const routes = {
     status: 201,
     errors: [400, 404],
   },
+  deleteTask: {
+    operationId: 'deleteTask',
+    method: 'DELETE',
+    path: '/tasks/{taskId}',
+    summary: '左滑删除: delete a task (and everything under it); returns its parent level',
+    params: S.TaskParams,
+    response: S.Level,
+    status: 200,
+    errors: [400, 404],
+  },
   reorderLevel: {
     operationId: 'reorderLevel',
     method: 'PUT',

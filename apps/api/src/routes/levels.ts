@@ -1,4 +1,4 @@
-import { and, count, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { z } from 'zod';
 import { routes, type CreateTask } from '@takt/contract';
@@ -14,6 +14,7 @@ export function summary(n: TaskNode) {
     name: n.name,
     short: n.short,
     place: n.place,
+    address: n.address,
     lat: n.lat,
     lng: n.lng,
     completed: n.completed,
@@ -54,6 +55,7 @@ export async function createTask(db: Db, parentId: string, body: z.output<typeof
         name: body.name,
         short: body.short ?? body.name,
         place: body.place ?? '',
+        address: body.address ?? '',
         lat: body.lat ?? null,
         lng: body.lng ?? null,
       })
@@ -76,6 +78,7 @@ export async function createTask(db: Db, parentId: string, body: z.output<typeof
       name: row!.name,
       short: row!.short,
       place: row!.place,
+      address: row!.address,
       lat: row!.lat,
       lng: row!.lng,
       completed: false,
@@ -108,6 +111,37 @@ export function levelRoutes(app: FastifyInstance, db: Db, owner: ResolveOwner) {
   route(app, owner, routes.createTask, async ({ owner, params, body }) => {
     await projectOfTask(db, owner, params.taskId);
     return createTask(db, params.taskId, body);
+  });
+
+  route(app, owner, routes.deleteTask, async ({ owner, params }) => {
+    await projectOfTask(db, owner, params.taskId);
+    const parentId = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .select({ parentId: tasks.parentId })
+        .from(tasks)
+        .where(eq(tasks.id, params.taskId))
+        .for('update');
+      if (!row) throw notFound('Task');
+      if (row.parentId === null)
+        throw new HttpError(400, 'cannot_delete_root', 'The project root cannot be deleted');
+      // Locks the parent row (like create / reorder) and invalidates saved orders of this level.
+      await tx
+        .update(tasks)
+        .set({ childrenVersion: sql`${tasks.childrenVersion} + 1` })
+        .where(eq(tasks.id, row.parentId));
+      await tx.delete(tasks).where(eq(tasks.id, params.taskId)); // children + prerequisites cascade
+      const rest = await tx
+        .select({ id: tasks.id })
+        .from(tasks)
+        .where(eq(tasks.parentId, row.parentId))
+        .orderBy(asc(tasks.position));
+      for (const [i, r] of rest.entries()) {
+        await tx.update(tasks).set({ position: i }).where(eq(tasks.id, r.id));
+      }
+      return row.parentId;
+    });
+    const { tree, task } = await loadTask(db, owner, parentId);
+    return level(tree, task);
   });
 
   route(app, owner, routes.reorderLevel, async ({ owner, params, body }) => {
