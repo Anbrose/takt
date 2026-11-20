@@ -1,12 +1,16 @@
 import SwiftUI
 import TaktAPI
 
-/// App root: loads the first project and shows 规划模式, or a minimal empty / error state.
+/// App root: Project 列表, with the open project pushed over it (规划页 slides in from the right,
+/// the list drifts left and dims; back reverses it). Loading / error states cross-fade.
 public struct RootView: View {
     @State private var app: AppModel
     @State private var matrix: RouteMatrix
     @AppStorage("theme") private var themeRaw = ThemeChoice.system.rawValue
-    @State private var newName = ""
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    /// The list is taken out of the hierarchy once a project fully covers it (so VoiceOver and
+    /// UI tests only see one screen), and put back under the project just before popping.
+    @State private var listMounted = true
 
     public init(backend: any TaktBackend, routes: any RouteProvider = MapKitRouteProvider()) {
         _app = State(initialValue: AppModel(backend: backend))
@@ -19,29 +23,69 @@ public struct RootView: View {
     }
 
     public var body: some View {
-        Group {
+        ZStack {
             switch app.phase {
             case .loading:
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.opacity)
             case .failed(let message):
                 status(icon: "wifi.exclamationmark", text: message) {
-                    WideButton(title: "重试", kind: .primary) { Task { await app.start() } }
+                    WideButton(title: "重试", kind: .primary) { Task { await app.start(animation: Motion.fade) } }
                         .frame(width: 160)
                 }
-            case .empty:
-                status(icon: "square.stack.3d.up", text: "还没有 Project") {
-                    InputField(text: $newName, placeholder: "名称").frame(maxWidth: 280)
-                    WideButton(title: "新建", kind: .primary) { Task { await app.createProject(name: newName) } }
-                        .frame(width: 160)
-                }
-            case .ready(let plan):
-                PlanScreen(plan: plan, theme: theme)
+                .transition(.opacity)
+            case .ready:
+                stack.transition(.opacity)
             }
         }
         .background(Palette.bg.ignoresSafeArea())
         .environment(matrix)
         .preferredColorScheme(theme.wrappedValue.colorScheme)
-        .task { await app.start() }
+        .task { await app.start(animation: Motion.fade) }
+    }
+
+    private var stack: some View {
+        GeometryReader { geo in
+            let pushed = app.open != nil
+            ZStack {
+                if listMounted || !pushed {
+                ProjectListScreen(app: app, theme: theme)
+                    .overlay {
+                        Color.black
+                            .opacity(pushed ? 0.18 : 0)
+                            .ignoresSafeArea()
+                            .allowsHitTesting(false)
+                    }
+                    .offset(x: pushed && !reduce ? -geo.size.width * 0.28 : 0)
+                    .allowsHitTesting(!pushed)
+                    .accessibilityHidden(pushed)
+                }
+
+                if let plan = app.open {
+                    PlanScreen(plan: plan, theme: theme) {
+                        listMounted = true
+                        // Next runloop: the list is laid out (drifted left, dimmed) before it slides back.
+                        DispatchQueue.main.async {
+                            app.closeProject(animation: reduce ? Motion.fade : Motion.push)
+                        }
+                    }
+                    .id(plan.project.id)
+                    .background(Palette.bg.ignoresSafeArea())
+                    .compositingGroup()
+                    .shadow(color: .black.opacity(0.12), radius: 15, x: -10)
+                    .transition(reduce ? .opacity : .move(edge: .trailing))
+                    .zIndex(1)
+                }
+            }
+            .onChange(of: app.open?.project.id) { _, id in
+                guard id != nil else { return }
+                Task {
+                    try? await Task.sleep(for: .milliseconds(480))
+                    if app.open != nil { listMounted = false }
+                }
+            }
+        }
     }
 
     private func status<C: View>(icon: String, text: String, @ViewBuilder actions: () -> C) -> some View {

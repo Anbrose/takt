@@ -37,8 +37,29 @@ public actor InMemoryBackend: TaktBackend {
         try check("createProject")
         let root = add(parent: nil, name: name)
         let p = Project(id: newId(), name: name, rootTaskId: root, createdAt: Date())
-        projectList.append(p)
+        projectList.insert(p, at: 0)
         return p
+    }
+
+    public func renameProject(_ id: String, name: String) async throws -> Project {
+        try check("renameProject \(id)")
+        guard let i = projectList.firstIndex(where: { $0.id == id }) else { throw notFound }
+        projectList[i].name = name
+        let root = projectList[i].rootTaskId
+        nodes[root]?.summary.name = name
+        nodes[root]?.summary.short = name
+        return projectList[i]
+    }
+
+    public func deleteProject(_ id: String) async throws {
+        try check("deleteProject \(id)")
+        guard let i = projectList.firstIndex(where: { $0.id == id }) else { throw notFound }
+        var stack = [projectList[i].rootTaskId]
+        while let t = stack.popLast() {
+            stack += nodes[t]?.children ?? []
+            nodes[t] = nil
+        }
+        projectList.remove(at: i)
     }
 
     public func level(_ taskId: String) async throws -> Level {

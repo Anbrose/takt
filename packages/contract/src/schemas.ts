@@ -44,6 +44,12 @@ export const CreateProject = z
   .object({ name: z.string().trim().min(1).max(200) })
   .meta({ id: 'CreateProject' });
 
+export const UpdateProject = z
+  .object({ name: z.string().trim().min(1).max(200) })
+  .meta({ id: 'UpdateProject' });
+
+export const DeletedProject = z.object({ id: z.uuid() }).meta({ id: 'DeletedProject' });
+
 export const Level = z
   .object({
     projectId: z.uuid(),

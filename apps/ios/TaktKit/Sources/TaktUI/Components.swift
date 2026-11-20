@@ -146,3 +146,42 @@ struct InputField: View {
             .overlay(RoundedRectangle(cornerRadius: Metrics.controlRadius).strokeBorder(Palette.line, lineWidth: 1))
     }
 }
+
+/// 深浅色切换 (header, top right).
+struct ThemeToggle: View {
+    @Binding var theme: ThemeChoice
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        Button {
+            theme = (scheme == .dark) ? .light : .dark
+        } label: {
+            Image(systemName: "circle.lefthalf.filled")
+                .font(.system(size: 17))
+                .foregroundStyle(Palette.text)
+                .frame(width: Metrics.hit, height: Metrics.hit)
+                .background(Palette.surface, in: RoundedRectangle(cornerRadius: Metrics.controlRadius))
+                .overlay(RoundedRectangle(cornerRadius: Metrics.controlRadius).strokeBorder(Palette.line))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(scheme == .dark ? "切换到浅色" : "切换到深色")
+    }
+}
+
+/// Round filled 新建 button, bottom right.
+struct FloatingAddButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "plus")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Palette.onFill)
+                .frame(width: 56, height: 56)
+                .background(Palette.fill, in: Circle())
+                .shadow(color: .black.opacity(0.22), radius: 9, y: 6)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("新建")
+    }
+}

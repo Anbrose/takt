@@ -71,6 +71,34 @@ describe('projects & levels', () => {
     expect((await level(p.body.rootTaskId)).body.children).toEqual([]);
     expect((await call('POST', '/projects', { name: '' })).status).toBe(400);
   });
+
+  it('lists newest first', async () => {
+    const a = await call('POST', '/projects', { name: '搬家' });
+    const r = await call('GET', '/projects');
+    expect(r.body.projects.map((p: { name: string }) => p.name)).toEqual(['搬家', '日本旅行']);
+    expect(r.body.projects[0].id).toBe(a.body.id);
+  });
+
+  it('renames a project and its root task', async () => {
+    const r = await call('PATCH', `/projects/${project.id}`, { name: '  关西之旅 ' });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ id: project.id, name: '关西之旅', rootTaskId: project.rootTaskId });
+    expect((await call('GET', `/projects/${project.id}`)).body.name).toBe('关西之旅');
+    const osaka = await level(id('osaka'));
+    expect(osaka.body.breadcrumb.map((c: { name: string }) => c.name)).toEqual(['关西之旅', '大阪']);
+    expect((await call('PATCH', `/projects/${project.id}`, { name: ' ' })).status).toBe(400);
+  });
+
+  it('deletes a project with its whole tree', async () => {
+    const keep = await call('POST', '/projects', { name: '搬家' });
+    const r = await call('DELETE', `/projects/${project.id}`);
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ id: project.id });
+    expect((await call('GET', '/projects')).body.projects.map((p: { id: string }) => p.id)).toEqual([keep.body.id]);
+    expect((await call('GET', `/projects/${project.id}`)).status).toBe(404);
+    expect((await level(id('osaka'))).status).toBe(404);
+    expect((await call('DELETE', `/projects/${project.id}`)).status).toBe(404);
+  });
 });
 
 describe('新建', () => {
@@ -295,6 +323,9 @@ describe('ownership & errors', () => {
     expect((await call('GET', `/projects/${project.id}/run`, undefined, 'someone-else')).status).toBe(404);
     const pre = (await level(id('osaka'))).body.children[0].prerequisites[0].id;
     expect((await call('PATCH', `/prerequisites/${pre}`, { done: true }, 'someone-else')).status).toBe(404);
+    expect((await call('PATCH', `/projects/${project.id}`, { name: 'x' }, 'someone-else')).status).toBe(404);
+    expect((await call('DELETE', `/projects/${project.id}`, undefined, 'someone-else')).status).toBe(404);
+    expect((await call('GET', `/projects/${project.id}`)).status).toBe(200);
   });
 
   it('returns ApiError shapes', async () => {

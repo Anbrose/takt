@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Observation
 import os
 import TaktAPI
@@ -62,46 +63,104 @@ public final class PlanModel {
     }
 }
 
-/// Loads the first project (no Project list page yet — see HANDOFF 原型的限制 5).
+/// Project 列表 and the project that is open on top of it.
+/// Mutations take the animation to run them in, so the list never changes in a single frame.
 @MainActor
 @Observable
 public final class AppModel {
-    public enum Phase {
+    public enum Phase: Equatable {
         case loading
-        case empty
         case failed(String)
-        case ready(PlanModel)
+        case ready
     }
 
     public private(set) var phase: Phase = .loading
+    /// Newest first (the server's order).
+    public private(set) var projects: [Project] = []
+    /// The project being planned, pushed over the list; nil = the list is showing.
+    public private(set) var open: PlanModel?
+    /// Short failure message for the list's toast.
+    public var notice: String?
     private let backend: any TaktBackend
 
     public init(backend: any TaktBackend) {
         self.backend = backend
     }
 
-    public func start() async {
-        phase = .loading
+    public func start(animation: Animation? = nil) async {
+        if case .ready = phase {} else { phase = .loading }
         do {
-            if let first = try await backend.projects().first {
-                phase = .ready(PlanModel(project: first, backend: backend))
-            } else {
-                phase = .empty
+            let list = try await backend.projects()
+            withAnimation(animation) {
+                projects = list
+                phase = .ready
             }
         } catch {
             log.error("start failed: \(String(describing: error), privacy: .public)")
-            phase = .failed("连不上服务器")
+            withAnimation(animation) { phase = .failed("连不上服务器") }
         }
     }
 
-    public func createProject(name: String) async {
+    public func openProject(_ project: Project, animation: Animation? = nil) {
+        withAnimation(animation) { open = PlanModel(project: project, backend: backend) }
+    }
+
+    public func closeProject(animation: Animation? = nil) {
+        open?.current.cancel()
+        withAnimation(animation) { open = nil }
+    }
+
+    /// Creates at the top of the list. Returns the project, or nil (with a notice) on failure.
+    @discardableResult
+    public func createProject(name: String, animation: Animation? = nil) async -> Project? {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
+        guard !name.isEmpty else { return nil }
         do {
             let p = try await backend.createProject(name: name)
-            phase = .ready(PlanModel(project: p, backend: backend))
+            withAnimation(animation) { projects.insert(p, at: 0) }
+            return p
         } catch {
-            phase = .failed("新建失败")
+            log.error("create project failed: \(String(describing: error), privacy: .public)")
+            withAnimation(animation) { notice = "新建失败" }
+            return nil
+        }
+    }
+
+    /// Optimistic: the name changes at once and rolls back if the server refuses.
+    @discardableResult
+    public func renameProject(_ id: String, to name: String, animation: Animation? = nil) async -> Bool {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, let i = projects.firstIndex(where: { $0.id == id }) else { return false }
+        let before = projects[i]
+        guard before.name != name else { return true }
+        withAnimation(animation) { projects[i].name = name }
+        do {
+            let saved = try await backend.renameProject(id, name: name)
+            if let j = projects.firstIndex(where: { $0.id == id }) { projects[j] = saved }
+            return true
+        } catch {
+            log.error("rename project failed: \(String(describing: error), privacy: .public)")
+            withAnimation(animation) {
+                if let j = projects.firstIndex(where: { $0.id == id }) { projects[j] = before }
+                notice = "重命名失败"
+            }
+            return false
+        }
+    }
+
+    /// Optimistic: the card collapses at once and comes back if the server refuses.
+    public func deleteProject(_ id: String, animation: Animation? = nil) async {
+        guard let i = projects.firstIndex(where: { $0.id == id }) else { return }
+        let removed = projects[i]
+        withAnimation(animation) { _ = projects.remove(at: i) }
+        do {
+            try await backend.deleteProject(id)
+        } catch {
+            log.error("delete project failed: \(String(describing: error), privacy: .public)")
+            withAnimation(animation) {
+                projects.insert(removed, at: min(i, projects.count))
+                notice = "删除失败"
+            }
         }
     }
 }

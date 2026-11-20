@@ -1,5 +1,13 @@
 import XCTest
 
+/// The app opens on the Project 列表; most tests start inside 日本旅行.
+func openTrip(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+    let card = app.buttons["project.日本旅行"]
+    XCTAssertTrue(card.waitForExistence(timeout: 5), "Project 列表 shows 日本旅行", file: file, line: line)
+    card.tap()
+    XCTAssertTrue(app.buttons["进入 大阪，6 项"].waitForExistence(timeout: 5), file: file, line: line)
+}
+
 /// End-to-end checks of 规划模式 in the simulator against the in-memory demo backend.
 /// Screenshots are attached to the test results (Xcode: Report navigator → Attachments).
 final class PlanFlowUITests: XCTestCase {
@@ -17,6 +25,7 @@ final class PlanFlowUITests: XCTestCase {
             app.launchArguments.append("-demo")
         }
         app.launch()
+        openTrip(app)
     }
 
     private func row(_ name: String) -> XCUIElement { app.descendants(matching: .any)["row.\(name)"] }
@@ -113,6 +122,7 @@ final class MapUITests: XCTestCase {
             app.launchArguments.append("-demo")
         }
         app.launch()
+        openTrip(app)
         let open = app.buttons["进入 大阪，6 项"]
         XCTAssertTrue(open.waitForExistence(timeout: 5))
         open.tap()
@@ -173,6 +183,71 @@ final class SplashUITests: XCTestCase {
         shot.lifetime = .keepAlways
         add(shot)
         start.tap()
-        XCTAssertTrue(app.buttons["进入 大阪，6 项"].waitForExistence(timeout: 5))
+        openTrip(app)
+    }
+}
+
+/// Project 列表: create → lands inside, back → list, rename and delete via the long-press menu.
+final class ProjectListUITests: XCTestCase {
+    func testCreateRenameDeleteAndBack() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-skip-splash", "-demo"]
+        app.launch()
+
+        let trip = app.buttons["project.日本旅行"]
+        XCTAssertTrue(trip.waitForExistence(timeout: 5))
+
+        // 新建 → pushes into the new (empty) project.
+        app.buttons["新建"].tap()
+        let field = app.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 3))
+        field.tap()
+        field.typeText("搬家")
+        app.buttons["创建"].tap()
+        XCTAssertTrue(app.staticTexts["搬家"].waitForExistence(timeout: 5))
+        let back = app.buttons["返回"]
+        XCTAssertTrue(back.waitForExistence(timeout: 3))
+        snap(app, "inside new project")
+
+        // 返回 at the top level → back on the list, newest first.
+        back.tap()
+        let moving = app.buttons["project.搬家"]
+        XCTAssertTrue(moving.waitForExistence(timeout: 5))
+        XCTAssertTrue(trip.waitForExistence(timeout: 2))
+        XCTAssertLessThan(moving.frame.minY, trip.frame.minY)
+
+        // Long-press → 重命名.
+        moving.press(forDuration: 1.0)
+        let rename = app.buttons["重命名"]
+        XCTAssertTrue(rename.waitForExistence(timeout: 3))
+        rename.tap()
+        let renameField = app.textFields.firstMatch
+        XCTAssertTrue(renameField.waitForExistence(timeout: 3))
+        XCTAssertEqual(renameField.value as? String, "搬家")
+        renameField.tap()
+        renameField.typeText("2")
+        app.buttons["保存"].tap()
+        let renamed = app.buttons["project.搬家2"]
+        XCTAssertTrue(renamed.waitForExistence(timeout: 5))
+        snap(app, "renamed")
+
+        // Long-press → 删除 → confirm.
+        renamed.press(forDuration: 1.0)
+        let delete = app.buttons["删除"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 3))
+        delete.tap()
+        let alert = app.alerts["删除「搬家2」？"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 3))
+        alert.buttons["删除"].tap()
+        XCTAssertTrue(renamed.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(trip.exists)
+    }
+
+    private func snap(_ app: XCUIApplication, _ name: String) {
+        let a = XCTAttachment(screenshot: app.screenshot())
+        a.name = name
+        a.lifetime = .keepAlways
+        add(a)
     }
 }
