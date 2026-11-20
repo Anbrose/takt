@@ -57,8 +57,6 @@ public final class LevelModel {
     }
 
     public var scopeAll: Bool { selection.isEmpty }
-    public var allLabel: String { scopeAll ? "全选" : "清空" }
-    public var scopeLabel: String { scopeAll ? "\(items.count) 项" : "已选 \(selection.count) 项" }
 
     /// Ids in the order they'd have if the current drag were released now.
     public var liveOrder: [String] {
@@ -93,10 +91,6 @@ public final class LevelModel {
 
     public func toggle(_ id: String) {
         if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
-    }
-
-    public func toggleAll() {
-        selection = scopeAll ? Set(items.map(\.id)) : []
     }
 
     public func isSelected(_ id: String) -> Bool { selection.contains(id) }
@@ -179,21 +173,49 @@ public final class LevelModel {
         }
     }
 
+    // MARK: 左滑删除
+
+    /// Deletes a task (and everything under it). Optimistic: the row goes at once and comes back
+    /// if the server refuses. Not offered while an order is being edited.
+    public func delete(_ id: String) async {
+        guard !isEditing, let before = level, before.children.contains(where: { $0.id == id }) else { return }
+        var after = before
+        after.children.removeAll { $0.id == id }
+        level = after
+        selection.remove(id)
+        do {
+            level = try await backend.deleteTask(id)
+            pruneSelection()
+        } catch let e as BackendError where e.code == "not_found" {
+            await load() // already gone elsewhere
+        } catch {
+            level = before
+            notice = "删除失败"
+        }
+    }
+
     // MARK: 新建
 
     /// Appends a task to this level. Prerequisites default to 行前订.
+    /// `location` comes from the place search; typed-in text without a pick stays 未定位.
     @discardableResult
-    public func create(name: String, place: String, prerequisites: [String]) async -> Bool {
+    public func create(
+        name: String, place: String, location: PlaceChoice? = nil, prerequisites: [String]
+    ) async -> Bool {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return false }
-        let place = place.trimmingCharacters(in: .whitespacesAndNewlines)
+        let place = (location?.name ?? place).trimmingCharacters(in: .whitespacesAndNewlines)
         let pres = prerequisites
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .map { NewPrerequisite(action: $0, urgency: .before) }
+        let address = location?.address.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let body = CreateTaskBody(
             name: name,
             place: place.isEmpty ? nil : place,
+            address: address.isEmpty ? nil : address,
+            lat: location?.lat,
+            lng: location?.lng,
             prerequisites: pres.isEmpty ? nil : pres
         )
         do {

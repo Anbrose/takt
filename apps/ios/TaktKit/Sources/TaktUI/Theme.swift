@@ -19,6 +19,8 @@ public enum Palette {
     public static let accentText = Color(light: 0xC2185B, dark: 0xFF8AB5)
     public static let fill = Color(light: 0xC2185B, dark: 0xF272A3)
     public static let onFill = Color(light: 0xFFFFFF, dark: 0x1A1A1D)
+    /// 删除 (swipe action) — white text on it passes 4.5:1 in both themes.
+    public static let danger = Color(light: 0xC62828, dark: 0xC62828)
     public static let soft = Color(light: 0xFCE6EF, dark: 0x3A2230)
     public static let map = Color(light: 0xF7ECF1, dark: 0x202024)
     public static let grid = Color(light: 0xEBD8E0, dark: 0x2E2E34)

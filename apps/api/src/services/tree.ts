@@ -42,6 +42,7 @@ export async function loadTree(db: Db, projectId: string): Promise<ProjectTree> 
         name: row.name,
         short: row.short,
         place: row.place,
+        address: row.address,
         lat: row.lat,
         lng: row.lng,
         completed: row.completedAt !== null,

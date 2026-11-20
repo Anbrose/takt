@@ -61,11 +61,13 @@ struct CheckBox: View {
     }
 }
 
-/// Bordered pill with icon + short label ("新建", "地图").
+/// Bordered pill with icon + short label ("地图").
 struct ToolButton: View {
     let icon: String
     let title: String
     var pressed = false
+    /// Stretch to the full width, content centred.
+    var wide = false
     let action: () -> Void
 
     var body: some View {
@@ -77,7 +79,7 @@ struct ToolButton: View {
             .foregroundStyle(Palette.accentText)
             .padding(.leading, 12)
             .padding(.trailing, 14)
-            .frame(minHeight: Metrics.hit)
+            .frame(maxWidth: wide ? .infinity : nil, minHeight: Metrics.hit)
             .background(pressed ? Palette.soft : Palette.surface, in: RoundedRectangle(cornerRadius: Metrics.controlRadius))
             .overlay(
                 RoundedRectangle(cornerRadius: Metrics.controlRadius)

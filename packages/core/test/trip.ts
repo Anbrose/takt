@@ -6,6 +6,7 @@ interface FixtureTask {
   name: string;
   short: string;
   place: string;
+  address: string;
   lat: number | null;
   lng: number | null;
   prerequisites: { action: string; urgency: string }[];
@@ -19,6 +20,7 @@ export function tripTree(): TaskNode[] {
     name: t.name,
     short: t.short,
     place: t.place,
+    address: t.address,
     lat: t.lat,
     lng: t.lng,
     completed: false,
@@ -39,6 +41,7 @@ export function leaf(id: string, extra: Partial<TaskNode> = {}): TaskNode {
     name: id,
     short: id,
     place: '',
+    address: '',
     lat: null,
     lng: null,
     completed: false,

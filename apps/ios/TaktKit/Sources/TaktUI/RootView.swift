@@ -5,17 +5,14 @@ import TaktAPI
 /// the list drifts left and dims; back reverses it). Loading / error states cross-fade.
 public struct RootView: View {
     @State private var app: AppModel
-    @State private var matrix: RouteMatrix
     @AppStorage("theme") private var themeRaw = ThemeChoice.system.rawValue
     @Environment(\.accessibilityReduceMotion) private var reduce
     /// The list is taken out of the hierarchy once a project fully covers it (so VoiceOver and
     /// UI tests only see one screen), and put back under the project just before popping.
     @State private var listMounted = true
 
-    public init(backend: any TaktBackend, routes: any RouteProvider = MapKitRouteProvider()) {
+    public init(backend: any TaktBackend) {
         _app = State(initialValue: AppModel(backend: backend))
-        _matrix = State(initialValue: RouteMatrix(
-            provider: routes, cacheURL: routes is MapKitRouteProvider ? RouteMatrix.defaultCacheURL : nil))
     }
 
     private var theme: Binding<ThemeChoice> {
@@ -40,7 +37,6 @@ public struct RootView: View {
             }
         }
         .background(Palette.bg.ignoresSafeArea())
-        .environment(matrix)
         .preferredColorScheme(theme.wrappedValue.colorScheme)
         .task { await app.start(animation: Motion.fade) }
     }
@@ -111,7 +107,7 @@ private struct PreviewHost: View {
     @State private var backend: InMemoryBackend?
     var body: some View {
         Group {
-            if let backend { RootView(backend: backend, routes: StraightLineProvider()) } else { Color.clear }
+            if let backend { RootView(backend: backend) } else { Color.clear }
         }
         .task { backend = await InMemoryBackend.sample() }
     }
