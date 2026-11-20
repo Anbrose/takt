@@ -1,0 +1,4 @@
+design/
+pnpm-lock.yaml
+**/migrations/
+packages/contract/openapi.json

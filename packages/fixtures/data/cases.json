@@ -1,0 +1,974 @@
+{
+  "_about": "Golden cases shared by TS (packages/core) and Swift tests. route/geo/prep/run expectations were computed by running design/takt-handoff/prototype/logic.js. Format rule: <100 km one decimal (JS toFixed: exact binary value, ties round up), otherwise integer; a value that rounds to 100.0 shows as \"100\" (deviation from prototype).",
+  "geo": [
+    {
+      "a": {
+        "id": "osaka",
+        "lat": 34.6937,
+        "lng": 135.5023
+      },
+      "b": {
+        "id": "castle",
+        "lat": 34.6873,
+        "lng": 135.5262
+      },
+      "km": 2.2981099120752777
+    },
+    {
+      "a": {
+        "id": "castle",
+        "lat": 34.6873,
+        "lng": 135.5262
+      },
+      "b": {
+        "id": "usj",
+        "lat": 34.6654,
+        "lng": 135.4323
+      },
+      "km": 8.925255606661402
+    },
+    {
+      "a": {
+        "id": "usj",
+        "lat": 34.6654,
+        "lng": 135.4323
+      },
+      "b": {
+        "id": "dotonbori",
+        "lat": 34.6687,
+        "lng": 135.5013
+      },
+      "km": 6.321029404881601
+    },
+    {
+      "a": {
+        "id": "dotonbori",
+        "lat": 34.6687,
+        "lng": 135.5013
+      },
+      "b": {
+        "id": "kaiyukan",
+        "lat": 34.6545,
+        "lng": 135.429
+      },
+      "km": 6.798505918319665
+    },
+    {
+      "a": {
+        "id": "kaiyukan",
+        "lat": 34.6545,
+        "lng": 135.429
+      },
+      "b": {
+        "id": "umeda",
+        "lat": 34.7053,
+        "lng": 135.4903
+      },
+      "km": 7.957839722212701
+    },
+    {
+      "a": {
+        "id": "umeda",
+        "lat": 34.7053,
+        "lng": 135.4903
+      },
+      "b": {
+        "id": "tsutenkaku",
+        "lat": 34.6525,
+        "lng": 135.5063
+      },
+      "km": 6.050643029800652
+    },
+    {
+      "a": {
+        "id": "tsutenkaku",
+        "lat": 34.6525,
+        "lng": 135.5063
+      },
+      "b": {
+        "id": "tokyo",
+        "lat": 35.6812,
+        "lng": 139.7671
+      },
+      "km": 403.80177406179286
+    },
+    {
+      "a": {
+        "id": "tokyo",
+        "lat": 35.6812,
+        "lng": 139.7671
+      },
+      "b": {
+        "id": "ghibli",
+        "lat": 35.6962,
+        "lng": 139.5704
+      },
+      "km": 17.842568665051793
+    },
+    {
+      "a": {
+        "id": "ghibli",
+        "lat": 35.6962,
+        "lng": 139.5704
+      },
+      "b": {
+        "id": "shibuyasky",
+        "lat": 35.6585,
+        "lng": 139.7022
+      },
+      "km": 12.621370766159755
+    },
+    {
+      "a": {
+        "id": "shibuyasky",
+        "lat": 35.6585,
+        "lng": 139.7022
+      },
+      "b": {
+        "id": "teamlab",
+        "lat": 35.6491,
+        "lng": 139.7898
+      },
+      "km": 7.983541064909533
+    },
+    {
+      "a": {
+        "id": "teamlab",
+        "lat": 35.6491,
+        "lng": 139.7898
+      },
+      "b": {
+        "id": "sensoji",
+        "lat": 35.7148,
+        "lng": 139.7967
+      },
+      "km": 7.332040371305398
+    },
+    {
+      "a": {
+        "id": "sensoji",
+        "lat": 35.7148,
+        "lng": 139.7967
+      },
+      "b": {
+        "id": "tokyotower",
+        "lat": 35.6586,
+        "lng": 139.7454
+      },
+      "km": 7.779326568873158
+    },
+    {
+      "a": {
+        "id": "tokyotower",
+        "lat": 35.6586,
+        "lng": 139.7454
+      },
+      "b": {
+        "id": "hokkaido",
+        "lat": 43.0618,
+        "lng": 141.3545
+      },
+      "km": 834.6928785497513
+    },
+    {
+      "a": {
+        "id": "hokkaido",
+        "lat": 43.0618,
+        "lng": 141.3545
+      },
+      "b": {
+        "id": "odori",
+        "lat": 43.06,
+        "lng": 141.3478
+      },
+      "km": 0.5799546507069797
+    },
+    {
+      "a": {
+        "id": "odori",
+        "lat": 43.06,
+        "lng": 141.3478
+      },
+      "b": {
+        "id": "otaru",
+        "lat": 43.1984,
+        "lng": 141.002
+      },
+      "km": 32.004984123835506
+    },
+    {
+      "a": {
+        "id": "otaru",
+        "lat": 43.1984,
+        "lng": 141.002
+      },
+      "b": {
+        "id": "noboribetsu",
+        "lat": 42.4977,
+        "lng": 141.1466
+      },
+      "km": 78.8009776108129
+    },
+    {
+      "a": {
+        "id": "noboribetsu",
+        "lat": 42.4977,
+        "lng": 141.1466
+      },
+      "b": {
+        "id": "toya",
+        "lat": 42.6,
+        "lng": 140.85
+      },
+      "km": 26.827689514011915
+    },
+    {
+      "a": {
+        "id": "toya",
+        "lat": 42.6,
+        "lng": 140.85
+      },
+      "b": {
+        "id": "hakodate",
+        "lat": 41.759,
+        "lng": 140.7044
+      },
+      "km": 94.28135468747897
+    }
+  ],
+  "format": [
+    {
+      "km": 0,
+      "text": "0.0"
+    },
+    {
+      "km": 0.04,
+      "text": "0.0"
+    },
+    {
+      "km": 0.05,
+      "text": "0.1"
+    },
+    {
+      "km": 0.25,
+      "text": "0.3"
+    },
+    {
+      "km": 1.15,
+      "text": "1.1"
+    },
+    {
+      "km": 2.45,
+      "text": "2.5"
+    },
+    {
+      "km": 9.95,
+      "text": "9.9"
+    },
+    {
+      "km": 12.34,
+      "text": "12.3"
+    },
+    {
+      "km": 99.94,
+      "text": "99.9"
+    },
+    {
+      "km": 99.96,
+      "text": "100",
+      "note": "prototype printed 100.0"
+    },
+    {
+      "km": 100,
+      "text": "100"
+    },
+    {
+      "km": 100.5,
+      "text": "101"
+    },
+    {
+      "km": 101.5,
+      "text": "102"
+    },
+    {
+      "km": 482.7,
+      "text": "483"
+    },
+    {
+      "km": 1234.49,
+      "text": "1234"
+    }
+  ],
+  "route": [
+    {
+      "name": "root",
+      "points": [
+        {
+          "id": "osaka",
+          "lat": 34.6937,
+          "lng": 135.5023
+        },
+        {
+          "id": "tokyo",
+          "lat": 35.6812,
+          "lng": 139.7671
+        },
+        {
+          "id": "hokkaido",
+          "lat": 43.0618,
+          "lng": 141.3545
+        }
+      ],
+      "totalKm": 1234.6886456812576,
+      "bestOrder": ["osaka", "tokyo", "hokkaido"],
+      "bestKm": 1234.6886456812576
+    },
+    {
+      "name": "root:reversed",
+      "points": [
+        {
+          "id": "hokkaido",
+          "lat": 43.0618,
+          "lng": 141.3545
+        },
+        {
+          "id": "tokyo",
+          "lat": 35.6812,
+          "lng": 139.7671
+        },
+        {
+          "id": "osaka",
+          "lat": 34.6937,
+          "lng": 135.5023
+        }
+      ],
+      "totalKm": 1234.6886456812576,
+      "bestOrder": ["hokkaido", "tokyo", "osaka"],
+      "bestKm": 1234.6886456812576
+    },
+    {
+      "name": "root:rotated",
+      "points": [
+        {
+          "id": "hokkaido",
+          "lat": 43.0618,
+          "lng": 141.3545
+        },
+        {
+          "id": "osaka",
+          "lat": 34.6937,
+          "lng": 135.5023
+        },
+        {
+          "id": "tokyo",
+          "lat": 35.6812,
+          "lng": 139.7671
+        }
+      ],
+      "totalKm": 1461.5611491055524,
+      "bestOrder": ["hokkaido", "tokyo", "osaka"],
+      "bestKm": 1234.6886456812576
+    },
+    {
+      "name": "osaka",
+      "points": [
+        {
+          "id": "castle",
+          "lat": 34.6873,
+          "lng": 135.5262
+        },
+        {
+          "id": "usj",
+          "lat": 34.6654,
+          "lng": 135.4323
+        },
+        {
+          "id": "dotonbori",
+          "lat": 34.6687,
+          "lng": 135.5013
+        },
+        {
+          "id": "kaiyukan",
+          "lat": 34.6545,
+          "lng": 135.429
+        },
+        {
+          "id": "umeda",
+          "lat": 34.7053,
+          "lng": 135.4903
+        },
+        {
+          "id": "tsutenkaku",
+          "lat": 34.6525,
+          "lng": 135.5063
+        }
+      ],
+      "totalKm": 36.05327368187602,
+      "bestOrder": ["castle", "umeda", "dotonbori", "tsutenkaku", "usj", "kaiyukan"],
+      "bestKm": 18.062555890939674
+    },
+    {
+      "name": "osaka:reversed",
+      "points": [
+        {
+          "id": "tsutenkaku",
+          "lat": 34.6525,
+          "lng": 135.5063
+        },
+        {
+          "id": "umeda",
+          "lat": 34.7053,
+          "lng": 135.4903
+        },
+        {
+          "id": "kaiyukan",
+          "lat": 34.6545,
+          "lng": 135.429
+        },
+        {
+          "id": "dotonbori",
+          "lat": 34.6687,
+          "lng": 135.5013
+        },
+        {
+          "id": "usj",
+          "lat": 34.6654,
+          "lng": 135.4323
+        },
+        {
+          "id": "castle",
+          "lat": 34.6873,
+          "lng": 135.5262
+        }
+      ],
+      "totalKm": 36.05327368187602,
+      "bestOrder": ["tsutenkaku", "dotonbori", "castle", "umeda", "usj", "kaiyukan"],
+      "bestKm": 16.942108862787514
+    },
+    {
+      "name": "osaka:rotated",
+      "points": [
+        {
+          "id": "dotonbori",
+          "lat": 34.6687,
+          "lng": 135.5013
+        },
+        {
+          "id": "kaiyukan",
+          "lat": 34.6545,
+          "lng": 135.429
+        },
+        {
+          "id": "umeda",
+          "lat": 34.7053,
+          "lng": 135.4903
+        },
+        {
+          "id": "tsutenkaku",
+          "lat": 34.6525,
+          "lng": 135.5063
+        },
+        {
+          "id": "castle",
+          "lat": 34.6873,
+          "lng": 135.5262
+        },
+        {
+          "id": "usj",
+          "lat": 34.6654,
+          "lng": 135.4323
+        }
+      ],
+      "totalKm": 34.00841731280747,
+      "bestOrder": ["dotonbori", "tsutenkaku", "castle", "umeda", "usj", "kaiyukan"],
+      "bestKm": 18.142258652423084
+    },
+    {
+      "name": "osaka:subset",
+      "points": [
+        {
+          "id": "castle",
+          "lat": 34.6873,
+          "lng": 135.5262
+        },
+        {
+          "id": "dotonbori",
+          "lat": 34.6687,
+          "lng": 135.5013
+        },
+        {
+          "id": "kaiyukan",
+          "lat": 34.6545,
+          "lng": 135.429
+        }
+      ],
+      "totalKm": 9.874529164497138,
+      "bestOrder": ["castle", "dotonbori", "kaiyukan"],
+      "bestKm": 9.874529164497138
+    },
+    {
+      "name": "tokyo",
+      "points": [
+        {
+          "id": "ghibli",
+          "lat": 35.6962,
+          "lng": 139.5704
+        },
+        {
+          "id": "shibuyasky",
+          "lat": 35.6585,
+          "lng": 139.7022
+        },
+        {
+          "id": "teamlab",
+          "lat": 35.6491,
+          "lng": 139.7898
+        },
+        {
+          "id": "sensoji",
+          "lat": 35.7148,
+          "lng": 139.7967
+        },
+        {
+          "id": "tokyotower",
+          "lat": 35.6586,
+          "lng": 139.7454
+        }
+      ],
+      "totalKm": 35.71627877124784,
+      "bestOrder": ["ghibli", "shibuyasky", "tokyotower", "teamlab", "sensoji"],
+      "bestKm": 28.00476522892634
+    },
+    {
+      "name": "tokyo:reversed",
+      "points": [
+        {
+          "id": "tokyotower",
+          "lat": 35.6586,
+          "lng": 139.7454
+        },
+        {
+          "id": "sensoji",
+          "lat": 35.7148,
+          "lng": 139.7967
+        },
+        {
+          "id": "teamlab",
+          "lat": 35.6491,
+          "lng": 139.7898
+        },
+        {
+          "id": "shibuyasky",
+          "lat": 35.6585,
+          "lng": 139.7022
+        },
+        {
+          "id": "ghibli",
+          "lat": 35.6962,
+          "lng": 139.5704
+        }
+      ],
+      "totalKm": 35.71627877124784,
+      "bestOrder": ["tokyotower", "teamlab", "sensoji", "shibuyasky", "ghibli"],
+      "bestKm": 34.68633420376648
+    },
+    {
+      "name": "tokyo:rotated",
+      "points": [
+        {
+          "id": "teamlab",
+          "lat": 35.6491,
+          "lng": 139.7898
+        },
+        {
+          "id": "sensoji",
+          "lat": 35.7148,
+          "lng": 139.7967
+        },
+        {
+          "id": "tokyotower",
+          "lat": 35.6586,
+          "lng": 139.7454
+        },
+        {
+          "id": "ghibli",
+          "lat": 35.6962,
+          "lng": 139.5704
+        },
+        {
+          "id": "shibuyasky",
+          "lat": 35.6585,
+          "lng": 139.7022
+        }
+      ],
+      "totalKm": 44.083218969558686,
+      "bestOrder": ["teamlab", "sensoji", "tokyotower", "shibuyasky", "ghibli"],
+      "bestKm": 31.63572171940048
+    },
+    {
+      "name": "tokyo:subset",
+      "points": [
+        {
+          "id": "ghibli",
+          "lat": 35.6962,
+          "lng": 139.5704
+        },
+        {
+          "id": "teamlab",
+          "lat": 35.6491,
+          "lng": 139.7898
+        },
+        {
+          "id": "sensoji",
+          "lat": 35.7148,
+          "lng": 139.7967
+        }
+      ],
+      "totalKm": 27.83088358185507,
+      "bestOrder": ["ghibli", "teamlab", "sensoji"],
+      "bestKm": 27.83088358185507
+    },
+    {
+      "name": "hokkaido",
+      "points": [
+        {
+          "id": "odori",
+          "lat": 43.06,
+          "lng": 141.3478
+        },
+        {
+          "id": "otaru",
+          "lat": 43.1984,
+          "lng": 141.002
+        },
+        {
+          "id": "noboribetsu",
+          "lat": 42.4977,
+          "lng": 141.1466
+        },
+        {
+          "id": "toya",
+          "lat": 42.6,
+          "lng": 140.85
+        },
+        {
+          "id": "hakodate",
+          "lat": 41.759,
+          "lng": 140.7044
+        }
+      ],
+      "totalKm": 231.9150059361393,
+      "bestOrder": ["odori", "otaru", "toya", "noboribetsu", "hakodate"],
+      "bestKm": 216.38427265946586
+    },
+    {
+      "name": "hokkaido:reversed",
+      "points": [
+        {
+          "id": "hakodate",
+          "lat": 41.759,
+          "lng": 140.7044
+        },
+        {
+          "id": "toya",
+          "lat": 42.6,
+          "lng": 140.85
+        },
+        {
+          "id": "noboribetsu",
+          "lat": 42.4977,
+          "lng": 141.1466
+        },
+        {
+          "id": "otaru",
+          "lat": 43.1984,
+          "lng": 141.002
+        },
+        {
+          "id": "odori",
+          "lat": 43.06,
+          "lng": 141.3478
+        }
+      ],
+      "totalKm": 231.9150059361393,
+      "bestOrder": ["hakodate", "noboribetsu", "toya", "odori", "otaru"],
+      "bestKm": 214.00360431148587
+    },
+    {
+      "name": "hokkaido:rotated",
+      "points": [
+        {
+          "id": "noboribetsu",
+          "lat": 42.4977,
+          "lng": 141.1466
+        },
+        {
+          "id": "toya",
+          "lat": 42.6,
+          "lng": 140.85
+        },
+        {
+          "id": "hakodate",
+          "lat": 41.759,
+          "lng": 140.7044
+        },
+        {
+          "id": "odori",
+          "lat": 43.06,
+          "lng": 141.3478
+        },
+        {
+          "id": "otaru",
+          "lat": 43.1984,
+          "lng": 141.002
+        }
+      ],
+      "totalKm": 307.119550471493,
+      "bestOrder": ["noboribetsu", "odori", "otaru", "toya", "hakodate"],
+      "bestKm": 258.612685912491
+    },
+    {
+      "name": "hokkaido:subset",
+      "points": [
+        {
+          "id": "odori",
+          "lat": 43.06,
+          "lng": 141.3478
+        },
+        {
+          "id": "noboribetsu",
+          "lat": 42.4977,
+          "lng": 141.1466
+        },
+        {
+          "id": "toya",
+          "lat": 42.6,
+          "lng": 140.85
+        }
+      ],
+      "totalKm": 91.47289707651083,
+      "bestOrder": ["odori", "noboribetsu", "toya"],
+      "bestKm": 91.47289707651083
+    },
+    {
+      "name": "two",
+      "points": [
+        {
+          "id": "osaka",
+          "lat": 34.6937,
+          "lng": 135.5023
+        },
+        {
+          "id": "tokyo",
+          "lat": 35.6812,
+          "lng": 139.7671
+        }
+      ],
+      "totalKm": 402.78418302745206,
+      "bestOrder": ["osaka", "tokyo"],
+      "bestKm": 402.78418302745206
+    },
+    {
+      "name": "one",
+      "points": [
+        {
+          "id": "osaka",
+          "lat": 34.6937,
+          "lng": 135.5023
+        }
+      ],
+      "totalKm": 0,
+      "bestOrder": ["osaka"],
+      "bestKm": 0
+    }
+  ],
+  "prep": [
+    {
+      "level": "root",
+      "order": ["osaka:0", "osaka:1", "tokyo:0", "hokkaido:0", "hokkaido:1", "tokyo:1"],
+      "noPrep": 0
+    },
+    {
+      "level": "osaka",
+      "order": ["usj:1", "usj:0", "kaiyukan:0", "castle:0", "umeda:0", "tsutenkaku:0"],
+      "noPrep": 1
+    },
+    {
+      "level": "tokyo",
+      "order": ["ghibli:0", "shibuyasky:0", "teamlab:0", "tokyotower:0"],
+      "noPrep": 1
+    },
+    {
+      "level": "hokkaido",
+      "order": ["noboribetsu:0", "hakodate:0"],
+      "noPrep": 3
+    }
+  ],
+  "run": {
+    "sequence": [
+      "castle",
+      "usj",
+      "dotonbori",
+      "kaiyukan",
+      "umeda",
+      "tsutenkaku",
+      "ghibli",
+      "shibuyasky",
+      "teamlab",
+      "sensoji",
+      "tokyotower",
+      "odori",
+      "otaru",
+      "noboribetsu",
+      "toya",
+      "hakodate"
+    ],
+    "steps": [
+      {
+        "current": "castle",
+        "next": "usj",
+        "stageChange": false,
+        "stage": null,
+        "nextKm": 8.925255606661402,
+        "nextPrerequisites": ["usj:0", "usj:1"],
+        "later": ["dotonbori", "kaiyukan", "umeda"]
+      },
+      {
+        "current": "usj",
+        "next": "dotonbori",
+        "stageChange": false,
+        "stage": null,
+        "nextKm": 6.321029404881601,
+        "nextPrerequisites": [],
+        "later": ["kaiyukan", "umeda", "tsutenkaku"]
+      },
+      {
+        "current": "dotonbori",
+        "next": "kaiyukan",
+        "stageChange": false,
+        "stage": null,
+        "nextKm": 6.798505918319665,
+        "nextPrerequisites": ["kaiyukan:0"],
+        "later": ["umeda", "tsutenkaku", "ghibli"]
+      },
+      {
+        "current": "kaiyukan",
+        "next": "umeda",
+        "stageChange": false,
+        "stage": null,
+        "nextKm": 7.957839722212701,
+        "nextPrerequisites": ["umeda:0"],
+        "later": ["tsutenkaku", "ghibli", "shibuyasky"]
+      },
+      {
+        "current": "umeda",
+        "next": "tsutenkaku",
+        "stageChange": false,
+        "stage": null,
+        "nextKm": 6.050643029800652,
+        "nextPrerequisites": ["tsutenkaku:0"],
+        "later": ["ghibli", "shibuyasky", "teamlab"]
+      },
+      {
+        "current": "tsutenkaku",
+        "next": "ghibli",
+        "stageChange": true,
+        "stage": {
+          "from": "osaka",
+          "to": "tokyo"
+        },
+        "nextKm": 387.15551280146434,
+        "nextPrerequisites": ["tokyo:0", "tokyo:1", "ghibli:0"],
+        "later": ["shibuyasky", "teamlab", "sensoji"]
+      },
+      {
+        "current": "ghibli",
+        "next": "shibuyasky",
+        "stageChange": false,
+        "stage": null,
+        "nextKm": 12.621370766159755,
+        "nextPrerequisites": ["shibuyasky:0"],
+        "later": ["teamlab", "sensoji", "tokyotower"]
+      },
+      {
+        "current": "shibuyasky",
+        "next": "teamlab",
+        "stageChange": false,
+        "stage": null,
+        "nextKm": 7.983541064909533,
+        "nextPrerequisites": ["teamlab:0"],
+        "later": ["sensoji", "tokyotower", "odori"]
+      },
+      {
+        "current": "teamlab",
+        "next": "sensoji",
+        "stageChange": false,
+        "stage": null,
+        "nextKm": 7.332040371305398,
+        "nextPrerequisites": [],
+        "later": ["tokyotower", "odori", "otaru"]
+      },
+      {
+        "current": "sensoji",
+        "next": "tokyotower",
+        "stageChange": false,
+        "stage": null,
+        "nextKm": 7.779326568873158,
+        "nextPrerequisites": ["tokyotower:0"],
+        "later": ["odori", "otaru", "noboribetsu"]
+      },
+      {
+        "current": "tokyotower",
+        "next": "odori",
+        "stageChange": true,
+        "stage": {
+          "from": "tokyo",
+          "to": "hokkaido"
+        },
+        "nextKm": 834.4009106228976,
+        "nextPrerequisites": ["hokkaido:0", "hokkaido:1"],
+        "later": ["otaru", "noboribetsu", "toya"]
+      },
+      {
+        "current": "odori",
+        "next": "otaru",
+        "stageChange": false,
+        "stage": null,
+        "nextKm": 32.004984123835506,
+        "nextPrerequisites": [],
+        "later": ["noboribetsu", "toya", "hakodate"]
+      },
+      {
+        "current": "otaru",
+        "next": "noboribetsu",
+        "stageChange": false,
+        "stage": null,
+        "nextKm": 78.8009776108129,
+        "nextPrerequisites": ["noboribetsu:0"],
+        "later": ["toya", "hakodate"]
+      },
+      {
+        "current": "noboribetsu",
+        "next": "toya",
+        "stageChange": false,
+        "stage": null,
+        "nextKm": 26.827689514011915,
+        "nextPrerequisites": [],
+        "later": ["hakodate"]
+      },
+      {
+        "current": "toya",
+        "next": "hakodate",
+        "stageChange": false,
+        "stage": null,
+        "nextKm": 94.28135468747897,
+        "nextPrerequisites": ["hakodate:0"],
+        "later": []
+      },
+      {
+        "current": "hakodate",
+        "next": null
+      }
+    ]
+  }
+}

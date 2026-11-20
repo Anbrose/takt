@@ -1,0 +1,12 @@
+# Optional: real Postgres for local dev. Without DATABASE_URL the API uses embedded PGlite.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: takt
+      POSTGRES_PASSWORD: takt
+      POSTGRES_DB: takt
+    ports: ['5433:5432']
+    volumes: ['pgdata:/var/lib/postgresql/data']
+volumes:
+  pgdata:

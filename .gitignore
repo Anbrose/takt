@@ -1,0 +1,12 @@
+node_modules/
+.data/
+dist/
+.DS_Store
+*.log
+.env
+# Xcode
+apps/ios/**/xcuserdata/
+apps/ios/**/DerivedData/
+# SwiftPM
+apps/ios/TaktKit/.build/
+apps/ios/TaktKit/.swiftpm/
