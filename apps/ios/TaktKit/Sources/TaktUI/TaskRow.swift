@@ -22,7 +22,7 @@ struct TaskRow: View {
         HStack(alignment: .top, spacing: 2) {
             CheckBox(on: selected, label: task.name, action: onToggle)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("\(number).").foregroundStyle(Palette.muted).fontWeight(.medium)
                     Text(task.name).frame(maxWidth: .infinity, alignment: .leading)
@@ -38,9 +38,15 @@ struct TaskRow: View {
                 .foregroundStyle(Palette.text)
                 .frame(minHeight: 24)
 
-                if !compact {
-                    details.transition(.opacity)
-                }
+                // Folds like the prototype's grid-template-rows 1fr → 0fr: the details stay laid out
+                // and are clipped while the height collapses, so nothing spills past the card.
+                details
+                    .padding(.top, 6)
+                    .frame(height: compact ? 0 : nil, alignment: .top)
+                    .clipped()
+                    .opacity(compact ? 0 : 1)
+                    .allowsHitTesting(!compact)
+                    .accessibilityHidden(compact)
             }
             .padding(.vertical, 10)
 
