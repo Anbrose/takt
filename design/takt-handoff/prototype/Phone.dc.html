@@ -13,17 +13,82 @@
 body{margin:0}
 button{font:inherit;color:inherit}
 a{color:#C2185B}a:hover{color:#E6397C}
-.t-light{--bg:#FAF7F8;--surface:#FFFFFF;--text:#1A1A1D;--muted:#5F5660;--line:#EAD8E0;--accent:#E6397C;--accent-text:#C2185B;--fill:#C2185B;--onfill:#FFFFFF;--soft:#FCE6EF;--map:#F7ECF1;--grid:#EBD8E0}
-.t-dark{--bg:#1A1A1D;--surface:#25252A;--text:#F4F1F3;--muted:#B4ADB3;--line:#3A3A41;--accent:#E6397C;--accent-text:#FF8AB5;--fill:#F272A3;--onfill:#1A1A1D;--soft:#3A2230;--map:#202024;--grid:#2E2E34}
+.t-light{--bg:#FAF7F8;--surface:#FFFFFF;--text:#1A1A1D;--muted:#5F5660;--line:#EAD8E0;--accent:#E6397C;--accent-text:#C2185B;--fill:#C2185B;--onfill:#FFFFFF;--soft:#FCE6EF;--map:#F7ECF1;--grid:#EBD8E0;--danger:#C62828;--menu:#FFFFFF}
+.t-dark{--bg:#1A1A1D;--surface:#25252A;--text:#F4F1F3;--muted:#B4ADB3;--line:#3A3A41;--accent:#E6397C;--accent-text:#FF8AB5;--fill:#F272A3;--onfill:#1A1A1D;--soft:#3A2230;--map:#202024;--grid:#2E2E34;--danger:#FF6B6B;--menu:#2E2E34}
 .app, .app *{transition:background-color .28s ease,border-color .28s ease,color .28s ease,opacity .28s ease}
 @keyframes inRA{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
 @keyframes inRB{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
 @keyframes inLA{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
 @keyframes inLB{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
+.card{-webkit-touch-callout:none;user-select:none}
 @media (prefers-reduced-motion: reduce){.app, .app *{transition:none !important;animation:none !important}}
 </style>
 </helmet>
 <div class="app {{themeCls}}" style="position: relative; width: 390px; height: 844px; box-sizing: border-box; overflow: hidden; background: var(--bg); color: var(--text); font-family: Inter, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif; display: flex; flex-direction: column">
+<div style="position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; background: var(--bg); transform: {{screens.listTf}}; visibility: {{screens.listVis}}; transition: transform 420ms cubic-bezier(0.32, 0.72, 0, 1), {{screens.listVisTr}}">
+<header style="flex: 0 0 76px; box-sizing: border-box; display: flex; align-items: center; padding: 20px 16px 12px">
+  <h1 style="flex: 1; margin: 0; font-size: 24px; font-weight: 700">Project</h1>
+  <button type="button" onClick="{{toggleTheme}}" aria-label="{{themeLabel}}" style="flex: 0 0 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="6.5"></circle><path d="M9 2.5a6.5 6.5 0 0 0 0 13z" fill="currentColor"></path></svg></button>
+</header>
+<div style="flex: 1; min-height: 0; overflow-y: auto; box-sizing: border-box; padding: 4px 16px 96px; display: flex; flex-direction: column">
+  <sc-for list="{{pl.projects}}" as="p" hint-placeholder-count="3">
+    <div style="flex: 0 0 auto; display: grid; grid-template-rows: {{p.rows}}; margin-bottom: {{p.mb}}; opacity: {{p.o}}; transition: grid-template-rows 340ms cubic-bezier(0.32, 0.72, 0, 1), margin-bottom 340ms cubic-bezier(0.32, 0.72, 0, 1), opacity 240ms ease">
+      <div style="min-height: 0; overflow: hidden">
+        <button type="button" class="card" onClick="{{p.open}}" onPointerDown="{{p.down}}" onPointerUp="{{p.up}}" onPointerLeave="{{p.up}}" onPointerCancel="{{p.up}}" onContextMenu="{{p.menu}}" style="width: 100%; height: 56px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--surface); color: var(--text); text-align: left; font-size: 16px; font-weight: 600; cursor: pointer">
+          <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{p.name}}</span>
+          <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--muted)"><path d="M5 3l4 4-4 4"></path></svg>
+        </button>
+      </div>
+    </div>
+  </sc-for>
+</div>
+<div style="position: absolute; inset: 76px 0 76px; display: flex; align-items: center; justify-content: center; pointer-events: none">
+  <button type="button" onClick="{{pl.openNew}}" disabled="{{pl.emptyOff}}" style="pointer-events: auto; min-height: 48px; padding: 0 22px 0 18px; border-radius: 12px; border: none; background: var(--fill); color: var(--onfill); font-size: 15px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; opacity: {{pl.emptyO}}; transform: {{pl.emptyTf}}; visibility: {{pl.emptyVis}}; transition: opacity 260ms ease, transform 260ms ease, {{pl.emptyVisTr}}"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg><span>新建</span></button>
+</div>
+<button type="button" onClick="{{pl.openNew}}" aria-label="新建" disabled="{{pl.fabOff}}" style="position: absolute; right: 16px; bottom: 32px; z-index: 4; width: 56px; height: 56px; border-radius: 50%; border: none; background: var(--fill); color: var(--onfill); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: {{pl.fabO}}; transform: {{pl.fabTf}}; visibility: {{pl.fabVis}}; transition: opacity 220ms ease, transform 220ms ease, {{pl.fabVisTr}}"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg></button>
+
+<button type="button" aria-label="关闭菜单" onClick="{{pl.closeMenu}}" disabled="{{pl.menu.off}}" style="position: absolute; inset: 0; z-index: 8; border: none; padding: 0; background: rgba(0, 0, 0, 0.28); opacity: {{pl.menu.o}}; visibility: {{pl.menu.vis}}; transition: opacity 220ms ease, {{pl.menu.visTr}}"></button>
+<div style="position: absolute; left: 16px; right: 16px; top: {{pl.menu.top}}; z-index: 9; display: flex; flex-direction: column; gap: 10px; opacity: {{pl.menu.o}}; visibility: {{pl.menu.vis}}; transform: {{pl.menu.tf}}; transform-origin: top left; transition: opacity 220ms ease, transform 220ms cubic-bezier(0.32, 0.72, 0, 1), {{pl.menu.visTr}}">
+  <div style="height: 56px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-radius: 14px; border: 1.5px solid var(--accent); background: var(--surface); font-size: 16px; font-weight: 600; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.2)">
+    <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{pl.menu.name}}</span>
+  </div>
+  <div role="menu" aria-label="{{pl.menu.name}}" style="width: 230px; border-radius: 14px; overflow: hidden; background: var(--menu); box-shadow: 0 10px 32px rgba(0, 0, 0, 0.24); display: flex; flex-direction: column">
+    <button type="button" role="menuitem" onClick="{{pl.openRename}}" disabled="{{pl.menu.off}}" style="min-height: 48px; padding: 0 16px; border: none; border-bottom: 1px solid var(--line); background: transparent; color: var(--text); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: space-between">
+      <span>重命名</span>
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 3.5l3 3L7 16H4v-3z"></path></svg>
+    </button>
+    <button type="button" role="menuitem" onClick="{{pl.openDelete}}" disabled="{{pl.menu.off}}" style="min-height: 48px; padding: 0 16px; border: none; background: transparent; color: var(--danger); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: space-between">
+      <span>删除</span>
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 5.5h13M8 5.5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M5.5 5.5l.8 10.6a1 1 0 0 0 1 .9h5.4a1 1 0 0 0 1-.9l.8-10.6"></path></svg>
+    </button>
+  </div>
+</div>
+
+<button type="button" aria-label="关闭" onClick="{{pl.closeSheet}}" disabled="{{pl.sheet.off}}" style="position: absolute; inset: 0; z-index: 10; border: none; padding: 0; background: rgba(0, 0, 0, 0.4); opacity: {{pl.sheet.scrimO}}; visibility: {{pl.sheet.vis}}; transition: opacity 320ms ease, {{pl.sheet.visTr}}"></button>
+<form onSubmit="{{pl.submitSheet}}" style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 11; box-sizing: border-box; border-radius: 20px 20px 0 0; display: flex; flex-direction: column; gap: 14px; padding: 20px 16px 28px; background: var(--surface); box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18); transform: {{pl.sheet.y}}; visibility: {{pl.sheet.vis}}; transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1), {{pl.sheet.visTr}}">
+  <h2 style="margin: 0; font-size: 18px; font-weight: 700">{{pl.sheet.title}}</h2>
+  <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted)">
+    <span>名称</span>
+    <input type="text" value="{{pl.draft}}" onInput="{{pl.onDraft}}" disabled="{{pl.sheet.off}}" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 16px; font-weight: 400">
+  </label>
+  <div style="display: flex; gap: 10px">
+    <button type="button" onClick="{{pl.closeSheet}}" disabled="{{pl.sheet.off}}" style="flex: 1; min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); font-size: 15px; font-weight: 600; cursor: pointer">取消</button>
+    <button type="submit" disabled="{{pl.sheet.submitOff}}" style="flex: 1; min-height: 48px; border-radius: 12px; border: none; background: var(--fill); color: var(--onfill); font-size: 15px; font-weight: 700; cursor: pointer; opacity: {{pl.sheet.submitO}}; transition: opacity 200ms ease">{{pl.sheet.action}}</button>
+  </div>
+</form>
+
+<div style="position: absolute; inset: 0; z-index: 12; display: flex; align-items: center; justify-content: center; padding: 0 40px; background: rgba(0, 0, 0, 0.4); opacity: {{pl.confirm.o}}; visibility: {{pl.confirm.vis}}; transition: opacity 220ms ease, {{pl.confirm.visTr}}">
+  <div role="alertdialog" aria-label="{{pl.confirm.title}}" style="width: 100%; border-radius: 16px; background: var(--surface); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28); display: flex; flex-direction: column; gap: 16px; padding: 22px 16px 16px; transform: {{pl.confirm.tf}}; transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1)">
+    <h2 style="margin: 0; font-size: 17px; font-weight: 700; text-align: center">{{pl.confirm.title}}</h2>
+    <div style="display: flex; gap: 10px">
+      <button type="button" onClick="{{pl.closeConfirm}}" disabled="{{pl.confirm.off}}" style="flex: 1; min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); font-size: 15px; font-weight: 600; cursor: pointer">取消</button>
+      <button type="button" onClick="{{pl.doDelete}}" disabled="{{pl.confirm.off}}" style="flex: 1; min-height: 44px; border-radius: 12px; border: none; background: var(--danger); color: #FFFFFF; font-size: 15px; font-weight: 700; cursor: pointer">删除</button>
+    </div>
+  </div>
+</div>
+<div aria-hidden="true" style="position: absolute; inset: 0; z-index: 13; background: #000000; pointer-events: none; opacity: {{screens.dimO}}; transition: opacity 420ms cubic-bezier(0.32, 0.72, 0, 1)"></div>
+</div>
+<div style="position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); box-shadow: -10px 0 30px rgba(0, 0, 0, 0.12); transform: {{screens.planTf}}; visibility: {{screens.planVis}}; transition: transform 420ms cubic-bezier(0.32, 0.72, 0, 1), {{screens.planVisTr}}">
 
 <header style="display: flex; align-items: center; padding: 20px 16px 12px">
   <button type="button" onClick="{{back}}" disabled="{{backBtn.off}}" aria-label="返回" style="flex: 0 0 auto; width: {{backBtn.w}}; height: 44px; margin-left: -8px; padding: 0; overflow: hidden; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: {{backBtn.o}}; transition: width 260ms ease, opacity 260ms ease">
@@ -316,8 +381,9 @@ a{color:#C2185B}a:hover{color:#E6397C}
     </div>
 </form>
 </div>
+</div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"$preview":{"width":390,"height":844}}'>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"start":{"editor":"enum","options":["list","plan"],"default":"list"},"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   tree() {
     return { id: 'root', name: '日本旅行', children: [
@@ -442,10 +508,125 @@ class Component extends DCLogic {
     } catch (err) {}
   }
 
+  plSeed() {
+    return [
+      { id: 'p3', name: '搬家' },
+      { id: 'p2', name: '毕业论文' },
+      { id: 'p1', name: '日本旅行' }
+    ];
+  }
+
+  listVals(st) {
+    var self = this;
+    var all = st.plProjects || this.plSeed();
+    var leaving = st.plLeaving || null;
+    var entering = st.plEntering || null;
+    var live = all.filter(function (p) { return p.id !== leaving; });
+    var menuIdx = all.findIndex(function (p) { return p.id === st.plMenu; });
+    var menuOn = menuIdx >= 0;
+    var sheetOn = !!st.plSheet;
+    var confirmP = all.filter(function (p) { return p.id === st.plConfirm; })[0];
+    var draft = st.plDraft || '';
+    var trimmed = draft.trim();
+    var empty = live.length === 0;
+    function vis(on, ms) { return on ? 'visibility 0s' : 'visibility 0s linear ' + ms + 'ms'; }
+    function open(p) {
+      var next = { screen: 'plan', project: p.id, level: 'root', tab: 'tasks', mode: 'plan', draft: null, drag: null, focus: null, swiped: null, addOpen: false, runIdx: 0 };
+      if ((st.project || 'p1') !== p.id) { next.sel = {}; next.order = {}; next.added = {}; next.removed = {}; next.done = {}; }
+      self._drag = null;
+      self.setState(next);
+    }
+    return {
+      projects: all.map(function (p) {
+        var gone = p.id === leaving || p.id === entering;
+        return {
+          name: p.name,
+          rows: gone ? '0fr' : '1fr',
+          mb: gone ? '0px' : '10px',
+          o: gone || p.id === st.plMenu ? '0' : '1',
+          open: function () {
+            if (self._plLong) { self._plLong = false; return; }
+            open(p);
+          },
+          down: function () {
+            clearTimeout(self._plTimer);
+            self._plLong = false;
+            self._plTimer = setTimeout(function () { self._plLong = true; self.setState({ plMenu: p.id }); }, 450);
+          },
+          up: function () { clearTimeout(self._plTimer); },
+          menu: function (e) {
+            e.preventDefault();
+            clearTimeout(self._plTimer);
+            self._plLong = true;
+            self.setState({ plMenu: p.id });
+          }
+        };
+      }),
+      openNew: function () { self.setState({ plSheet: 'new', plDraft: '', plTarget: null }); },
+      emptyO: empty ? '1' : '0', emptyTf: empty ? 'scale(1)' : 'scale(0.94)',
+      emptyVis: empty ? 'visible' : 'hidden', emptyVisTr: vis(empty, 260), emptyOff: !empty,
+      fabO: empty ? '0' : '1', fabTf: empty ? 'scale(0.6)' : 'scale(1)',
+      fabVis: empty ? 'hidden' : 'visible', fabVisTr: vis(!empty, 220), fabOff: empty,
+      menu: {
+        name: menuOn ? all[menuIdx].name : '',
+        top: (80 + Math.max(menuIdx, 0) * 66) + 'px',
+        o: menuOn ? '1' : '0', tf: menuOn ? 'scale(1)' : 'scale(0.96)',
+        vis: menuOn ? 'visible' : 'hidden', visTr: vis(menuOn, 220), off: !menuOn
+      },
+      closeMenu: function () { self.setState({ plMenu: null }); },
+      openRename: function () {
+        var p = all[menuIdx];
+        self.setState({ plMenu: null, plSheet: 'rename', plTarget: p.id, plDraft: p.name });
+      },
+      openDelete: function () { self.setState({ plMenu: null, plConfirm: st.plMenu }); },
+      sheet: {
+        title: st.plSheet === 'rename' ? '重命名' : '新建 Project',
+        action: st.plSheet === 'rename' ? '保存' : '创建',
+        y: sheetOn ? 'translateY(0%)' : 'translateY(110%)',
+        scrimO: sheetOn ? '1' : '0',
+        vis: sheetOn ? 'visible' : 'hidden', visTr: vis(sheetOn, 320), off: !sheetOn,
+        submitOff: !sheetOn || !trimmed, submitO: trimmed ? '1' : '0.45'
+      },
+      draft: draft,
+      onDraft: function (e) { self.setState({ plDraft: e.currentTarget.value }); },
+      closeSheet: function () { self.setState({ plSheet: null }); },
+      submitSheet: function (e) {
+        e.preventDefault();
+        if (!trimmed) return;
+        if (st.plSheet === 'rename') {
+          self.setState({ plSheet: null, plProjects: all.map(function (p) { return p.id === st.plTarget ? { id: p.id, name: trimmed } : p; }) });
+          return;
+        }
+        var p = { id: 'n' + Date.now(), name: trimmed };
+        self.setState({ plSheet: null, plProjects: [p].concat(all), plEntering: p.id });
+        setTimeout(function () { self.setState({ plEntering: null }); }, 40);
+        setTimeout(function () { open(p); }, 520);
+      },
+      confirm: {
+        title: confirmP ? '删除「' + confirmP.name + '」？' : '',
+        o: confirmP ? '1' : '0', tf: confirmP ? 'scale(1)' : 'scale(0.96)',
+        vis: confirmP ? 'visible' : 'hidden', visTr: vis(!!confirmP, 220), off: !confirmP
+      },
+      closeConfirm: function () { self.setState({ plConfirm: null }); },
+      doDelete: function () {
+        var id = st.plConfirm;
+        self.setState({ plConfirm: null, plLeaving: id });
+        setTimeout(function () {
+          var cur = self.state.plProjects || self.plSeed();
+          self.setState({ plLeaving: null, plProjects: cur.filter(function (p) { return p.id !== id; }) });
+        }, 360);
+      }
+    };
+  }
+
   renderVals() {
     var self = this;
     var st = this.state || {};
     var root = this.tree();
+    var plCur = (st.plProjects || this.plSeed()).filter(function (p) { return p.id === (st.project || 'p1'); })[0];
+    if (plCur && plCur.id !== 'p1') root = { id: 'root', name: plCur.name, children: [] };
+    else if (plCur) root.name = plCur.name;
+    var onPlan = (st.screen || this.props.start || 'list') === 'plan';
     var added = st.added || {};
     root.children = root.children.concat((added.root || []).map(function (t) {
       var c = {}; Object.keys(t).forEach(function (k) { c[k] = t[k]; }); c.children = []; return c;
@@ -893,7 +1074,7 @@ class Component extends DCLogic {
     function pane(on) { return { vis: on ? 'visible' : 'hidden', tr: on ? 'visibility 0s' : 'visibility 0s linear 320ms' }; }
     var tabIdx = tab === 'map' ? 1 : tab === 'prep' ? 2 : 0;
     var canOpt = showDetour && !editing;
-    var showBackBtn = plan && !isRoot;
+    var showBackBtn = isRoot || plan;
     var aiOn = tab === 'tasks';
 
     var addOpen = !!st.addOpen;
@@ -969,6 +1150,16 @@ class Component extends DCLogic {
     };
 
     return {
+      pl: this.listVals(st),
+      screens: {
+        listTf: onPlan ? 'translateX(-28%)' : 'translateX(0%)',
+        listVis: onPlan ? 'hidden' : 'visible',
+        listVisTr: onPlan ? 'visibility 0s linear 420ms' : 'visibility 0s',
+        dimO: onPlan ? '0.18' : '0',
+        planTf: onPlan ? 'translateX(0%)' : 'translateX(100%)',
+        planVis: onPlan ? 'visible' : 'hidden',
+        planVisTr: onPlan ? 'visibility 0s' : 'visibility 0s linear 420ms'
+      },
       add: addVals,
       navAnim: anim(st.navSeq, st.navDir), runAnim: anim(st.runSeq, st.runDir),
       mode: { items: modeSegs, w: 'calc((100% - 8px) / 2)', x: plan ? '0%' : '100%' },
@@ -999,7 +1190,7 @@ class Component extends DCLogic {
       toggleTheme: function () { self.setState({ theme: dark ? 'light' : 'dark' }); },
       levels: levels, levelName: level.name, isRoot: isRoot, notRoot: !isRoot,
       crumb: isRoot ? 'Flow · ' + items.length + ' 个任务' : root.name + ' / ' + level.name,
-      back: function () { go('root'); },
+      back: function () { if (isRoot) { self.setState({ screen: 'list' }); } else { go('root'); } },
       rows: rows,
       fab: (function () {
         var on = plan && tab !== 'prep' && !editing && !addOpen;

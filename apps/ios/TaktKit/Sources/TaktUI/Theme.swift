@@ -66,6 +66,10 @@ public enum Motion {
     public static let nav = Animation.easeOut(duration: 0.28)
     /// Colour / check / border fades.
     public static let fade = Animation.easeInOut(duration: 0.28)
+    /// Project 列表 ↔ 规划页 push / pop (design/guidelines.md: cubic-bezier(0.32, 0.72, 0, 1)).
+    public static let push = Animation.timingCurve(0.32, 0.72, 0, 1, duration: 0.42)
+    /// A list item opening / collapsing in place.
+    public static let collapse = Animation.timingCurve(0.32, 0.72, 0, 1, duration: 0.34)
 
     static func with<R>(_ animation: Animation, reduce: Bool, _ body: () throws -> R) rethrows -> R {
         try withAnimation(reduce ? nil : animation, body)

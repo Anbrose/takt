@@ -10,3 +10,4 @@ apps/ios/**/DerivedData/
 # SwiftPM
 apps/ios/TaktKit/.build/
 apps/ios/TaktKit/.swiftpm/
+apps/ios/build/

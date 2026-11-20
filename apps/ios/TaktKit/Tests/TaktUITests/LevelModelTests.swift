@@ -189,12 +189,53 @@ private func names(_ m: LevelModel) -> [String] { m.items.map(\.name) }
         #expect(!plan.model(for: osaka.id).isEditing) // leaving a level drops its unsaved drag
     }
 
-    @Test func appStartsWithTheFirstProjectOrEmpty() async throws {
-        let empty = AppModel(backend: InMemoryBackend())
-        await empty.start()
-        guard case .empty = empty.phase else { Issue.record("expected empty"); return }
-        await empty.createProject(name: "周末")
-        guard case .ready(let plan) = empty.phase else { Issue.record("expected ready"); return }
-        #expect(plan.project.name == "周末")
+    @Test func projectListCreateRenameDeleteAndOpen() async throws {
+        let backend = InMemoryBackend()
+        let app = AppModel(backend: backend)
+        await app.start()
+        #expect(app.phase == .ready && app.projects.isEmpty && app.open == nil)
+
+        let a = try #require(await app.createProject(name: "  日本旅行 "))
+        let b = try #require(await app.createProject(name: "搬家"))
+        #expect(app.projects.map(\.name) == ["搬家", "日本旅行"]) // newest first
+        #expect(await app.createProject(name: "  ") == nil)
+
+        #expect(await app.renameProject(a.id, to: "关西之旅"))
+        #expect(app.projects.map(\.name) == ["搬家", "关西之旅"])
+        #expect(try await backend.level(a.rootTaskId).task.name == "关西之旅")
+
+        app.openProject(app.projects[1])
+        #expect(app.open?.project.name == "关西之旅" && app.open?.isRoot == true)
+        app.closeProject()
+        #expect(app.open == nil)
+
+        await app.deleteProject(b.id)
+        #expect(app.projects.map(\.id) == [a.id])
+        #expect(try await backend.projects().map(\.id) == [a.id])
+    }
+
+    @Test func projectChangesRollBackWhenTheServerRefuses() async throws {
+        let backend = InMemoryBackend()
+        let app = AppModel(backend: backend)
+        await app.start()
+        let p = try #require(await app.createProject(name: "日本旅行"))
+
+        await backend.failNextCall(with: BackendError.unexpected(status: 500))
+        #expect(await app.renameProject(p.id, to: "x") == false)
+        #expect(app.projects[0].name == "日本旅行" && app.notice == "重命名失败")
+
+        await backend.failNextCall(with: BackendError.unexpected(status: 500))
+        await app.deleteProject(p.id)
+        #expect(app.projects.map(\.id) == [p.id] && app.notice == "删除失败")
+    }
+
+    @Test func startFailureShowsRetryState() async {
+        let backend = InMemoryBackend()
+        await backend.failNextCall(with: BackendError.unexpected(status: 500))
+        let app = AppModel(backend: backend)
+        await app.start()
+        #expect(app.phase == .failed("连不上服务器"))
+        await app.start()
+        #expect(app.phase == .ready)
     }
 }

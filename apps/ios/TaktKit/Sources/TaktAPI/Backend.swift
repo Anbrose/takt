@@ -33,6 +33,9 @@ public enum BackendError: Error, Equatable, Sendable {
 public protocol TaktBackend: Sendable {
     func projects() async throws -> [Project]
     func createProject(name: String) async throws -> Project
+    func renameProject(_ id: String, name: String) async throws -> Project
+    /// Deletes the project and its whole task tree.
+    func deleteProject(_ id: String) async throws
     func level(_ taskId: String) async throws -> Level
     func createTask(in parentId: String, _ body: CreateTaskBody) async throws -> TaskSummary
     func reorder(_ parentId: String, ids: [String], version: Int) async throws -> Level
@@ -64,6 +67,23 @@ public struct LiveBackend: TaktBackend {
         switch try await client.createProject(body: .json(.init(name: name))) {
         case .created(let r): return try r.body.json
         case .badRequest(let r): throw err(400, try r.body.json)
+        case .undocumented(let s, _): throw BackendError.unexpected(status: s)
+        }
+    }
+
+    public func renameProject(_ id: String, name: String) async throws -> Project {
+        switch try await client.updateProject(path: .init(projectId: id), body: .json(.init(name: name))) {
+        case .ok(let r): return try r.body.json
+        case .badRequest(let r): throw err(400, try r.body.json)
+        case .notFound(let r): throw err(404, try r.body.json)
+        case .undocumented(let s, _): throw BackendError.unexpected(status: s)
+        }
+    }
+
+    public func deleteProject(_ id: String) async throws {
+        switch try await client.deleteProject(path: .init(projectId: id)) {
+        case .ok: return
+        case .notFound(let r): throw err(404, try r.body.json)
         case .undocumented(let s, _): throw BackendError.unexpected(status: s)
         }
     }

@@ -6,14 +6,19 @@ import TaktCore
 public struct PlanScreen: View {
     @Bindable var plan: PlanModel
     @Binding var theme: ThemeChoice
+    /// Back from the top level (to the Project 列表). nil = no list behind this screen.
+    var onExit: (() -> Void)?
     @Environment(\.accessibilityReduceMotion) private var reduce
-    @Environment(\.colorScheme) private var scheme
     @State private var adding = false
 
-    public init(plan: PlanModel, theme: Binding<ThemeChoice>) {
+    public init(plan: PlanModel, theme: Binding<ThemeChoice>, onExit: (() -> Void)? = nil) {
         self.plan = plan
         self._theme = theme
+        self.onExit = onExit
     }
+
+    /// The back button shows inside a stage, and at the top level when there is a list to return to.
+    private var canGoBack: Bool { !plan.isRoot || onExit != nil }
 
     private var level: LevelModel { plan.current }
 
@@ -47,10 +52,10 @@ public struct PlanScreen: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .frame(width: plan.isRoot ? 0 : Metrics.hit, alignment: .leading)
-            .opacity(plan.isRoot ? 0 : 1)
+            .frame(width: canGoBack ? Metrics.hit : 0, alignment: .leading)
+            .opacity(canGoBack ? 1 : 0)
             .clipped()
-            .disabled(plan.isRoot)
+            .disabled(!canGoBack)
             .accessibilityLabel("返回")
             .padding(.leading, -8)
 
@@ -68,25 +73,14 @@ public struct PlanScreen: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, 8)
 
-            Button {
-                theme = (scheme == .dark) ? .light : .dark
-            } label: {
-                Image(systemName: "circle.lefthalf.filled")
-                    .font(.system(size: 17))
-                    .foregroundStyle(Palette.text)
-                    .frame(width: Metrics.hit, height: Metrics.hit)
-                    .background(Palette.surface, in: RoundedRectangle(cornerRadius: Metrics.controlRadius))
-                    .overlay(RoundedRectangle(cornerRadius: Metrics.controlRadius).strokeBorder(Palette.line))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(scheme == .dark ? "切换到浅色" : "切换到深色")
+            ThemeToggle(theme: $theme)
         }
         .padding(EdgeInsets(top: 12, leading: Metrics.gutter, bottom: 12, trailing: Metrics.gutter))
     }
 
     /// 进入子任务 / 返回: content slides in from the right / left and fades (prototype inR / inL).
     private var navTransition: AnyTransition {
-        if reduce { return .identity }
+        if reduce { return .opacity }
         let dx: CGFloat = plan.direction == .forward ? 28 : -28
         return .asymmetric(insertion: .offset(x: dx).combined(with: .opacity), removal: .opacity)
     }
@@ -100,7 +94,11 @@ public struct PlanScreen: View {
     }
 
     private func back() {
-        Motion.with(Motion.nav, reduce: reduce) { plan.back() }
+        if plan.isRoot {
+            onExit?()
+        } else {
+            Motion.with(Motion.nav, reduce: reduce) { plan.back() }
+        }
     }
 }
 

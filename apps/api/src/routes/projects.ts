@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { routes } from '@takt/contract';
 import type { Db } from '../db/client.ts';
@@ -24,7 +24,7 @@ export function projectRoutes(app: FastifyInstance, db: Db, owner: ResolveOwner)
       .from(projects)
       .innerJoin(tasks, and(eq(tasks.projectId, projects.id), isNull(tasks.parentId)))
       .where(eq(projects.ownerId, owner))
-      .orderBy(asc(projects.createdAt));
+      .orderBy(desc(projects.createdAt), desc(projects.id));
     return { projects: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })) };
   });
 
@@ -33,5 +33,25 @@ export function projectRoutes(app: FastifyInstance, db: Db, owner: ResolveOwner)
   route(app, owner, routes.getProject, async ({ owner, params }) => {
     const p = await assertProject(db, owner, params.projectId);
     return { ...p, createdAt: p.createdAt.toISOString() };
+  });
+
+  route(app, owner, routes.updateProject, async ({ owner, params, body }) => {
+    const p = await assertProject(db, owner, params.projectId);
+    return db.transaction(async (tx) => {
+      await tx.update(projects).set({ name: body.name }).where(eq(projects.id, p.id));
+      // The hidden root task mirrors the project name (it shows as the run-mode path).
+      await tx
+        .update(tasks)
+        .set({ name: body.name, short: body.name })
+        .where(and(eq(tasks.projectId, p.id), isNull(tasks.parentId)));
+      return { ...p, name: body.name, createdAt: p.createdAt.toISOString() };
+    });
+  });
+
+  route(app, owner, routes.deleteProject, async ({ owner, params }) => {
+    const p = await assertProject(db, owner, params.projectId);
+    // tasks and prerequisites go with it (ON DELETE CASCADE).
+    await db.delete(projects).where(eq(projects.id, p.id));
+    return { id: p.id };
   });
 }
