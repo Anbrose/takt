@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.16",
+    "@google-cloud/storage": "^9.0.0",
     "@takt/contract": "workspace:*",
     "@takt/core": "workspace:*",
     "@takt/fixtures": "workspace:*",
