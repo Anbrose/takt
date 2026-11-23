@@ -5,6 +5,7 @@ import { notes } from '../src/db/schema.ts';
 import { transcriptHash } from '../src/services/notes.ts';
 import { FakeExtractor, type DraftChain } from '../src/llm/extractor.ts';
 import { openDb, type DbHandle } from '../src/db/client.ts';
+import { seedTrip } from '../src/db/seed.ts';
 import { MemoryAudioStore, segmentObject } from '../src/storage/audio-store.ts';
 
 const NOTE = '11111111-1111-4111-8111-111111111111';
@@ -203,6 +204,7 @@ describe('extraction', () => {
     await setTranscript('第一版');
     await extract();
     const imported = {
+      stepId: '55555555-5555-4555-8555-555555555555',
       chainName: 'c',
       stepName: 's',
       taskId: '33333333-3333-4333-8333-333333333333',
@@ -315,5 +317,204 @@ describe('extraction', () => {
   it('hides other owners notes', async () => {
     await setTranscript('一');
     expect((await call('POST', `/notes/${NOTE}/extract`, undefined, 'other')).status).toBe(404);
+  });
+});
+
+describe('draft edits and import', () => {
+  const KYOTO: DraftChain = {
+    name: '京都一日游',
+    steps: [
+      { name: '伏见稻荷', place: '伏见稻荷大社', quote: { startMs: 0, endMs: 1000 } },
+      { name: '吃午饭', place: null, quote: { startMs: 1000, endMs: 2000 } },
+      { name: '清水寺', place: '清水寺', quote: { startMs: 2000, endMs: 3000 } },
+    ],
+  };
+  const SOLO: DraftChain = {
+    name: '买伴手礼',
+    steps: [{ name: '买抹茶', place: null, quote: { startMs: 3000, endMs: 4000 } }],
+  };
+  let ids: Map<string, string>;
+  let root: string;
+  const id = (key: string) => ids.get(key)!;
+  const owner = () => ({
+    resolveOwner: (req: { headers: Record<string, unknown> }) =>
+      (req.headers['x-test-owner'] as string) ?? 'local',
+  });
+  const children = async (taskId: string, who?: string) =>
+    (await call('GET', `/tasks/${taskId}/children`, undefined, who)).body;
+  const extract = () => call('POST', `/notes/${NOTE}/extract`);
+  const draft = async () => (await call('GET', `/notes/${NOTE}`)).body;
+  const doImport = (body: unknown, who?: string) => call('POST', `/notes/${NOTE}/import`, body, who);
+
+  beforeEach(async () => {
+    await app.close();
+    fake = new FakeExtractor([KYOTO, SOLO]);
+    app = buildApp({ db: handle.db, audioStore: store, extractor: fake, limits, ...owner() });
+    const seeded = await seedTrip(handle.db, 'local');
+    ids = seeded.ids;
+    root = seeded.project.rootTaskId;
+    await call('POST', '/notes', { id: NOTE, locale: 'zh_CN' });
+    await call('PATCH', `/notes/${NOTE}`, { transcript: [line('京都')] });
+    await extract();
+  });
+
+  it('imports a whole chain as a parent task with ordered children', async () => {
+    const note = await draft();
+    const chain = note.extraction.chains[0];
+    const before = (await children(root)).children.length;
+    const r = await doImport({
+      parentTaskId: root,
+      picks: [{ chainId: chain.id, stepIds: chain.steps.map((s: { id: string }) => s.id) }],
+    });
+    expect(r.status).toBe(200);
+    const added = r.body.level.children.at(-1);
+    expect(r.body.level.children).toHaveLength(before + 1);
+    expect(added).toMatchObject({ name: '京都一日游', childCount: 3 });
+    const kids = await children(added.id);
+    expect(kids.children.map((c: { name: string }) => c.name)).toEqual(['伏见稻荷', '吃午饭', '清水寺']);
+    expect(kids.children[0].place).toBe('伏见稻荷大社');
+    expect(kids.children[1].place).toBe('');
+    expect(kids.children[1].lat).toBeNull();
+    expect(r.body.note.extraction.chains.map((c: { name: string }) => c.name)).toEqual(['买伴手礼']);
+    expect(r.body.note.imported).toHaveLength(3);
+    expect(r.body.note.imported[0]).toMatchObject({
+      chainName: '京都一日游',
+      stepName: '伏见稻荷',
+      stepId: chain.steps[0].id,
+      parentTaskId: added.id,
+      taskId: kids.children[0].id,
+    });
+    expect(r.body.note.extraction.version).toBe(note.extraction.version + 1);
+  });
+
+  it('imports a single step as a plain task, with a picked place', async () => {
+    const chain = (await draft()).extraction.chains[1];
+    const step = chain.steps[0];
+    const r = await doImport({
+      parentTaskId: id('osaka'),
+      picks: [
+        {
+          chainId: chain.id,
+          stepIds: [step.id],
+          places: { [step.id]: { place: '辻利', address: '京都市', lat: 35.01, lng: 135.77 } },
+        },
+      ],
+    });
+    expect(r.status).toBe(200);
+    expect(r.body.level.task.id).toBe(id('osaka'));
+    expect(r.body.level.children.at(-1)).toMatchObject({
+      name: '买抹茶',
+      place: '辻利',
+      address: '京都市',
+      lat: 35.01,
+      lng: 135.77,
+      childCount: 0,
+    });
+    expect(r.body.note.extraction.chains.map((c: { name: string }) => c.name)).toEqual(['京都一日游']);
+  });
+
+  it('imports part of a chain, leaving the rest in the draft', async () => {
+    const chain = (await draft()).extraction.chains[0];
+    const [a, b, c] = chain.steps;
+    const r = await doImport({ parentTaskId: root, picks: [{ chainId: chain.id, stepIds: [c.id, a.id] }] });
+    expect(r.status).toBe(200);
+    const added = r.body.level.children.at(-1);
+    expect((await children(added.id)).children.map((x: { name: string }) => x.name)).toEqual([
+      '伏见稻荷',
+      '清水寺',
+    ]);
+    const left = r.body.note.extraction.chains[0];
+    expect(left.steps.map((s: { id: string }) => s.id)).toEqual([b.id]);
+    expect(r.body.note.imported).toHaveLength(2);
+  });
+
+  it('refuses stale picks and writes nothing', async () => {
+    const old = (await draft()).extraction.chains[0];
+    await call('PATCH', `/notes/${NOTE}`, { transcript: [line('改了')] });
+    await extract();
+    const before = await children(root);
+    const r = await doImport({
+      parentTaskId: root,
+      picks: [{ chainId: old.id, stepIds: [old.steps[0].id] }],
+    });
+    expect(r.status).toBe(409);
+    expect(r.body.error).toBe('stale_draft');
+    const after = await children(root);
+    expect(after.version).toBe(before.version);
+    expect(after.children).toHaveLength(before.children.length);
+  });
+
+  it('refuses a pick that is half stale without writing the good half', async () => {
+    const chain = (await draft()).extraction.chains[0];
+    const before = await children(root);
+    const r = await doImport({
+      parentTaskId: root,
+      picks: [
+        { chainId: chain.id, stepIds: [chain.steps[0].id] },
+        { chainId: chain.id, stepIds: ['99999999-9999-4999-8999-999999999999'] },
+      ],
+    });
+    expect(r.status).toBe(409);
+    expect((await children(root)).version).toBe(before.version);
+    expect((await draft()).imported).toHaveLength(0);
+  });
+
+  it('refuses a target in another owners project', async () => {
+    const chain = (await draft()).extraction.chains[0];
+    const pick = { chainId: chain.id, stepIds: [chain.steps[0].id] };
+    expect((await doImport({ parentTaskId: root, picks: [pick] }, 'other')).status).toBe(404);
+    expect(
+      (await doImport({ parentTaskId: '99999999-9999-4999-8999-999999999999', picks: [pick] })).status,
+    ).toBe(404);
+  });
+
+  it('rejects an extraction edit from an old version', async () => {
+    const n = await draft();
+    const r = await call('PUT', `/notes/${NOTE}/extraction`, {
+      version: n.extraction.version - 1,
+      chains: n.extraction.chains,
+    });
+    expect(r.status).toBe(409);
+    expect(r.body.error).toBe('version_conflict');
+  });
+
+  it('replaces the draft, keeping client ids and bumping the version', async () => {
+    const n = await draft();
+    const chains = [n.extraction.chains[0]];
+    chains[0] = { ...chains[0], name: '改名', steps: chains[0].steps.slice(0, 2) };
+    const r = await call('PUT', `/notes/${NOTE}/extraction`, { version: n.extraction.version, chains });
+    expect(r.status).toBe(200);
+    expect(r.body.extraction.version).toBe(n.extraction.version + 1);
+    expect(r.body.extraction.chains).toEqual(chains);
+    expect(r.body.chainCount).toBe(1);
+    expect(
+      (await call('PUT', `/notes/${NOTE}/extraction`, { version: n.extraction.version, chains })).status,
+    ).toBe(409);
+    expect((await call('PUT', `/notes/${NOTE}/extraction`, { version: 1, chains }, 'other')).status).toBe(
+      404,
+    );
+  });
+
+  it('rejects an edit that brings back an imported step', async () => {
+    const n = await draft();
+    const chain = n.extraction.chains[0];
+    const step = chain.steps[0];
+    const imp = await doImport({ parentTaskId: root, picks: [{ chainId: chain.id, stepIds: [step.id] }] });
+    const r = await call('PUT', `/notes/${NOTE}/extraction`, {
+      version: imp.body.note.extraction.version,
+      chains: [{ ...chain, steps: [step] }],
+    });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toBe('already_imported');
+  });
+
+  it('keeps imported steps across a re-extract', async () => {
+    const chain = (await draft()).extraction.chains[0];
+    await doImport({ parentTaskId: root, picks: [{ chainId: chain.id, stepIds: [chain.steps[0].id] }] });
+    await call('PATCH', `/notes/${NOTE}`, { transcript: [line('第二版')] });
+    const r = await extract();
+    expect(r.body.imported).toHaveLength(1);
+    expect(r.body.imported[0].stepName).toBe('伏见稻荷');
+    expect(r.body.extraction.chains.flatMap((c: { steps: unknown[] }) => c.steps)).toHaveLength(4);
   });
 });

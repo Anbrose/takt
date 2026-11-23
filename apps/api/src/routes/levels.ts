@@ -34,60 +34,69 @@ function level(tree: ProjectTree, l: Loaded) {
 }
 
 /** Appends a task (with prerequisites) to the end of `parentId`'s children. */
-export async function createTask(db: Db, parentId: string, body: z.output<typeof CreateTask>) {
-  return db.transaction(async (tx) => {
-    // Locks the parent row, so concurrent creates/reorders on this level serialize.
-    const [parent] = await tx
-      .update(tasks)
-      .set({ childrenVersion: sql`${tasks.childrenVersion} + 1`, completedAt: null })
-      .where(eq(tasks.id, parentId))
-      .returning({ projectId: tasks.projectId });
-    if (!parent) throw notFound('Task');
-    const [{ n }] = (await tx.select({ n: count() }).from(tasks).where(eq(tasks.parentId, parentId))) as [
-      { n: number },
-    ];
-    const [row] = await tx
-      .insert(tasks)
-      .values({
-        projectId: parent.projectId,
-        parentId,
-        position: n,
-        name: body.name,
-        short: body.short ?? body.name,
-        place: body.place ?? '',
-        address: body.address ?? '',
-        lat: body.lat ?? null,
-        lng: body.lng ?? null,
-      })
-      .returning();
-    const pres = body.prerequisites?.length
-      ? await tx
-          .insert(prerequisites)
-          .values(
-            body.prerequisites.map((p, i) => ({
-              taskId: row!.id,
-              position: i,
-              action: p.action,
-              urgency: p.urgency ?? 'before',
-            })),
-          )
-          .returning()
-      : [];
-    return {
-      id: row!.id,
-      name: row!.name,
-      short: row!.short,
-      place: row!.place,
-      address: row!.address,
-      lat: row!.lat,
-      lng: row!.lng,
-      completed: false,
-      prerequisites: pres
-        .sort((a, b) => a.position - b.position)
-        .map((p) => ({ id: p.id, action: p.action, urgency: p.urgency, done: false })),
-      childCount: 0,
-    };
-  });
+export function createTask(db: Db, parentId: string, body: z.output<typeof CreateTask>) {
+  return db.transaction((tx) => insertTask(tx, parentId, body));
+}
+
+/** createTask's body, for callers that already hold a transaction. */
+export async function insertTask(tx: Db, parentId: string, body: z.output<typeof CreateTask>) {
+  // Locks the parent row, so concurrent creates/reorders on this level serialize.
+  const [parent] = await tx
+    .update(tasks)
+    .set({ childrenVersion: sql`${tasks.childrenVersion} + 1`, completedAt: null })
+    .where(eq(tasks.id, parentId))
+    .returning({ projectId: tasks.projectId });
+  if (!parent) throw notFound('Task');
+  const [{ n }] = (await tx.select({ n: count() }).from(tasks).where(eq(tasks.parentId, parentId))) as [
+    { n: number },
+  ];
+  const [row] = await tx
+    .insert(tasks)
+    .values({
+      projectId: parent.projectId,
+      parentId,
+      position: n,
+      name: body.name,
+      short: body.short ?? body.name,
+      place: body.place ?? '',
+      address: body.address ?? '',
+      lat: body.lat ?? null,
+      lng: body.lng ?? null,
+    })
+    .returning();
+  const pres = body.prerequisites?.length
+    ? await tx
+        .insert(prerequisites)
+        .values(
+          body.prerequisites.map((p, i) => ({
+            taskId: row!.id,
+            position: i,
+            action: p.action,
+            urgency: p.urgency ?? 'before',
+          })),
+        )
+        .returning()
+    : [];
+  return {
+    id: row!.id,
+    name: row!.name,
+    short: row!.short,
+    place: row!.place,
+    address: row!.address,
+    lat: row!.lat,
+    lng: row!.lng,
+    completed: false,
+    prerequisites: pres
+      .sort((a, b) => a.position - b.position)
+      .map((p) => ({ id: p.id, action: p.action, urgency: p.urgency, done: false })),
+    childCount: 0,
+  };
+}
+
+/** The Level response for a task, read through `db` (pass a transaction to see its writes). */
+export async function loadLevel(db: Db, owner: string, taskId: string) {
+  const { tree, task } = await loadTask(db, owner, taskId);
+  return level(tree, task);
 }
 
 function parseScope(raw: string | undefined, children: readonly TaskNode[]): string[] {

@@ -215,6 +215,7 @@ export const Extraction = z.object({ version: Ms, chains: z.array(Chain).max(50)
 
 export const ImportedStep = z
   .object({
+    stepId: z.uuid(),
     chainName: z.string(),
     stepName: z.string(),
     taskId: z.uuid(),

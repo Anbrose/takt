@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, isNotNull, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
-import { routes } from '@takt/contract';
+import type { z } from 'zod';
+import { routes, type ImportedStep as ImportedStepSchema } from '@takt/contract';
 import type { Db } from '../db/client.ts';
+import { insertTask, loadLevel } from './levels.ts';
 import { llmUsage, noteSegments, notes } from '../db/schema.ts';
 import { chunkLines, type DraftChain, type ExtractLimits, type Extractor } from '../llm/extractor.ts';
-import { HttpError, route, type ResolveOwner } from '../http.ts';
+import { HttpError, notFound, route, type ResolveOwner } from '../http.ts';
 import {
   defaultTitle,
   loadNote,
@@ -14,7 +16,10 @@ import {
   toSummary,
   transcriptHash,
 } from '../services/notes.ts';
+import { projectOfTask } from '../services/tree.ts';
 import { notePrefix, segmentObject, type AudioStore } from '../storage/audio-store.ts';
+
+type ImportedStep = z.infer<typeof ImportedStepSchema>;
 
 const READ_URL_TTL_SECONDS = 3600;
 
@@ -224,5 +229,107 @@ export function noteRoutes(
       throw new HttpError(409, 'version_conflict', 'The draft changed during extraction');
     }
     return full(updated);
+  });
+
+  route(app, owner, routes.updateExtraction, async ({ owner, params, body }) => {
+    const row = await loadNote(db, owner, params.noteId);
+    if (body.version !== row.extractionVersion) {
+      throw new HttpError(409, 'version_conflict', 'The draft changed since it was loaded');
+    }
+    const imported = new Set(row.imported.map((i) => i.stepId));
+    if (body.chains.some((c) => c.steps.some((s) => imported.has(s.id)))) {
+      throw new HttpError(400, 'already_imported', 'A step in the draft was already imported');
+    }
+    const [updated] = await db
+      .update(notes)
+      .set({
+        extraction: { chains: body.chains },
+        extractionVersion: row.extractionVersion + 1,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(notes.id, row.id),
+          eq(notes.ownerId, owner),
+          eq(notes.extractionVersion, row.extractionVersion),
+        ),
+      )
+      .returning();
+    if (!updated) {
+      await loadNote(db, owner, row.id);
+      throw new HttpError(409, 'version_conflict', 'The draft changed since it was loaded');
+    }
+    return full(updated);
+  });
+
+  route(app, owner, routes.importNote, async ({ owner, params, body }) => {
+    const result = await db.transaction(async (tx) => {
+      // Note first, then (inside insertTask) the parent: the same order everywhere.
+      const [row] = await tx
+        .select()
+        .from(notes)
+        .where(and(eq(notes.id, params.noteId), eq(notes.ownerId, owner)))
+        .for('update');
+      if (!row) throw notFound('Note');
+      await projectOfTask(tx, owner, body.parentTaskId);
+
+      // Validate every pick against the current draft before writing anything.
+      const draft = new Map(row.extraction.chains.map((c) => [c.id, c]));
+      const used = new Set<string>();
+      const plan = body.picks.map((pick) => {
+        const chain = draft.get(pick.chainId);
+        const wanted = new Set(pick.stepIds);
+        const steps = chain?.steps.filter((s) => wanted.has(s.id)) ?? [];
+        if (!chain || steps.length !== wanted.size || pick.stepIds.length !== wanted.size) {
+          throw new HttpError(409, 'stale_draft', 'The draft changed; reload it before importing');
+        }
+        for (const s of steps) {
+          if (used.has(s.id)) throw new HttpError(400, 'duplicate_pick', 'A step was picked twice');
+          used.add(s.id);
+        }
+        return { chain, steps, places: pick.places ?? {} };
+      });
+
+      const importedAt = new Date().toISOString();
+      const imported: ImportedStep[] = [];
+      for (const { chain, steps, places } of plan) {
+        const fields = (s: (typeof steps)[number]) => {
+          const p = places[s.id];
+          return p
+            ? { place: p.place, address: p.address, lat: p.lat, lng: p.lng }
+            : { place: s.place ?? '' };
+        };
+        const parent =
+          steps.length >= 2 ? await insertTask(tx, body.parentTaskId, { name: chain.name }) : null;
+        for (const s of steps) {
+          const task = await insertTask(tx, parent?.id ?? body.parentTaskId, { name: s.name, ...fields(s) });
+          imported.push({
+            stepId: s.id,
+            chainName: chain.name,
+            stepName: s.name,
+            taskId: task.id,
+            parentTaskId: parent?.id ?? body.parentTaskId,
+            importedAt,
+          });
+        }
+      }
+
+      const taken = new Set(used);
+      const chains = row.extraction.chains
+        .map((c) => ({ ...c, steps: c.steps.filter((s) => !taken.has(s.id)) }))
+        .filter((c) => c.steps.length > 0);
+      const [updated] = await tx
+        .update(notes)
+        .set({
+          extraction: { chains },
+          imported: [...row.imported, ...imported],
+          extractionVersion: row.extractionVersion + 1,
+          updatedAt: new Date(),
+        })
+        .where(eq(notes.id, row.id))
+        .returning();
+      return { level: await loadLevel(tx, owner, body.parentTaskId), note: updated! };
+    });
+    return { level: result.level, note: toNote(result.note, await loadSegments(db, result.note.id)) };
   });
 }
