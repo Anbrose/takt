@@ -14,10 +14,32 @@ public actor InMemoryBackend: TaktBackend {
     private var projectList: [Project] = []
     private var nodes: [String: Node] = [:]
     private var nextId = 0
+    private var noteRows: [String: NoteRow] = [:]
     /// Calls made, for tests.
     public private(set) var calls: [String] = []
     /// When set, the next call throws this error.
     private var failNext: Error?
+
+    /// A stored note: what the server keeps, minus the audio itself.
+    struct NoteRow {
+        var id: String
+        var title: String
+        var locale: String
+        var createdAt: Date
+        var durationMs = 0
+        var transcript: [TranscriptLine] = []
+        var speakers: [Speaker] = []
+        /// Uploaded segments: index -> duration.
+        var segments: [Int: Int] = [:]
+        var chains: [Chain] = []
+        var extractionVersion = 0
+        var imported: [ImportedStep] = []
+        /// The transcript the current draft was extracted from (nil = never extracted).
+        var extractedFrom: [TranscriptLine]?
+    }
+
+    /// Segments that were given an upload ticket (the server only completes uploaded audio).
+    private var ticketed: Set<String> = []
 
     public init() {}
 
@@ -117,6 +139,204 @@ public actor InMemoryBackend: TaktBackend {
             }
         }
         throw notFound
+    }
+
+    // MARK: Notes
+
+    public func notes() async throws -> [NoteSummary] {
+        try check("notes")
+        return noteRows.values
+            .sorted { ($0.createdAt, $0.id) > ($1.createdAt, $1.id) }
+            .map(summary)
+    }
+
+    public func createNote(id: String, title: String?, locale: String, createdAt: Date) async throws -> Note {
+        try check("createNote \(id)")
+        if let existing = noteRows[id] { return note(existing) }
+        noteRows[id] = NoteRow(id: id, title: title ?? Self.defaultTitle(createdAt), locale: locale, createdAt: createdAt)
+        return note(noteRows[id]!)
+    }
+
+    public func note(_ id: String) async throws -> Note {
+        try check("note \(id)")
+        return note(try row(id))
+    }
+
+    public func updateNote(
+        _ id: String, title: String?, durationMs: Int?, transcript: [TranscriptLine]?, speakers: [Speaker]?
+    ) async throws -> Note {
+        try check("updateNote \(id)")
+        var r = try row(id)
+        if let title { r.title = title }
+        if let durationMs { r.durationMs = durationMs }
+        if let speakers { r.speakers = speakers }
+        if let transcript { r.transcript = transcript }
+        noteRows[id] = r
+        return note(r)
+    }
+
+    public func deleteNote(_ id: String) async throws {
+        try check("deleteNote \(id)")
+        _ = try row(id)
+        noteRows[id] = nil
+        ticketed = ticketed.filter { !$0.hasPrefix("\(id)/") }
+    }
+
+    public func uploadTicket(note id: String, segment: Int) async throws -> UploadTicket {
+        try check("uploadTicket \(id) \(segment)")
+        _ = try row(id)
+        ticketed.insert("\(id)/\(segment)")
+        let now = Date()
+        return UploadTicket(uploadUrl: Self.audioURL(id, segment), expiresAt: now.addingTimeInterval(900))
+    }
+
+    public func completeSegment(note id: String, segment: Int, durationMs: Int) async throws -> Note {
+        try check("completeSegment \(id) \(segment)")
+        var r = try row(id)
+        guard ticketed.contains("\(id)/\(segment)") else {
+            throw BackendError.api(status: 409, code: "segment_missing", message: "not uploaded")
+        }
+        r.segments[segment] = durationMs
+        r.durationMs = r.segments.values.reduce(0, +)
+        noteRows[id] = r
+        return note(r)
+    }
+
+    public func noteAudio(_ id: String) async throws -> AudioUrls {
+        try check("noteAudio \(id)")
+        let r = try row(id)
+        let expires = Date().addingTimeInterval(3600)
+        return AudioUrls(segments: r.segments.sorted { $0.key < $1.key }.map {
+            AudioSegmentURL(index: $0.key, durationMs: $0.value, url: Self.audioURL(id, $0.key), expiresAt: expires)
+        })
+    }
+
+    /// Deterministic stand-in for the language model: one chain per line that mentions
+    /// 去 / 订 / 买, with that line as its only step.
+    public func extract(note id: String) async throws -> Note {
+        try check("extract \(id)")
+        var r = try row(id)
+        guard !r.transcript.isEmpty else {
+            throw BackendError.api(status: 400, code: "empty_transcript", message: "empty")
+        }
+        if r.extractedFrom == r.transcript { return note(r) }
+        let last = r.transcript.map(\.endMs).max() ?? 0
+        r.chains = r.transcript.filter { l in ["去", "订", "买"].contains { l.text.contains($0) } }.map { l in
+            let text = String(l.text.trimmingCharacters(in: .whitespaces).prefix(200))
+            let clause = text.split(whereSeparator: { "，。！？,.!?".contains($0) }).first.map(String.init) ?? text
+            return Chain(
+                id: newId(), name: clause,
+                steps: [ChainStep(
+                    id: newId(), name: text,
+                    quote: Quote(startMs: min(l.startMs, last), endMs: min(max(l.endMs, l.startMs), last)))])
+        }
+        r.extractionVersion += 1
+        r.extractedFrom = r.transcript
+        noteRows[id] = r
+        return note(r)
+    }
+
+    public func updateExtraction(note id: String, version: Int, chains: [Chain]) async throws -> Note {
+        try check("updateExtraction \(id)")
+        var r = try row(id)
+        guard version == r.extractionVersion else {
+            throw BackendError.api(status: 409, code: "version_conflict", message: "changed")
+        }
+        let done = Set(r.imported.map(\.stepId))
+        guard !chains.contains(where: { $0.steps.contains { done.contains($0.id) } }) else {
+            throw BackendError.api(status: 400, code: "already_imported", message: "imported")
+        }
+        r.chains = chains
+        r.extractionVersion += 1
+        noteRows[id] = r
+        return note(r)
+    }
+
+    public func importNote(_ id: String, parent: String, picks: [ImportPick]) async throws -> (level: Level, note: Note) {
+        try check("importNote \(id)")
+        var r = try row(id)
+        guard nodes[parent] != nil else { throw notFound }
+
+        // Validate every pick against the current draft before writing anything.
+        let draft = Dictionary(r.chains.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var used = Set<String>()
+        var plan: [(chain: Chain, steps: [ChainStep], places: [String: PickedPlace])] = []
+        for pick in picks {
+            let wanted = Set(pick.stepIds)
+            let steps = draft[pick.chainId]?.steps.filter { wanted.contains($0.id) } ?? []
+            guard let chain = draft[pick.chainId], steps.count == wanted.count, pick.stepIds.count == wanted.count else {
+                throw BackendError.api(status: 409, code: "stale_draft", message: "reload the draft")
+            }
+            for s in steps where !used.insert(s.id).inserted {
+                throw BackendError.api(status: 400, code: "duplicate_pick", message: "picked twice")
+            }
+            plan.append((chain, steps, pick.placesByStep))
+        }
+
+        let now = Date()
+        for (chain, steps, places) in plan {
+            // One step is a plain task; a chain of two or more becomes a parent with ordered children.
+            let group = steps.count >= 2 ? add(parent: parent, name: chain.name) : parent
+            for s in steps {
+                let task: String
+                if let p = places[s.id] {
+                    task = add(parent: group, name: s.name, place: p.place, address: p.address, lat: p.lat, lng: p.lng)
+                } else {
+                    task = add(parent: group, name: s.name, place: s.place ?? "")
+                }
+                r.imported.append(ImportedStep(
+                    stepId: s.id, chainName: chain.name, stepName: s.name, taskId: task, parentTaskId: group,
+                    importedAt: now))
+            }
+        }
+        r.chains = r.chains
+            .map { Chain(id: $0.id, name: $0.name, steps: $0.steps.filter { !used.contains($0.id) }) }
+            .filter { !$0.steps.isEmpty }
+        r.extractionVersion += 1
+        noteRows[id] = r
+        return (try levelOf(parent), note(r))
+    }
+
+    /// Stores a ready-made note (demo data, tests).
+    public func seed(_ n: Note) {
+        noteRows[n.id] = NoteRow(
+            id: n.id, title: n.title, locale: n.locale, createdAt: n.createdAt, durationMs: n.durationMs,
+            transcript: n.transcript, speakers: n.speakers,
+            segments: Dictionary(n.segments.filter(\.uploaded).map { ($0.index, $0.durationMs) }, uniquingKeysWith: { a, _ in a }),
+            chains: n.extraction.chains, extractionVersion: n.extraction.version, imported: n.imported)
+    }
+
+    private func row(_ id: String) throws -> NoteRow {
+        guard let r = noteRows[id] else { throw notFound }
+        return r
+    }
+
+    private func summary(_ r: NoteRow) -> NoteSummary {
+        NoteSummary(
+            id: r.id, title: r.title, locale: r.locale, durationMs: r.durationMs, createdAt: r.createdAt,
+            hasTranscript: !r.transcript.isEmpty, chainCount: r.chains.count, importedCount: r.imported.count)
+    }
+
+    private func note(_ r: NoteRow) -> Note {
+        Note(
+            id: r.id, title: r.title, locale: r.locale, durationMs: r.durationMs, createdAt: r.createdAt,
+            hasTranscript: !r.transcript.isEmpty, chainCount: r.chains.count, importedCount: r.imported.count,
+            transcript: r.transcript, speakers: r.speakers,
+            segments: r.segments.sorted { $0.key < $1.key }.map {
+                NoteSegment(index: $0.key, durationMs: $0.value, uploaded: true)
+            },
+            extraction: .init(version: r.extractionVersion, chains: r.chains), imported: r.imported)
+    }
+
+    private static func audioURL(_ note: String, _ segment: Int) -> String { "memory://notes/\(note)/\(segment).m4a" }
+
+    /// `YYYY-MM-DD HH:mm` in UTC, like the server.
+    private static func defaultTitle(_ at: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyy-MM-dd HH:mm"
+        return f.string(from: at)
     }
 
     // MARK: Building
@@ -237,6 +457,32 @@ extension InMemoryBackend {
         await b.add(parent: hokkaido, name: "函馆山夜景", short: "函馆山", place: "函馆市", address: "北海道函館市元町19-7",
                     lat: 41.7590,
                     lng: 140.7044, prerequisites: [("购买缆车票", .onsite)])
+        await b.seedKyotoNote()
         return b
+    }
+
+    /// 京都讨论: the spike's 8-line, 3-speaker transcript (50.3 s), recorded in one segment.
+    func seedKyotoNote() {
+        let lines: [(Int, String, String)] = [
+            (0, "1", "下周去京都的行程我们定一下吧，我想第一天先去伏见稻荷大社。"),
+            (6000, "2", "好啊，那我来订酒店，最好住在京都站附近，交通方便一点。"),
+            (12000, "3", "伏见稻荷人很多，建议早上七点之前到，拍照比较清净。"),
+            (19000, "1", "那就七点出发。之后去清水寺，中午在二年坂吃午饭。"),
+            (25000, "2", "午饭要提前预约吗？我可以顺便查一下二年坂那家荞麦面店。"),
+            (31000, "3", "要的，周末一般要排队。还有，岚山的小火车票也得提前在网上买。"),
+            (38000, "1", "岚山放第二天吧。第二天上午小火车，下午去竹林和天龙寺。"),
+            (44000, "2", "好，那小火车票我也一起买了，酒店和车票都交给我。"),
+        ]
+        let created = DateComponents(
+            calendar: Calendar(identifier: .gregorian), timeZone: TimeZone(identifier: "UTC"),
+            year: 2026, month: 11, day: 20, hour: 9
+        ).date!
+        let transcript = lines.map { TranscriptLine(startMs: $0.0, endMs: $0.0 + 5800, text: $0.2, speaker: $0.1) }
+        seed(Note(
+            id: newId(), title: "京都讨论", locale: "zh-CN", durationMs: 50340, createdAt: created,
+            hasTranscript: true, chainCount: 0, importedCount: 0, transcript: transcript,
+            speakers: [Speaker(id: "1", name: "我"), Speaker(id: "2", name: "小林"), Speaker(id: "3", name: "3")],
+            segments: [NoteSegment(index: 0, durationMs: 50340, uploaded: true)],
+            extraction: .init(version: 0, chains: []), imported: []))
     }
 }
