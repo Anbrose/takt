@@ -93,7 +93,8 @@ public actor NoteSync {
     private let store: NoteStore
     private let backend: any TaktBackend
     private let uploader: SegmentUploading
-    private var running: Set<UUID> = []
+    /// Notes being synced, and whether another call asked for a rerun meanwhile.
+    private var running: [UUID: Bool] = [:]
 
     public init(store: NoteStore, backend: any TaktBackend, uploader: SegmentUploading) {
         self.store = store; self.backend = backend; self.uploader = uploader
@@ -104,9 +105,15 @@ public actor NoteSync {
     }
 
     public func sync(_ id: UUID) async {
-        guard running.insert(id).inserted else { return }
-        defer { running.remove(id) }
-        do { try await run(id) } catch {}
+        if running[id] != nil {
+            running[id] = true // the pass in flight may have read the note before this change
+            return
+        }
+        repeat {
+            running[id] = false
+            do { try await run(id) } catch {}
+        } while running[id] == true
+        running[id] = nil
     }
 
     private func run(_ id: UUID) async throws {

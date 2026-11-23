@@ -22,8 +22,7 @@ public struct NoteItem: Equatable, Identifiable, Sendable {
 @Observable
 public final class NotesModel {
     private static let localeKey = "notes.locale"
-    /// Languages the picker offers; the default is the device language when it is one of these.
-    private static let languages = ["zh-CN", "en-US"]
+    private static let fallbackLocale = "zh_CN"
 
     private let backend: any TaktBackend
     private let store: NoteStore
@@ -31,6 +30,10 @@ public final class NotesModel {
     private let sync: NoteSync
     private let capture: AudioCapture
     private let defaults: UserDefaults
+    private let deviceLocale: String
+    private let supportedLocales: @Sendable () async -> [String]
+    private var recovered = false
+    private var applyingDefault = false
 
     private var summaries: [NoteSummary] = []
     private var locals: [LocalNote] = []
@@ -43,7 +46,7 @@ public final class NotesModel {
 
     public private(set) var items: [NoteItem] = []
     public var locale: String {
-        didSet { defaults.set(locale, forKey: Self.localeKey) }
+        didSet { if !applyingDefault { defaults.set(locale, forKey: Self.localeKey) } }
     }
     public private(set) var recording: (id: UUID, startedAt: Date)?
     /// Short, user-facing message for the last failure. Cleared on the next action.
@@ -51,23 +54,38 @@ public final class NotesModel {
 
     public init(
         backend: any TaktBackend, store: NoteStore, processor: NoteProcessor, sync: NoteSync,
-        capture: AudioCapture, defaults: UserDefaults = .standard
+        capture: AudioCapture, defaults: UserDefaults = .standard,
+        deviceLocale: String = Locale.current.identifier,
+        supportedLocales: @escaping @Sendable () async -> [String] = NotesModel.systemSupportedLocales
     ) {
         self.backend = backend; self.store = store; self.processor = processor; self.sync = sync
         self.capture = capture; self.defaults = defaults
-        locale = defaults.string(forKey: Self.localeKey) ?? Self.defaultLocale()
+        self.deviceLocale = deviceLocale; self.supportedLocales = supportedLocales
+        locale = defaults.string(forKey: Self.localeKey) ?? Self.fallbackLocale
     }
 
-    private static func defaultLocale() -> String {
-        let language = Locale.current.language.languageCode?.identifier
-        return languages.first { $0.hasPrefix((language ?? "") + "-") } ?? languages[0]
+    /// Identifiers (`zh_CN`) of the languages on-device transcription supports; empty before iOS 26.
+    public static let systemSupportedLocales: @Sendable () async -> [String] = {
+        if #available(iOS 26, macOS 26, *) { return await SupportedLanguages.all().map(\.identifier) }
+        return []
+    }
+
+    /// Without a remembered choice, the device language is used once it is known to be supported.
+    private func resolveDefaultLocale() async {
+        guard defaults.string(forKey: Self.localeKey) == nil else { return }
+        let supported = await supportedLocales()
+        guard supported.contains(deviceLocale), defaults.string(forKey: Self.localeKey) == nil else { return }
+        applyingDefault = true
+        locale = deviceLocale
+        applyingDefault = false
     }
 
     // MARK: Loading
 
     /// Recovers notes cut off by a kill, resumes unsent work in the background, and shows the server's list.
     public func load() async {
-        await processor.recoverAfterLaunch()
+        await recoverOnce()
+        await resolveDefaultLocale()
         locals = await store.all()
         rebuild()
         let sync = sync
@@ -76,6 +94,14 @@ public final class NotesModel {
             await self?.refresh()
         }
         await fetchSummaries()
+    }
+
+    /// Once per model, and before the first recording: a later run would mistake the live recording for one
+    /// cut off by a kill.
+    private func recoverOnce() async {
+        guard !recovered else { return }
+        recovered = true
+        await processor.recoverAfterLaunch()
     }
 
     private func refresh() async {
@@ -120,6 +146,7 @@ public final class NotesModel {
     public func startRecording() async throws {
         guard recording == nil else { return }
         notice = nil
+        await recoverOnce()
         let note = LocalNote(locale: locale)
         try await store.save(note)
         let id = note.id

@@ -299,3 +299,75 @@ final class StubGCS: URLProtocol, @unchecked Sendable {
         #expect(requests == [nil, "bytes */10", "bytes */10"])
     }
 }
+
+/// Forwards to an InMemoryBackend; the first updateNote waits until the gate opens.
+private actor Gate {
+    var entered = false
+    private var isOpen = false
+    private var waiter: CheckedContinuation<Void, Never>?
+    func pass() async {
+        entered = true
+        if isOpen { return }
+        await withCheckedContinuation { waiter = $0 }
+    }
+    func open() { isOpen = true; waiter?.resume(); waiter = nil }
+    func waitEntered() async { while !entered { await Task.yield() } }
+}
+
+private struct GatedBackend: TaktBackend {
+    let inner: InMemoryBackend
+    let gate: Gate
+    func projects() async throws -> [Project] { try await inner.projects() }
+    func createProject(name: String) async throws -> Project { try await inner.createProject(name: name) }
+    func renameProject(_ id: String, name: String) async throws -> Project { try await inner.renameProject(id, name: name) }
+    func deleteProject(_ id: String) async throws { try await inner.deleteProject(id) }
+    func level(_ taskId: String) async throws -> Level { try await inner.level(taskId) }
+    func createTask(in parentId: String, _ body: CreateTaskBody) async throws -> TaskSummary { try await inner.createTask(in: parentId, body) }
+    func reorder(_ parentId: String, ids: [String], version: Int) async throws -> Level { try await inner.reorder(parentId, ids: ids, version: version) }
+    func deleteTask(_ id: String) async throws -> Level { try await inner.deleteTask(id) }
+    func setPrerequisite(_ id: String, done: Bool) async throws -> Prerequisite { try await inner.setPrerequisite(id, done: done) }
+    func notes() async throws -> [NoteSummary] { try await inner.notes() }
+    func createNote(id: String, title: String?, locale: String, createdAt: Date) async throws -> Note {
+        try await inner.createNote(id: id, title: title, locale: locale, createdAt: createdAt)
+    }
+    func note(_ id: String) async throws -> Note { try await inner.note(id) }
+    func updateNote(_ id: String, title: String?, durationMs: Int?, transcript: [TranscriptLine]?, speakers: [Speaker]?) async throws -> Note {
+        await gate.pass()
+        return try await inner.updateNote(id, title: title, durationMs: durationMs, transcript: transcript, speakers: speakers)
+    }
+    func deleteNote(_ id: String) async throws { try await inner.deleteNote(id) }
+    func uploadTicket(note: String, segment: Int) async throws -> UploadTicket { try await inner.uploadTicket(note: note, segment: segment) }
+    func completeSegment(note: String, segment: Int, durationMs: Int) async throws -> Note {
+        try await inner.completeSegment(note: note, segment: segment, durationMs: durationMs)
+    }
+    func noteAudio(_ id: String) async throws -> AudioUrls { try await inner.noteAudio(id) }
+    func extract(note: String) async throws -> Note { try await inner.extract(note: note) }
+    func updateExtraction(note: String, version: Int, chains: [Chain]) async throws -> Note {
+        try await inner.updateExtraction(note: note, version: version, chains: chains)
+    }
+    func importNote(_ id: String, parent: String, picks: [ImportPick]) async throws -> (level: Level, note: Note) {
+        try await inner.importNote(id, parent: parent, picks: picks)
+    }
+}
+
+@Suite struct NoteSyncRerunTests {
+    @Test func syncRequestedMidPassRunsAgain() async throws {
+        let (store, _) = tempStore()
+        let inner = InMemoryBackend()
+        let gate = Gate()
+        let sync = NoteSync(store: store, backend: GatedBackend(inner: inner, gate: gate), uploader: FakeUploader())
+        let unlabeled = lines.map { AlignedLine(startMs: $0.startMs, endMs: $0.endMs, text: $0.text, speaker: nil) }
+        let n = try await seed(store, segments: 1, lines: unlabeled, diarized: false)
+
+        let first = Task { await sync.sync(n.id) }
+        await gate.waitEntered() // pass 1 is sending the unlabeled transcript
+        try await store.update(n.id) { $0.lines = lines; $0.diarized = true }
+        await sync.sync(n.id) // asked while pass 1 runs: must not be dropped
+        await gate.open()
+        await first.value
+
+        let server = try await inner.note(n.id.uuidString)
+        #expect(server.transcript.map(\.speaker) == ["1", "2", "1"])
+        #expect(await store.note(n.id)?.synced.diarizedSent == true)
+    }
+}

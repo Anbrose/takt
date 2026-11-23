@@ -17,7 +17,7 @@ final class StubTranscriber: Transcribing, @unchecked Sendable {
 
 struct StubDiarizer: Diarizing {
     func turns(for segments: [SegmentAudio]) async throws -> [SpeakerTurn] {
-        [SpeakerTurn(speaker: "1", startMs: 0, endMs: 5000)]
+        [SpeakerTurn(speaker: "1", startMs: 0, endMs: segments.reduce(0) { $0 + $1.durationMs })]
     }
 }
 
@@ -55,7 +55,7 @@ private struct Rig {
     let defaults = UserDefaults(suiteName: UUID().uuidString)!
     let model: NotesModel
 
-    init(syncBackend: InMemoryBackend? = nil) {
+    init(syncBackend: InMemoryBackend? = nil, device: String = "zh_CN", supported: [String] = []) {
         let root = FileManager.default.temporaryDirectory.appending(path: "notes-\(UUID().uuidString)")
         store = NoteStore(root: root)
         let sb = syncBackend ?? backend
@@ -64,7 +64,7 @@ private struct Rig {
             backend: backend, store: store,
             processor: NoteProcessor(store: store, transcriber: StubTranscriber(), diarizer: StubDiarizer()),
             sync: NoteSync(store: store, backend: sb, uploader: StubUploader()),
-            capture: capture, defaults: defaults)
+            capture: capture, defaults: defaults, deviceLocale: device, supportedLocales: { supported })
     }
 
     func detail(_ id: UUID = noteId) -> NoteDetailModel {
@@ -89,14 +89,73 @@ private func serverNote(_ b: InMemoryBackend, lines: [TranscriptLine]? = nil) as
 @Suite struct NotesModelTests {
     @Test func localeRemembered() {
         let r = Rig()
-        r.model.locale = "en-US"
+        r.model.locale = "en_US"
         let again = NotesModel(
             backend: r.backend, store: r.store,
             processor: NoteProcessor(store: r.store, transcriber: StubTranscriber(), diarizer: StubDiarizer()),
             sync: NoteSync(store: r.store, backend: r.backend, uploader: StubUploader()),
             capture: r.capture, defaults: r.defaults)
-        #expect(again.locale == "en-US")
-        #expect(r.defaults.string(forKey: "notes.locale") == "en-US")
+        #expect(again.locale == "en_US")
+        #expect(r.defaults.string(forKey: "notes.locale") == "en_US")
+    }
+
+    @Test func deviceLocaleIsDefaultWhenSupported() async {
+        let r = Rig(device: "ja_JP", supported: ["ja_JP", "en_US"])
+        #expect(r.model.locale == "zh_CN")
+        await r.model.load()
+        #expect(r.model.locale == "ja_JP")
+        #expect(r.defaults.string(forKey: "notes.locale") == nil)
+        let unsupported = Rig(device: "fr_FR", supported: ["ja_JP"])
+        await unsupported.model.load()
+        #expect(unsupported.model.locale == "zh_CN")
+    }
+
+    @Test func rememberedLocaleBeatsDevice() async {
+        let r = Rig(device: "ja_JP", supported: ["ja_JP"])
+        r.model.locale = "en_US"
+        await r.model.load()
+        #expect(r.model.locale == "en_US")
+    }
+
+    @Test func loadDuringRecordingDoesNotCutItShort() async throws {
+        let r = Rig()
+        try await r.model.startRecording()
+        let id = try #require(r.model.recording?.id)
+        await r.model.load()
+        r.capture.onSegment?(0, 300_000)
+        r.capture.stopResult = (1, 2000)
+        try Data("a".utf8).write(to: r.store.segmentFileURL(id, 1))
+        await r.model.stopRecording()
+        let local = try #require(await r.store.note(id))
+        #expect(local.segments.map(\.index) == [0, 1])
+        #expect(local.recording == false)
+        #expect(local.diarized)
+        // Diarization ran once, after stop: the lines cover the tokens of both segments.
+        #expect(local.tokens.count == 2)
+        #expect(local.lines?.map(\.text).joined().components(separatedBy: "先去伏见稻荷").count == 3)
+    }
+
+    @Test func offlineLocalNoteOpensAndPlays() async throws {
+        let r = Rig()
+        let lines = [AlignedLine(startMs: 0, endMs: 900, text: "你好", speaker: "1"),
+                     AlignedLine(startMs: 1000, endMs: 2000, text: "好", speaker: "2")]
+        try await r.store.save(LocalNote(
+            id: noteId, title: "t", locale: "zh_CN",
+            segments: [LocalSegment(index: 0, durationMs: 4000, file: "0.m4a", transcribed: true)],
+            lines: lines, diarized: true, recording: false))
+        let file = r.store.segmentFileURL(noteId, 0)
+        try Data("a".utf8).write(to: file)
+        let d = await r.model.open(noteId)
+        #expect(d.isLocalOnly)
+        #expect(d.notice == nil)
+        #expect(d.note?.transcript.map(\.text) == ["你好", "好"])
+        #expect(d.note?.speakers.map(\.id) == ["1", "2"])
+        #expect(d.note?.extraction.version == 0)
+        await d.extract()
+        #expect(await r.backend.calls.contains { $0.hasPrefix("extract") } == false)
+        let hit = try #require(await d.audioURL(at: 1500))
+        #expect(hit.0 == file)
+        #expect(hit.1 == 1.5)
     }
 
     @Test func demoNoteIdIsUUID() async throws {

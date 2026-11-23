@@ -17,6 +17,8 @@ public final class NoteDetailModel {
     /// Short, user-facing message for the last failure. Cleared on the next action.
     public var notice: String?
     public private(set) var extracting = false
+    /// The server doesn't have this note yet (recorded offline): shown from the device, read-only.
+    public private(set) var isLocalOnly = false
 
     public init(id: UUID, backend: any TaktBackend, store: NoteStore, onChange: @escaping () -> Void = {}) {
         self.id = id; self.backend = backend; self.store = store; self.onChange = onChange
@@ -25,15 +27,36 @@ public final class NoteDetailModel {
     public func load() async {
         do {
             note = try await backend.note(id.uuidString)
+            isLocalOnly = false
         } catch {
-            notice = "加载失败"
+            if let local = await store.note(id) {
+                note = Self.note(from: local)
+                isLocalOnly = true
+            } else {
+                notice = "加载失败"
+            }
         }
+    }
+
+    /// What the device knows of a note, shaped like the server's. No draft, nothing imported.
+    private static func note(from l: LocalNote) -> Note {
+        let transcript = (l.lines ?? []).map {
+            TranscriptLine(startMs: $0.startMs, endMs: $0.endMs, text: $0.text, speaker: $0.speaker)
+        }
+        var ids: [String] = []
+        for case let s? in transcript.map(\.speaker) where !ids.contains(s) { ids.append(s) }
+        return Note(
+            id: l.id.uuidString, title: l.title, locale: l.locale, durationMs: l.durationMs, createdAt: l.createdAt,
+            hasTranscript: !transcript.isEmpty, chainCount: 0, importedCount: 0, transcript: transcript,
+            speakers: ids.map { Speaker(id: $0, name: $0) },
+            segments: l.segments.map { NoteSegment(index: $0.index, durationMs: $0.durationMs, uploaded: $0.uploaded) },
+            extraction: .init(version: 0, chains: []), imported: [])
     }
 
     /// Renames one speaker; the others keep their names.
     public func renameSpeaker(_ speaker: String, to name: String) async {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let note, !name.isEmpty, note.speakers.contains(where: { $0.id == speaker }) else { return }
+        guard let note, !isLocalOnly, !name.isEmpty, note.speakers.contains(where: { $0.id == speaker }) else { return }
         notice = nil
         let speakers = note.speakers.map { $0.id == speaker ? Speaker(id: $0.id, name: name) : $0 }
         do {
@@ -45,7 +68,7 @@ public final class NoteDetailModel {
 
     /// Asks the server to extract chains from the transcript.
     public func extract() async {
-        guard !extracting else { return }
+        guard !extracting, !isLocalOnly else { return }
         notice = nil
         extracting = true
         defer { extracting = false }
@@ -65,7 +88,7 @@ public final class NoteDetailModel {
 
     /// Saves the edited draft. If it changed elsewhere meanwhile, the draft is reloaded instead.
     public func edit(_ chains: [Chain]) async {
-        guard let note else { return }
+        guard let note, !isLocalOnly else { return }
         notice = nil
         do {
             self.note = try await backend.updateExtraction(note: id.uuidString, version: note.extraction.version, chains: chains)
@@ -81,6 +104,7 @@ public final class NoteDetailModel {
     /// Writes the picked steps into `parent`. On a stale draft (409) or a missing target (404) nothing was
     /// written; the note is reloaded.
     public func importPicks(_ picks: [ImportPick], into parent: String) async -> Bool {
+        guard !isLocalOnly else { return false }
         notice = nil
         do {
             note = try await backend.importNote(id.uuidString, parent: parent, picks: picks).note
@@ -104,28 +128,33 @@ public final class NoteDetailModel {
     }
 
     /// Where to play the recording at `ms`: the segment holding it and the offset inside that segment.
-    /// A segment still on the device is played from there.
+    /// Segments still on the device are played from there, without the server; the server's signed URLs
+    /// are used only when the needed local file is gone.
     public func audioURL(at ms: Int) async -> (URL, TimeInterval)? {
-        guard let urls = await currentAudio() else { return nil }
-        let segments = urls.segments.sorted { $0.index < $1.index }
-        guard var hit = segments.first else { return nil }
+        if let local = await store.note(id),
+           let (index, offset) = Self.locate(ms, in: local.segments.map { ($0.index, $0.durationMs) }) {
+            let file = await store.segmentURL(id, index)
+            if FileManager.default.fileExists(atPath: file.path) { return (file, offset) }
+        }
+        guard let urls = await currentAudio(),
+              let (index, offset) = Self.locate(ms, in: urls.segments.map { ($0.index, $0.durationMs) }),
+              let hit = urls.segments.first(where: { $0.index == index }) else { return nil }
+        let file = await store.segmentURL(id, index)
+        if FileManager.default.fileExists(atPath: file.path) { return (file, offset) }
+        return URL(string: hit.url).map { ($0, offset) }
+    }
+
+    /// The segment containing `ms` (the last one when past the end) and the offset in seconds inside it.
+    private static func locate(_ ms: Int, in segments: [(index: Int, durationMs: Int)]) -> (Int, TimeInterval)? {
+        let sorted = segments.sorted { $0.index < $1.index }
+        guard var hit = sorted.first else { return nil }
         var start = 0
-        for s in segments {
+        for s in sorted {
             hit = s
             if ms < start + s.durationMs { break }
             start += s.durationMs
         }
-        let offset = min(max(ms - start, 0), hit.durationMs)
-        let local = await store.segmentURL(id, hit.index)
-        let url: URL
-        if FileManager.default.fileExists(atPath: local.path) {
-            url = local
-        } else if let remote = URL(string: hit.url) {
-            url = remote
-        } else {
-            return nil
-        }
-        return (url, TimeInterval(offset) / 1000)
+        return (hit.index, TimeInterval(min(max(ms - start, 0), hit.durationMs)) / 1000)
     }
 
     /// Signed URLs are reused until the first one expires.
