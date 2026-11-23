@@ -39,15 +39,21 @@ final class SpeakerAlignTests: XCTestCase {
     }
 
     func testNoTurnsGivesNilSpeaker() {
-        let lines = SpeakerAlign.align([tok(0, 500, "a"), tok(600, 900, "b"), tok(5000, 5400, "c")], [])
+        let lines = SpeakerAlign.align([tok(0, 500, "a"), tok(600, 900, " b"), tok(5000, 5400, "c")], [])
         XCTAssertEqual(lines.map(\.text), ["a b", "c"])
         XCTAssertTrue(lines.allSatisfy { $0.speaker == nil })
     }
 
     func testLongPauseSplitsSameSpeaker() {
         let turns = [turn("A", 0, 10000)]
-        let lines = SpeakerAlign.align([tok(0, 500, "a"), tok(600, 900, "b"), tok(3000, 3500, "c")], turns)
+        let lines = SpeakerAlign.align([tok(0, 500, "a"), tok(600, 900, " b"), tok(3000, 3500, "c")], turns)
         XCTAssertEqual(lines.map(\.text), ["a b", "c"])
         XCTAssertEqual(lines.map(\.speaker), ["A", "A"])
+    }
+
+    func testChineseTokensJoinWithoutSpaces() {
+        let turns = [turn("1", 0, 2000)]
+        let lines = SpeakerAlign.align([tok(0, 300, "先去"), tok(300, 600, "伏见"), tok(600, 900, "稻荷")], turns)
+        XCTAssertEqual(lines.map(\.text), ["先去伏见稻荷"])
     }
 }

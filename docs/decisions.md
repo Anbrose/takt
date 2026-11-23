@@ -74,6 +74,7 @@
 - **任务链提取（LLM）**：默认用 Vertex AI 上的 Gemini（`@google/genai` 的 Vertex 模式，`temperature` 0，JSON schema 结构化输出），模型和区域可配置，默认 `gemini-2.5-flash` / `us-central1`。**还没有和 Claude 对比过**——对比会产生费用，等用户批准后再做；换模型或 SDK 只需改 `apps/api/src/llm/vertex-extractor.ts`。只把逐字稿文本发给模型。手动试跑：`apps/api/scripts/try-extract.ts <transcript.json>`（不在 CI 里跑）。
 - **提取的限制**：未改动的逐字稿再次提取直接返回已有草稿，不调用、不计数；每条笔记最多提取 `NOTE_EXTRACT_LIMIT` 次（默认 10，超出 429 `extract_limit`）；每个 owner 每个 UTC 月最多 `LLM_MONTHLY_CALLS` 次模型调用（默认 300，超出 429 `budget_exceeded`）。长逐字稿按行切成约 3 万字的块，每块调用一次、各计一次；预算只在开始前检查，一次提取中途超出预算也会完成，不会做到一半失败。模型调用失败返回 502 `llm_failed`，只计已经发出的调用。
 - **提取相关环境变量**：`LLM_PROVIDER`（`fake` 默认，返回空草稿，启动时打日志；`vertex`）、`VERTEX_PROJECT`、`VERTEX_LOCATION`、`LLM_MODEL`、`NOTE_EXTRACT_LIMIT`、`LLM_MONTHLY_CALLS`。
+- **手机端转写与说话人**：录音按 300 秒一段存成 AAC（16 kHz 单声道 32 kbps），先存本地 `Application Support/Notes/{id}/`（`note.json` + `{index}.m4a`）。每段用系统的 `SpeechTranscriber`（iOS 26，离线）转写，语言模型没下载好时段落先留着，装好后再转。停止录音、所有段都转完后，把全部段拼成一个 16 kHz 文件用 FluidAudio 的离线说话人分离跑**一次**（这样各段的说话人编号一致），编号按出现顺序改成 1、2、3…；分离失败就保留没有说话人的逐字稿。FluidAudio 固定 `0.18.4`，用 SwiftPM trait `["Diarizer"]`（包的 tools-version 因此升到 6.2），不带 TTS 和文本规范化的依赖，iOS 真机和模拟器都能链接。
 
 ## 设计流程
 

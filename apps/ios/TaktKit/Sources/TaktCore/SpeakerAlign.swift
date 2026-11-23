@@ -1,4 +1,4 @@
-public struct TimedText: Equatable, Sendable {
+public struct TimedText: Codable, Equatable, Sendable {
     public var startMs: Int
     public var endMs: Int
     public var text: String
@@ -7,7 +7,7 @@ public struct TimedText: Equatable, Sendable {
     }
 }
 
-public struct SpeakerTurn: Equatable, Sendable {
+public struct SpeakerTurn: Codable, Equatable, Sendable {
     public var speaker: String
     public var startMs: Int
     public var endMs: Int
@@ -16,7 +16,7 @@ public struct SpeakerTurn: Equatable, Sendable {
     }
 }
 
-public struct AlignedLine: Equatable, Sendable {
+public struct AlignedLine: Codable, Equatable, Sendable {
     public var startMs: Int
     public var endMs: Int
     public var text: String
@@ -30,12 +30,14 @@ public enum SpeakerAlign {
     /// Each token → speaker with the most time overlap; no overlap → nearest turn by midpoint;
     /// no turns at all → speaker nil. Consecutive tokens of one speaker merge into a line,
     /// and a line also breaks when the gap to the next token exceeds `maxGapMs` (default 1500).
+    /// Token texts are concatenated as-is: SpeechTranscriber runs carry their own spacing
+    /// (none between Chinese characters, a leading space before English words).
     public static func align(_ tokens: [TimedText], _ turns: [SpeakerTurn], maxGapMs: Int = 1500) -> [AlignedLine] {
         var lines: [AlignedLine] = []
         for token in tokens.sorted(by: { $0.startMs < $1.startMs }) {
             let speaker = speaker(for: token, turns)
             if var last = lines.last, last.speaker == speaker, token.startMs - last.endMs <= maxGapMs {
-                last.text += " " + token.text
+                last.text += token.text
                 last.endMs = max(last.endMs, token.endMs)
                 lines[lines.count - 1] = last
             } else {
