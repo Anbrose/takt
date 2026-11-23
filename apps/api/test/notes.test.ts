@@ -462,10 +462,27 @@ describe('draft edits and import', () => {
   it('refuses a target in another owners project', async () => {
     const chain = (await draft()).extraction.chains[0];
     const pick = { chainId: chain.id, stepIds: [chain.steps[0].id] };
-    expect((await doImport({ parentTaskId: root, picks: [pick] }, 'other')).status).toBe(404);
+    const theirs = await seedTrip(handle.db, 'other');
+    const before = await children(theirs.project.rootTaskId, 'other');
+    const r = await doImport({ parentTaskId: theirs.project.rootTaskId, picks: [pick] });
+    expect(r.status).toBe(404);
+    expect((await children(theirs.project.rootTaskId, 'other')).version).toBe(before.version);
+    expect((await draft()).imported).toHaveLength(0);
     expect(
       (await doImport({ parentTaskId: '99999999-9999-4999-8999-999999999999', picks: [pick] })).status,
     ).toBe(404);
+  });
+
+  it('refuses to import a step twice and writes nothing', async () => {
+    const chain = (await draft()).extraction.chains[0];
+    const body = { parentTaskId: root, picks: [{ chainId: chain.id, stepIds: [chain.steps[0].id] }] };
+    expect((await doImport(body)).status).toBe(200);
+    const before = await children(root);
+    const r = await doImport(body);
+    expect(r.status).toBe(409);
+    expect(r.body.error).toBe('stale_draft');
+    expect((await children(root)).version).toBe(before.version);
+    expect((await draft()).imported).toHaveLength(1);
   });
 
   it('rejects an extraction edit from an old version', async () => {

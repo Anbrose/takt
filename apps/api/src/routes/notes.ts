@@ -326,7 +326,7 @@ export function noteRoutes(
           extractionVersion: row.extractionVersion + 1,
           updatedAt: new Date(),
         })
-        .where(eq(notes.id, row.id))
+        .where(and(eq(notes.id, row.id), eq(notes.ownerId, owner)))
         .returning();
       return { level: await loadLevel(tx, owner, body.parentTaskId), note: updated! };
     });
