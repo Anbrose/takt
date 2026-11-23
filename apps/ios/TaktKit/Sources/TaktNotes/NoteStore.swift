@@ -34,7 +34,7 @@ public actor NoteStore {
 
     /// Reads, changes and writes one note without another caller interleaving. Nil when the note doesn't exist.
     @discardableResult
-    public func update(_ id: UUID, _ change: (inout LocalNote) -> Void) throws -> LocalNote? {
+    public func update(_ id: UUID, _ change: @Sendable (inout LocalNote) -> Void) throws -> LocalNote? {
         guard var n = note(id) else { return nil }
         change(&n)
         try save(n)
@@ -42,7 +42,12 @@ public actor NoteStore {
     }
 
     public func segmentURL(_ id: UUID, _ index: Int) -> URL {
-        folder(id).appending(path: "\(index).m4a")
+        segmentFileURL(id, index)
+    }
+
+    /// Same path as `segmentURL`, readable without awaiting (the recorder asks for it synchronously).
+    public nonisolated func segmentFileURL(_ id: UUID, _ index: Int) -> URL {
+        root.appending(path: id.uuidString, directoryHint: .isDirectory).appending(path: "\(index).m4a")
     }
 
     /// Removes one segment's audio; the note and its segment entry stay.

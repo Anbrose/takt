@@ -35,7 +35,7 @@ let package = Package(
         .target(name: "TaktUI", dependencies: ["TaktCore", "TaktAPI", "TaktNotes"]),
         .testTarget(name: "TaktCoreTests", dependencies: ["TaktCore"]),
         .testTarget(name: "TaktAPITests", dependencies: ["TaktAPI"]),
-        .testTarget(name: "TaktUITests", dependencies: ["TaktUI"]),
+        .testTarget(name: "TaktUITests", dependencies: ["TaktUI", "TaktNotes", "TaktCore"]),
         .testTarget(
             name: "TaktNotesTests",
             dependencies: ["TaktNotes", "TaktCore", "TaktUI"],

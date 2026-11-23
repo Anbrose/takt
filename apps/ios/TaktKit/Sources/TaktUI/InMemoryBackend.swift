@@ -45,6 +45,12 @@ public actor InMemoryBackend: TaktBackend {
 
     public func failNextCall(with error: Error) { failNext = error }
 
+    /// Test hook: the next `extract` throws an API error with this status and code (the call is still recorded).
+    public func failNextExtract(with code: String, status: Int) {
+        failNextExtractError = .api(status: status, code: code, message: code)
+    }
+    private var failNextExtractError: BackendError?
+
     /// Bumps a level's version as if another device had changed it.
     public func touch(_ taskId: String) { nodes[taskId]?.version += 1 }
 
@@ -215,6 +221,10 @@ public actor InMemoryBackend: TaktBackend {
     /// 去 / 订 / 买, with that line as its only step.
     public func extract(note id: String) async throws -> Note {
         try check("extract \(id)")
+        if let e = failNextExtractError {
+            failNextExtractError = nil
+            throw e
+        }
         var r = try row(id)
         guard !r.transcript.isEmpty else {
             throw BackendError.api(status: 400, code: "empty_transcript", message: "empty")
