@@ -119,16 +119,49 @@ private func exists(_ store: NoteStore, _ n: LocalNote, _ i: Int) async -> Bool 
 
     @Test func doesNotDuplicateOnRetryAfterCreate() async throws {
         let (store, _) = tempStore()
-        let backend = InMemoryBackend()
-        let up = FakeUploader(failing: true)
-        let sync = NoteSync(store: store, backend: backend, uploader: up)
+        let memory = InMemoryBackend()
+        let backend = LostCreateResponse(memory)
+        let sync = NoteSync(store: store, backend: backend, uploader: FakeUploader())
         let n = try await seed(store, segments: 1)
+        await sync.sync(n.id)  // server created the note, the response was lost
+        #expect(await store.note(n.id)?.synced.created == false)
         await sync.sync(n.id)
-        #expect(await store.note(n.id)?.synced.created == true)
-        up.failing = false
-        await sync.sync(n.id)
-        #expect(try await backend.notes().count == 1)
+        #expect(try await memory.notes().count == 1)
+        #expect(backend.createCalls == 2)
         #expect(await store.note(n.id)?.segments[0].uploaded == true)
+    }
+
+    @Test func resumesAfterRelaunch() async throws {
+        let (store, root) = tempStore()
+        let backend = InMemoryBackend()
+        // (a) created, nothing uploaded.
+        let a = try await seed(store, segments: 1, lines: lines, diarized: true)
+        try await store.update(a.id) { $0.synced.created = true }
+        _ = try await backend.createNote(id: a.id.uuidString, title: "t", locale: "zh-CN", createdAt: a.createdAt)
+        // (b) fully uploaded, unlabeled transcript sent, diarization finished afterwards.
+        let b = try await seed(store, segments: 1, lines: lines, diarized: true)
+        _ = try await backend.createNote(id: b.id.uuidString, title: "t", locale: "zh-CN", createdAt: b.createdAt)
+        _ = try await backend.uploadTicket(note: b.id.uuidString, segment: 0)
+        _ = try await backend.completeSegment(note: b.id.uuidString, segment: 0, durationMs: 1000)
+        try await store.update(b.id) {
+            $0.synced = SyncState(created: true, transcriptSent: true, diarizedSent: false)
+            $0.segments[0].uploaded = true
+        }
+
+        // Fresh store and sync on the same folder, as after a relaunch.
+        let store2 = NoteStore(root: root)
+        await NoteSync(store: store2, backend: backend, uploader: FakeUploader()).syncAll()
+
+        for n in [a, b] {
+            let local = try #require(await store2.note(n.id))
+            #expect(local.segments.allSatisfy { $0.uploaded })
+            #expect(await exists(store2, n, 0) == false)
+            let server = try await backend.note(n.id.uuidString)
+            #expect(server.segments.map(\.uploaded) == [true])
+            #expect(server.transcript.map(\.speaker) == ["1", "2", "1"])
+            #expect(server.speakers.map(\.id) == ["1", "2"])
+        }
+        #expect(try await backend.notes().count == 2)
     }
 
     @Test func sendsTranscriptOnlyAfterLines() async throws {
@@ -168,5 +201,101 @@ private func exists(_ store: NoteStore, _ n: LocalNote, _ i: Int) async -> Bool 
         #expect(UploadResume.decide(status: 308, range: "bytes=0-41") == .resume(from: 42))
         #expect(UploadResume.decide(status: 308, range: nil) == .resume(from: 0))
         #expect(UploadResume.decide(status: 404, range: nil) == .failed(status: 404))
+    }
+}
+
+/// Forwards to a memory backend, but the first createNote's response is lost after the server handled it.
+final class LostCreateResponse: TaktBackend, @unchecked Sendable {
+    let inner: InMemoryBackend
+    private let lock = NSLock()
+    private var _createCalls = 0
+    init(_ inner: InMemoryBackend) { self.inner = inner }
+    var createCalls: Int { lock.withLock { _createCalls } }
+
+    func createNote(id: String, title: String?, locale: String, createdAt: Date) async throws -> Note {
+        let n = lock.withLock { _createCalls += 1; return _createCalls }
+        let note = try await inner.createNote(id: id, title: title, locale: locale, createdAt: createdAt)
+        if n == 1 { throw Offline() }
+        return note
+    }
+    func projects() async throws -> [Project] { try await inner.projects() }
+    func createProject(name: String) async throws -> Project { try await inner.createProject(name: name) }
+    func renameProject(_ id: String, name: String) async throws -> Project { try await inner.renameProject(id, name: name) }
+    func deleteProject(_ id: String) async throws { try await inner.deleteProject(id) }
+    func level(_ taskId: String) async throws -> Level { try await inner.level(taskId) }
+    func createTask(in parentId: String, _ body: CreateTaskBody) async throws -> TaskSummary { try await inner.createTask(in: parentId, body) }
+    func reorder(_ parentId: String, ids: [String], version: Int) async throws -> Level { try await inner.reorder(parentId, ids: ids, version: version) }
+    func deleteTask(_ id: String) async throws -> Level { try await inner.deleteTask(id) }
+    func setPrerequisite(_ id: String, done: Bool) async throws -> Prerequisite { try await inner.setPrerequisite(id, done: done) }
+    func notes() async throws -> [NoteSummary] { try await inner.notes() }
+    func note(_ id: String) async throws -> Note { try await inner.note(id) }
+    func updateNote(_ id: String, title: String?, durationMs: Int?, transcript: [TranscriptLine]?, speakers: [Speaker]?) async throws -> Note {
+        try await inner.updateNote(id, title: title, durationMs: durationMs, transcript: transcript, speakers: speakers)
+    }
+    func deleteNote(_ id: String) async throws { try await inner.deleteNote(id) }
+    func uploadTicket(note: String, segment: Int) async throws -> UploadTicket { try await inner.uploadTicket(note: note, segment: segment) }
+    func completeSegment(note: String, segment: Int, durationMs: Int) async throws -> Note {
+        try await inner.completeSegment(note: note, segment: segment, durationMs: durationMs)
+    }
+    func noteAudio(_ id: String) async throws -> AudioUrls { try await inner.noteAudio(id) }
+    func extract(note: String) async throws -> Note { try await inner.extract(note: note) }
+    func updateExtraction(note: String, version: Int, chains: [Chain]) async throws -> Note {
+        try await inner.updateExtraction(note: note, version: version, chains: chains)
+    }
+    func importNote(_ id: String, parent: String, picks: [ImportPick]) async throws -> (level: Level, note: Note) {
+        try await inner.importNote(id, parent: parent, picks: picks)
+    }
+}
+
+/// Scripted GCS: answers each request in order from `replies` and records them.
+final class StubGCS: URLProtocol, @unchecked Sendable {
+    nonisolated(unsafe) static var replies: [(status: Int, range: String?)] = []
+    nonisolated(unsafe) static var requests: [String?] = []  // Content-Range of each request
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        Self.requests.append(request.value(forHTTPHeaderField: "Content-Range"))
+        let r = Self.replies.isEmpty ? (status: 500, range: nil) : Self.replies.removeFirst()
+        var headers: [String: String] = [:]
+        if let range = r.range { headers["Range"] = range }
+        let resp = HTTPURLResponse(url: request.url!, statusCode: r.status, httpVersion: nil, headerFields: headers)!
+        client?.urlProtocol(self, didReceive: resp, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
+@Suite(.serialized) struct GCSUploaderTests {
+    private func run(_ replies: [(Int, String?)]) async -> (Error?, [String?]) {
+        StubGCS.replies = replies.map { (status: $0.0, range: $0.1) }
+        StubGCS.requests = []
+        let cfg = URLSessionConfiguration.ephemeral
+        cfg.protocolClasses = [StubGCS.self]
+        let file = FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).m4a")
+        try? Data(count: 10).write(to: file)
+        do {
+            try await GCSUploader(session: URLSession(configuration: cfg), attempts: 3)
+                .upload(file, to: URL(string: "https://gcs.test/session")!)
+            return (nil, StubGCS.requests)
+        } catch { return (error, StubGCS.requests) }
+    }
+
+    @Test func permanentFailureIsNotRetried() async {
+        let (error, requests) = await run([(404, nil)])
+        #expect(error as? UploadFailed == UploadFailed(status: 404))
+        #expect(requests.count == 1)
+    }
+
+    @Test func resumesFromReportedOffset() async {
+        // PUT dropped (500), status says 4 bytes arrived, resumed PUT finishes.
+        let (error, requests) = await run([(500, nil), (308, "bytes=0-3"), (200, nil)])
+        #expect(error == nil)
+        #expect(requests == [nil, "bytes */10", "bytes 4-9/10"])
+    }
+
+    @Test func fullyReceivedAsksStatusInsteadOfEmptyPut() async {
+        let (error, requests) = await run([(500, nil), (308, "bytes=0-9"), (200, nil)])
+        #expect(error == nil)
+        #expect(requests == [nil, "bytes */10", "bytes */10"])
     }
 }

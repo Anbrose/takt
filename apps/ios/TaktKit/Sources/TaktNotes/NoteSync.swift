@@ -41,19 +41,25 @@ public struct GCSUploader: SegmentUploading {
         var offset = 0
         var lastError: Error = UploadFailed(status: 0)
         for _ in 0..<attempts {
-            do {
-                if try await put(data, from: offset, to: sessionURL) { return }
-                lastError = UploadFailed(status: 308)
-            } catch {
-                lastError = error
-            }
-            do {
-                switch try await status(size: data.count, of: sessionURL) {
-                case .done: return
-                case .resume(let from): offset = min(from, data.count)
-                case .failed(let s): throw UploadFailed(status: s)
+            // Everything already arrived but GCS hasn't finalized: ask again instead of sending an empty range.
+            if offset < data.count {
+                do {
+                    if try await put(data, from: offset, to: sessionURL) { return }
+                    lastError = UploadFailed(status: 308)
+                } catch let e as UploadFailed where (400..<500).contains(e.status) && e.status != 408 && e.status != 429 {
+                    throw e  // expired or rejected session: retrying won't help
+                } catch {
+                    lastError = error
                 }
-            } catch { lastError = error }
+            }
+            switch try? await status(size: data.count, of: sessionURL) {
+            case .done?: return
+            case .resume(let from)?: offset = min(from, data.count)
+            case .failed(let s)?:
+                if (400..<500).contains(s) && s != 408 && s != 429 { throw UploadFailed(status: s) }
+                lastError = UploadFailed(status: s)
+            case nil: break
+            }
         }
         throw lastError
     }
