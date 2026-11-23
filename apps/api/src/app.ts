@@ -2,6 +2,7 @@ import Fastify, { type FastifyServerOptions } from 'fastify';
 import type { Db } from './db/client.ts';
 import { installErrorHandler, type ResolveOwner } from './http.ts';
 import { levelRoutes } from './routes/levels.ts';
+import { noteRoutes } from './routes/notes.ts';
 import { projectRoutes } from './routes/projects.ts';
 import { runRoutes } from './routes/run.ts';
 
@@ -21,5 +22,6 @@ export function buildApp({ db, resolveOwner = () => DEFAULT_OWNER, logger = fals
   projectRoutes(app, db, resolveOwner);
   levelRoutes(app, db, resolveOwner);
   runRoutes(app, db, resolveOwner);
+  noteRoutes(app, db, resolveOwner);
   return app;
 }
