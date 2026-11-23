@@ -65,6 +65,13 @@
 - **推入动画**：规划页从右侧滑入，列表左移 28% 并变暗，曲线 `cubic-bezier(0.32, 0.72, 0, 1)`、420ms；推入结束后列表移出视图层级，返回前先放回去。没有用 `NavigationStack`，因为规划页有自己的标题栏，系统导航栏的样式和动画对不上画布。
 - **未做**：边缘右滑返回手势；记住上次打开的 Project；网页端的 Project 列表；「减少动态效果」下其余界面仍是瞬间切换（准则要求改成淡入淡出，留待逐处审查）。
 
+## 录音笔记（第六阶段，2026-11-24）
+
+- **`notes` 表**：id 由客户端生成（UUID），`POST /notes` 幂等——同一个 id 重试返回 200 和同一条笔记，不会重复；别的 owner 用了同一个 id 返回 409。每个查询都按 `owner_id` 过滤。
+- **录音存在 GCS**：对象路径 `notes/{ownerId}/{noteId}/{segmentIndex}.m4a`。上传用 resumable 会话 URL，读取用 1 小时有效的签名 URL（v4）。**音频不经过 API**，手机和 GCS 直连，API 只发 URL。
+- **Bucket**：区域 `australia-southeast1`，统一访问控制并禁止公开访问。由 `scripts/notes-bucket.sh` 创建（需要 `GCP_PROJECT`，可重复运行），同时给 Cloud Run 默认服务账号 `roles/storage.objectAdmin`（bucket 上）和 `roles/iam.serviceAccountTokenCreator`（对自己，用于签名）。
+- **`NOTES_BUCKET` 环境变量**：设置后用 GCS，没设置时用内存存储（开发和测试不需要 GCP 凭据）。`scripts/deploy-api.sh` 合入后，部署时要加 `--set-env-vars NOTES_BUCKET=<脚本最后打印的值>`。
+
 ## 设计流程
 
 - 设计的唯一来源是 Design 画布：<https://claude.ai/artifact/P9mddKiiDZTGZtrFjXPLpb>。`design/takt-handoff/prototype/` 是它的副本，2026-11-21 同步过（手机画板已含 Project 列表）。设计准则见 `design/guidelines.md`。
