@@ -158,7 +158,7 @@ export function noteRoutes(
     // The budget is checked once, before the run. A multi-chunk run that crosses it
     // mid-way still finishes: failing half way would waste the calls already paid for.
     const lastEnd = row.transcript.reduce((m, l) => Math.max(m, l.endMs), 0);
-    const clamp = (ms: number) => Math.min(Math.max(ms, 0), lastEnd);
+    const clamp = (ms: number) => Math.round(Math.min(Math.max(ms, 0), lastEnd));
     const drafts: DraftChain[] = [];
     try {
       for (const lines of chunkLines(row.transcript)) {
@@ -210,8 +210,19 @@ export function noteRoutes(
         extractCount: row.extractCount + 1,
         updatedAt: new Date(),
       })
-      .where(and(eq(notes.id, row.id), eq(notes.ownerId, owner)))
+      // Only if nobody else extracted or edited the draft while the model ran.
+      .where(
+        and(
+          eq(notes.id, row.id),
+          eq(notes.ownerId, owner),
+          eq(notes.extractionVersion, row.extractionVersion),
+        ),
+      )
       .returning();
-    return full(updated!);
+    if (!updated) {
+      await loadNote(db, owner, row.id); // 404 when the note was deleted meanwhile
+      throw new HttpError(409, 'version_conflict', 'The draft changed during extraction');
+    }
+    return full(updated);
   });
 }

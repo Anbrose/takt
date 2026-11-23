@@ -260,7 +260,7 @@ export const routes = {
     params: S.NoteParams,
     response: S.Note,
     status: 200,
-    errors: [400, 404, 429, 502],
+    errors: [400, 404, 409, 429, 502],
   },
   updateExtraction: {
     operationId: 'updateExtraction',

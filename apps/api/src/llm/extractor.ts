@@ -35,7 +35,7 @@ export const DraftSchema = z.object({
         z.object({
           name: z.string(),
           place: z.string().nullable(),
-          quote: z.object({ startMs: z.number(), endMs: z.number() }),
+          quote: z.object({ startMs: z.int().min(0), endMs: z.int().min(0) }),
         }),
       ),
     }),

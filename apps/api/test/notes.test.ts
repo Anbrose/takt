@@ -270,6 +270,48 @@ describe('extraction', () => {
     expect(row!.extractCount).toBe(0);
   });
 
+  it('rounds fractional quotes from the model to integers', async () => {
+    fake = new FakeExtractor([
+      { name: 'c', steps: [{ name: 's', place: null, quote: { startMs: 1000.5, endMs: 2000.7 } }] },
+    ]);
+    await app.close();
+    app = buildApp({ db: handle.db, audioStore: store, extractor: fake, limits });
+    await setTranscript('一', '二');
+    const r = await extract();
+    expect(r.status).toBe(200);
+    const q = r.body.extraction.chains[0].steps[0].quote;
+    expect(Number.isInteger(q.startMs) && Number.isInteger(q.endMs)).toBe(true);
+    expect((await call('GET', `/notes/${NOTE}`)).status).toBe(200);
+  });
+
+  it('409s when the draft changed during extraction, 404s when the note was deleted', async () => {
+    class Racing extends FakeExtractor {
+      constructor(private act: () => Promise<unknown>) {
+        super([CHAIN]);
+      }
+      override async extract(input: Parameters<FakeExtractor['extract']>[0]) {
+        await this.act();
+        return super.extract(input);
+      }
+    }
+    const rebuild = async (x: FakeExtractor) => {
+      await app.close();
+      app = buildApp({ db: handle.db, audioStore: store, extractor: x, limits });
+    };
+    await setTranscript('一');
+    await rebuild(
+      new Racing(() => handle.db.update(notes).set({ extractionVersion: 5 }).where(eq(notes.id, NOTE))),
+    );
+    const r = await extract();
+    expect(r.status).toBe(409);
+    expect(r.body.error).toBe('version_conflict');
+    const [row] = await handle.db.select().from(notes).where(eq(notes.id, NOTE));
+    expect(row!.extractCount).toBe(0);
+
+    await rebuild(new Racing(() => handle.db.delete(notes).where(eq(notes.id, NOTE))));
+    expect((await extract()).status).toBe(404);
+  });
+
   it('hides other owners notes', async () => {
     await setTranscript('一');
     expect((await call('POST', `/notes/${NOTE}/extract`, undefined, 'other')).status).toBe(404);
