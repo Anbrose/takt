@@ -32,8 +32,10 @@ public struct LocalNote: Codable, Equatable, Sendable {
     public var segments: [LocalSegment]
     /// Whole-recording timeline, appended per segment in segment order.
     public var tokens: [TimedText]
-    /// Set after diarization + alignment (speaker nil when diarization failed).
+    /// Set once all segments are transcribed after recording stopped; speaker nil until diarization succeeds.
     public var lines: [AlignedLine]?
+    /// True once diarization succeeded and `lines` carry speakers; until then every process() retries it.
+    public var diarized: Bool
     /// True until stop() finished writing the last segment.
     public var recording: Bool
     public var synced: SyncState
@@ -41,11 +43,30 @@ public struct LocalNote: Codable, Equatable, Sendable {
     public init(
         id: UUID = UUID(), title: String = "", locale: String, createdAt: Date = Date(),
         segments: [LocalSegment] = [], tokens: [TimedText] = [], lines: [AlignedLine]? = nil,
-        recording: Bool = true, synced: SyncState = SyncState()
+        diarized: Bool = false, recording: Bool = true, synced: SyncState = SyncState()
     ) {
         self.id = id; self.title = title; self.locale = locale; self.createdAt = createdAt
-        self.segments = segments; self.tokens = tokens; self.lines = lines
+        self.segments = segments; self.tokens = tokens; self.lines = lines; self.diarized = diarized
         self.recording = recording; self.synced = synced
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, locale, createdAt, segments, tokens, lines, diarized, recording, synced
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        locale = try c.decode(String.self, forKey: .locale)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        segments = try c.decode([LocalSegment].self, forKey: .segments)
+        tokens = try c.decode([TimedText].self, forKey: .tokens)
+        lines = try c.decodeIfPresent([AlignedLine].self, forKey: .lines)
+        // Missing in notes saved before this field existed: diarization is retried.
+        diarized = try c.decodeIfPresent(Bool.self, forKey: .diarized) ?? false
+        recording = try c.decode(Bool.self, forKey: .recording)
+        synced = try c.decode(SyncState.self, forKey: .synced)
     }
 
     public var durationMs: Int { segments.reduce(0) { $0 + $1.durationMs } }

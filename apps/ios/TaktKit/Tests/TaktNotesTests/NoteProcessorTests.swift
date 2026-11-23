@@ -30,17 +30,19 @@ final class FakeTranscriber: Transcribing, @unchecked Sendable {
 
 struct DiarizeFailed: Error {}
 
+/// Throws for the first `failures` calls (nil: always), then returns `result`.
 final class FakeDiarizer: Diarizing, @unchecked Sendable {
     private let lock = NSLock()
-    private var _calls: [[URL]] = []
-    let result: [SpeakerTurn]?
-    init(_ result: [SpeakerTurn]?) { self.result = result }
-    var calls: [[URL]] { lock.withLock { _calls } }
+    private var _calls: [[SegmentAudio]] = []
+    let result: [SpeakerTurn]
+    let failures: Int?
+    init(_ result: [SpeakerTurn], failures: Int? = 0) { self.result = result; self.failures = failures }
+    var calls: [[SegmentAudio]] { lock.withLock { _calls } }
 
-    func turns(for files: [URL]) async throws -> [SpeakerTurn] {
-        lock.withLock { _calls.append(files) }
-        guard let result else { throw DiarizeFailed() }
-        return result
+    func turns(for segments: [SegmentAudio]) async throws -> [SpeakerTurn] {
+        let n = lock.withLock { _calls.append(segments); return _calls.count }
+        if let failures, n > failures { return result }
+        throw DiarizeFailed()
     }
 }
 
@@ -108,8 +110,10 @@ private func note(segments: Int, recording: Bool) -> LocalNote {
 
         let saved = try #require(await store.note(n.id))
         #expect(d.calls.count == 1)
-        let files = [await store.segmentURL(n.id, 0), await store.segmentURL(n.id, 1)]
-        #expect(d.calls.first == files)
+        let audio = [SegmentAudio(file: await store.segmentURL(n.id, 0), durationMs: 1000),
+                     SegmentAudio(file: await store.segmentURL(n.id, 1), durationMs: 1000)]
+        #expect(d.calls.first == audio)
+        #expect(saved.diarized)
         #expect(saved.lines == SpeakerAlign.align(saved.tokens, turns))
         #expect(saved.lines?.map(\.speaker) == ["1", "2"])
     }
@@ -118,12 +122,55 @@ private func note(segments: Int, recording: Bool) -> LocalNote {
         let (store, _) = tempStore()
         let n = note(segments: 1, recording: false)
         try await store.save(n)
-        await NoteProcessor(store: store, transcriber: FakeTranscriber(), diarizer: FakeDiarizer(nil)).process(n.id)
+        await NoteProcessor(store: store, transcriber: FakeTranscriber(), diarizer: FakeDiarizer(turns, failures: nil)).process(n.id)
 
         let saved = try #require(await store.note(n.id))
         let lines = try #require(saved.lines)
         #expect(lines.map(\.text) == ["s0as0b"])
         #expect(lines.allSatisfy { $0.speaker == nil })
+        #expect(!saved.diarized)
+    }
+
+    @Test func retriesDiarizationAfterFailure() async throws {
+        let (store, _) = tempStore()
+        let n = note(segments: 1, recording: false)
+        try await store.save(n)
+        let d = FakeDiarizer(turns, failures: 1)
+        let processor = NoteProcessor(store: store, transcriber: FakeTranscriber(), diarizer: d)
+
+        await processor.process(n.id)
+        #expect(await store.note(n.id)?.lines?.map(\.speaker) == [nil])
+
+        await processor.process(n.id)
+        await processor.process(n.id)
+        let saved = try #require(await store.note(n.id))
+        #expect(d.calls.count == 2)
+        #expect(saved.diarized)
+        #expect(saved.lines == SpeakerAlign.align(saved.tokens, turns))
+        #expect(saved.lines?.map(\.speaker) == ["1"])
+    }
+
+    @Test func recoversNoteKilledMidRecording() async throws {
+        let (store, root) = tempStore()
+        var n = note(segments: 2, recording: true)
+        n.segments[0].transcribed = true
+        n.segments[1].transcribed = true
+        n.tokens = [TimedText(startMs: 100, endMs: 500, text: "s0a"), TimedText(startMs: 1100, endMs: 1500, text: "s1a")]
+        try await store.save(n)
+        let finished = LocalNote(locale: "zh-CN", recording: false)
+        try await store.save(finished)
+
+        let d = FakeDiarizer(turns)
+        let processor = NoteProcessor(store: NoteStore(root: root), transcriber: FakeTranscriber(), diarizer: d)
+        await processor.recoverAfterLaunch()
+        await processor.recoverAfterLaunch()
+
+        let saved = try #require(await store.note(n.id))
+        #expect(!saved.recording)
+        #expect(saved.segments.map(\.index) == [0, 1])
+        #expect(d.calls.count == 1)
+        #expect(saved.diarized)
+        #expect(saved.lines?.map(\.speaker) == ["1", "2"])
     }
 
     @Test func resumesAfterRelaunch() async throws {
@@ -148,6 +195,14 @@ private func note(segments: Int, recording: Bool) -> LocalNote {
 }
 
 @Suite struct FluidDiarizerTests {
+    @Test func fitsSamplesToRecordedDuration() {
+        #expect(FluidDiarizer.fit([1, 1, 1], durationMs: 1).count == 16)
+        #expect(FluidDiarizer.fit([1, 1, 1], durationMs: 1) == [1, 1, 1] + [Float](repeating: 0, count: 13))
+        #expect(FluidDiarizer.fit([Float](repeating: 1, count: 20), durationMs: 1) == [Float](repeating: 1, count: 16))
+        #expect(FluidDiarizer.fit([], durationMs: 2) == [Float](repeating: 0, count: 32))
+        #expect(FluidDiarizer.fit([1], durationMs: 0).isEmpty)
+    }
+
     @Test func renumbersSpeakersByFirstAppearance() {
         let turns = FluidDiarizer.renumber([
             (id: "S3", startMs: 2000, endMs: 3000), (id: "S1", startMs: 0, endMs: 1000),

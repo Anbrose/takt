@@ -5,8 +5,10 @@ import Foundation
 @MainActor
 public protocol AudioCapture: AnyObject {
     /// Starts segment 0 at `segmentURL(0)`; every `segmentSeconds` of recorded audio the current file is closed,
-    /// `onSegment(index, durationMs)` is called and the next index starts.
-    func start(segmentURL: @escaping (Int) -> URL, segmentSeconds: Int, onSegment: @escaping (Int, Int) -> Void) throws
+    /// `onSegment(index, durationMs)` is called and the next index starts. If the next segment can't start,
+    /// recording ends: `onError` is called (the finished segment was already reported) and stop() returns nil.
+    func start(segmentURL: @escaping (Int) -> URL, segmentSeconds: Int, onSegment: @escaping (Int, Int) -> Void,
+               onError: @escaping (Error) -> Void) throws
     /// Closes the current segment and returns it; nil when nothing was recording.
     func stop() async -> (index: Int, durationMs: Int)?
 }
@@ -32,18 +34,20 @@ public final class SegmentRecorder: AudioCapture {
     private var segmentURL: ((Int) -> URL)?
     private var segmentSeconds = SegmentRecorder.defaultSegmentSeconds
     private var onSegment: ((Int, Int) -> Void)?
+    private var onError: ((Error) -> Void)?
     private var timer: Timer?
     private var observer: NSObjectProtocol?
 
     public init() {}
 
     public func start(segmentURL: @escaping (Int) -> URL, segmentSeconds: Int = SegmentRecorder.defaultSegmentSeconds,
-                      onSegment: @escaping (Int, Int) -> Void) throws {
+                      onSegment: @escaping (Int, Int) -> Void, onError: @escaping (Error) -> Void) throws {
         guard recorder == nil else { return }
         try Self.activateSession()
         self.segmentURL = segmentURL
         self.segmentSeconds = segmentSeconds
         self.onSegment = onSegment
+        self.onError = onError
         index = 0
         try begin(0)
         // Rotation follows recorded time (currentTime stops while paused), checked once a second.
@@ -54,16 +58,20 @@ public final class SegmentRecorder: AudioCapture {
     }
 
     public func stop() async -> (index: Int, durationMs: Int)? {
-        timer?.invalidate()
-        timer = nil
-        if let observer { NotificationCenter.default.removeObserver(observer) }
-        observer = nil
         guard let recorder else { return nil }
         let durationMs = Self.ms(recorder.currentTime)
         recorder.stop()
         self.recorder = nil
-        Self.deactivateSession()
+        end()
         return (index, durationMs)
+    }
+
+    private func end() {
+        timer?.invalidate()
+        timer = nil
+        if let observer { NotificationCenter.default.removeObserver(observer) }
+        observer = nil
+        Self.deactivateSession()
     }
 
     private func begin(_ i: Int) throws {
@@ -80,8 +88,12 @@ public final class SegmentRecorder: AudioCapture {
         recorder.stop()
         self.recorder = nil
         onSegment?(finished.0, finished.1)
-        // If the next file can't start, recording ends with the segments already reported.
-        try? begin(finished.0 + 1)
+        do {
+            try begin(finished.0 + 1)
+        } catch {
+            end()
+            onError?(error)
+        }
     }
 
     private static func ms(_ t: TimeInterval) -> Int { Int((t * 1000).rounded()) }

@@ -49,16 +49,37 @@ public actor NoteProcessor {
                 note = saved
             }
         }
-        guard !note.recording, note.lines == nil, note.segments.allSatisfy(\.transcribed) else { return }
+        guard !note.recording, !note.diarized, note.segments.allSatisfy(\.transcribed) else { return }
 
-        var files: [URL] = []
+        var audio: [SegmentAudio] = []
         for segment in note.segments.sorted(by: { $0.index < $1.index }) {
-            files.append(await store.segmentURL(id, segment.index))
+            audio.append(SegmentAudio(file: await store.segmentURL(id, segment.index), durationMs: segment.durationMs))
         }
-        let turns = files.isEmpty ? [] : ((try? await diarizer.turns(for: files)) ?? [])
+        // Failure (e.g. offline before the models are downloaded): show unlabeled lines, retry on the next call.
+        let turns: [SpeakerTurn]? = audio.isEmpty ? [] : try? await diarizer.turns(for: audio)
         _ = try? await store.update(id) { n in
-            guard n.lines == nil else { return }
-            n.lines = SpeakerAlign.align(n.tokens, turns)
+            guard !n.diarized else { return }
+            if let turns {
+                n.lines = SpeakerAlign.align(n.tokens, turns)
+                n.diarized = true
+            } else if n.lines == nil {
+                n.lines = SpeakerAlign.align(n.tokens, [])
+            }
+        }
+    }
+
+    /// Call once at launch, before a new recording starts: a note still marked recording was cut off by the app
+    /// being killed. It is marked stopped with the segments that finished (the killed session's partial file was
+    /// never listed), then every note with work left is processed.
+    public func recoverAfterLaunch() async {
+        for note in await store.all() where note.recording {
+            _ = try? await store.update(note.id) { n in
+                n.recording = false
+                n.segments.removeAll { $0.durationMs <= 0 }
+            }
+        }
+        for note in await store.all() where !note.diarized {
+            await process(note.id)
         }
     }
 }
