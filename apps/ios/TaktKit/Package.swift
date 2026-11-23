@@ -38,7 +38,7 @@ let package = Package(
         .testTarget(name: "TaktUITests", dependencies: ["TaktUI"]),
         .testTarget(
             name: "TaktNotesTests",
-            dependencies: ["TaktNotes", "TaktCore"],
+            dependencies: ["TaktNotes", "TaktCore", "TaktUI"],
             resources: [.copy("Fixtures")]
         ),
     ]

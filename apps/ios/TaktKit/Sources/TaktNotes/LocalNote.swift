@@ -17,9 +17,21 @@ public struct LocalSegment: Codable, Equatable, Sendable {
 /// What the server already has of this note.
 public struct SyncState: Codable, Equatable, Sendable {
     public var created: Bool
+    /// The transcript (lines, possibly without speakers) is on the server.
     public var transcriptSent: Bool
-    public init(created: Bool = false, transcriptSent: Bool = false) {
-        self.created = created; self.transcriptSent = transcriptSent
+    /// The server's transcript already carries speakers; it is sent again once diarization succeeds.
+    public var diarizedSent: Bool
+    public init(created: Bool = false, transcriptSent: Bool = false, diarizedSent: Bool = false) {
+        self.created = created; self.transcriptSent = transcriptSent; self.diarizedSent = diarizedSent
+    }
+
+    private enum CodingKeys: String, CodingKey { case created, transcriptSent, diarizedSent }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        created = try c.decode(Bool.self, forKey: .created)
+        transcriptSent = try c.decode(Bool.self, forKey: .transcriptSent)
+        diarizedSent = try c.decodeIfPresent(Bool.self, forKey: .diarizedSent) ?? false
     }
 }
 
