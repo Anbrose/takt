@@ -1,5 +1,9 @@
+import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.ts';
+import { notes } from '../src/db/schema.ts';
+import { transcriptHash } from '../src/services/notes.ts';
+import { FakeExtractor, type DraftChain } from '../src/llm/extractor.ts';
 import { openDb, type DbHandle } from '../src/db/client.ts';
 import { MemoryAudioStore, segmentObject } from '../src/storage/audio-store.ts';
 
@@ -9,13 +13,28 @@ const NOTE2 = '22222222-2222-4222-8222-222222222222';
 let handle: DbHandle;
 let app: ReturnType<typeof buildApp>;
 let store: MemoryAudioStore;
+let fake: FakeExtractor;
+let limits = { perNote: 10, monthlyCalls: 300 };
+
+const CHAIN: DraftChain = {
+  name: '京都一日游',
+  steps: [
+    { name: '去伏见稻荷大社', place: '伏见稻荷大社', quote: { startMs: 0, endMs: 9_999_999 } },
+    { name: '吃午饭', place: null, quote: { startMs: 5000, endMs: 4000 } },
+  ],
+};
+const line = (text: string, startMs = 0, endMs = 2000) => ({ startMs, endMs, text, speaker: 'S1' });
 
 beforeEach(async () => {
   handle = await openDb();
   store = new MemoryAudioStore();
+  fake = new FakeExtractor([CHAIN]);
+  limits = { perNote: 10, monthlyCalls: 300 };
   app = buildApp({
     db: handle.db,
     audioStore: store,
+    extractor: fake,
+    limits,
     resolveOwner: (req) => (req.headers['x-test-owner'] as string) ?? 'local',
   });
 });
@@ -69,6 +88,14 @@ describe('notes CRUD', () => {
     expect(list.map((n: { id: string }) => n.id)).toEqual([NOTE2, NOTE]);
     expect(list[1].hasTranscript).toBe(true);
     expect(list[0].hasTranscript).toBe(false);
+  });
+
+  it('stores the transcript hash used to detect unchanged transcripts', async () => {
+    await call('POST', '/notes', { id: NOTE, locale: 'zh_CN' });
+    const transcript = [line('你好')];
+    await call('PATCH', `/notes/${NOTE}`, { transcript });
+    const [row] = await handle.db.select().from(notes).where(eq(notes.id, NOTE));
+    expect(row!.transcriptHash).toBe(transcriptHash(transcript));
   });
 
   it('deletes a note', async () => {
@@ -137,5 +164,114 @@ describe('note audio', () => {
     await call('POST', `${seg(0)}/complete`, { durationMs: 1000 });
     await call('DELETE', `/notes/${NOTE}`);
     expect(await store.stat(object)).toBeNull();
+  });
+});
+
+describe('extraction', () => {
+  const extract = () => call('POST', `/notes/${NOTE}/extract`);
+  const setTranscript = (...texts: string[]) =>
+    call('PATCH', `/notes/${NOTE}`, { transcript: texts.map((t, i) => line(t, i * 3000, i * 3000 + 2000)) });
+  beforeEach(async () => {
+    await call('POST', '/notes', { id: NOTE, locale: 'zh_CN' });
+  });
+
+  it('refuses to extract an empty transcript', async () => {
+    const r = await extract();
+    expect(r.status).toBe(400);
+    expect(r.body.error).toBe('empty_transcript');
+    expect(fake.calls).toHaveLength(0);
+  });
+
+  it('extracts chains with ids and clamped quotes, and does not repeat for the same transcript', async () => {
+    await setTranscript('先去伏见稻荷大社', '然后吃午饭');
+    const a = await extract();
+    expect(a.status).toBe(200);
+    expect(a.body.extraction.version).toBe(1);
+    const chain = a.body.extraction.chains[0];
+    expect(chain.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(chain.steps.map((s: { name: string }) => s.name)).toEqual(['去伏见稻荷大社', '吃午饭']);
+    expect(chain.steps[0].id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(chain.steps[0].quote).toEqual({ startMs: 0, endMs: 5000 });
+    expect(chain.steps[1].quote).toEqual({ startMs: 5000, endMs: 5000 });
+    expect(fake.calls[0]).toMatchObject({ locale: 'zh_CN', lines: expect.any(Array) });
+    const b = await extract();
+    expect(b.body).toEqual(a.body);
+    expect(fake.calls).toHaveLength(1);
+  });
+
+  it('re-extracts after the transcript changes, keeping imported steps', async () => {
+    await setTranscript('第一版');
+    await extract();
+    const imported = {
+      chainName: 'c',
+      stepName: 's',
+      taskId: '33333333-3333-4333-8333-333333333333',
+      parentTaskId: '44444444-4444-4444-8444-444444444444',
+      importedAt: '2026-11-24T00:00:00.000Z',
+    };
+    await handle.db
+      .update(notes)
+      .set({ imported: [imported] })
+      .where(eq(notes.id, NOTE));
+    await setTranscript('第二版');
+    const r = await extract();
+    expect(r.body.extraction.version).toBe(2);
+    expect(r.body.imported).toEqual([imported]);
+    expect(fake.calls).toHaveLength(2);
+  });
+
+  it('stops at the per-note limit', async () => {
+    limits.perNote = 2;
+    for (const t of ['一', '二']) {
+      await setTranscript(t);
+      expect((await extract()).status).toBe(200);
+    }
+    await setTranscript('三');
+    const r = await extract();
+    expect(r.status).toBe(429);
+    expect(r.body.error).toBe('extract_limit');
+    expect(fake.calls).toHaveLength(2);
+  });
+
+  it('stops at the monthly budget, counted per call', async () => {
+    limits.monthlyCalls = 1;
+    await setTranscript('一');
+    expect((await extract()).status).toBe(200);
+    await setTranscript('二');
+    const r = await extract();
+    expect(r.status).toBe(429);
+    expect(r.body.error).toBe('budget_exceeded');
+    expect(fake.calls).toHaveLength(1);
+  });
+
+  it('counts one call per chunk and finishes a run that crosses the budget', async () => {
+    limits.monthlyCalls = 2;
+    const big = 'x'.repeat(4000);
+    await call('PATCH', `/notes/${NOTE}`, {
+      transcript: Array.from({ length: 20 }, (_, i) => line(big, i * 3000, i * 3000 + 2000)),
+    });
+    const r = await extract();
+    expect(r.status).toBe(200);
+    expect(fake.calls.length).toBeGreaterThan(2);
+    expect(r.body.extraction.chains).toHaveLength(fake.calls.length);
+  });
+
+  it('maps extractor failures to 502 without recording an extraction', async () => {
+    fake = new FakeExtractor(new Error('boom'));
+    await app.close();
+    app = buildApp({ db: handle.db, audioStore: store, extractor: fake, limits });
+    await setTranscript('一');
+    const r = await extract();
+    expect(r.status).toBe(502);
+    expect(r.body.error).toBe('llm_failed');
+    const note = (await call('GET', `/notes/${NOTE}`)).body;
+    expect(note.extraction.version).toBe(0);
+    const [row] = await handle.db.select().from(notes).where(eq(notes.id, NOTE));
+    expect(row!.extractCount).toBe(0);
+  });
+
+  it('hides other owners notes', async () => {
+    await setTranscript('一');
+    expect((await call('POST', `/notes/${NOTE}/extract`, undefined, 'other')).status).toBe(404);
   });
 });

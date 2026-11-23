@@ -1,6 +1,9 @@
 import Fastify, { type FastifyServerOptions } from 'fastify';
 import type { Db } from './db/client.ts';
 import { installErrorHandler, type ResolveOwner } from './http.ts';
+import { config } from './config.ts';
+import { FakeExtractor, type ExtractLimits, type Extractor } from './llm/extractor.ts';
+import { VertexExtractor } from './llm/vertex-extractor.ts';
 import { levelRoutes } from './routes/levels.ts';
 import { noteRoutes } from './routes/notes.ts';
 import { projectRoutes } from './routes/projects.ts';
@@ -15,6 +18,20 @@ export interface AppOptions {
   resolveOwner?: ResolveOwner;
   logger?: FastifyServerOptions['logger'];
   audioStore?: AudioStore;
+  extractor?: Extractor;
+  limits?: ExtractLimits;
+}
+
+export function defaultExtractor(): Extractor {
+  if (config.llmProvider === 'vertex') {
+    if (!config.vertexProject) throw new Error('LLM_PROVIDER=vertex requires VERTEX_PROJECT');
+    return new VertexExtractor({
+      project: config.vertexProject,
+      location: config.vertexLocation,
+      model: config.llmModel,
+    });
+  }
+  return new FakeExtractor([]);
 }
 
 export function buildApp({
@@ -22,6 +39,8 @@ export function buildApp({
   resolveOwner = () => DEFAULT_OWNER,
   logger = false,
   audioStore = new MemoryAudioStore(),
+  extractor = defaultExtractor(),
+  limits = { perNote: config.noteExtractLimit, monthlyCalls: config.llmMonthlyCalls },
 }: AppOptions) {
   const app = Fastify({ logger });
   installErrorHandler(app);
@@ -29,6 +48,6 @@ export function buildApp({
   projectRoutes(app, db, resolveOwner);
   levelRoutes(app, db, resolveOwner);
   runRoutes(app, db, resolveOwner);
-  noteRoutes(app, db, resolveOwner, audioStore);
+  noteRoutes(app, db, resolveOwner, audioStore, extractor, limits);
   return app;
 }

@@ -71,6 +71,9 @@
 - **录音存在 GCS**：对象路径 `notes/{ownerId}/{noteId}/{segmentIndex}.m4a`。上传用 resumable 会话 URL，读取用 1 小时有效的签名 URL（v4）。**音频不经过 API**，手机和 GCS 直连，API 只发 URL。
 - **Bucket**：区域 `australia-southeast1`，统一访问控制并禁止公开访问。由 `scripts/notes-bucket.sh` 创建（需要 `GCP_PROJECT`，可重复运行），同时给 Cloud Run 默认服务账号 `roles/storage.objectAdmin`（bucket 上）和 `roles/iam.serviceAccountTokenCreator`（对自己，用于签名）。
 - **`NOTES_BUCKET` 环境变量**：设置后用 GCS，没设置时用内存存储（开发和测试不需要 GCP 凭据）。`scripts/deploy-api.sh` 合入后，部署时要加 `--set-env-vars NOTES_BUCKET=<脚本最后打印的值>`。
+- **任务链提取（LLM）**：默认用 Vertex AI 上的 Gemini（`@google/genai` 的 Vertex 模式，`temperature` 0，JSON schema 结构化输出），模型和区域可配置，默认 `gemini-2.5-flash` / `us-central1`。**还没有和 Claude 对比过**——对比会产生费用，等用户批准后再做；换模型或 SDK 只需改 `apps/api/src/llm/vertex-extractor.ts`。只把逐字稿文本发给模型。手动试跑：`apps/api/scripts/try-extract.ts <transcript.json>`（不在 CI 里跑）。
+- **提取的限制**：未改动的逐字稿再次提取直接返回已有草稿，不调用、不计数；每条笔记最多提取 `NOTE_EXTRACT_LIMIT` 次（默认 10，超出 429 `extract_limit`）；每个 owner 每个 UTC 月最多 `LLM_MONTHLY_CALLS` 次模型调用（默认 300，超出 429 `budget_exceeded`）。长逐字稿按行切成约 3 万字的块，每块调用一次、各计一次；预算只在开始前检查，一次提取中途超出预算也会完成，不会做到一半失败。模型调用失败返回 502 `llm_failed`，只计已经发出的调用。
+- **提取相关环境变量**：`LLM_PROVIDER`（`fake` 默认，返回空草稿，启动时打日志；`vertex`）、`VERTEX_PROJECT`、`VERTEX_LOCATION`、`LLM_MODEL`、`NOTE_EXTRACT_LIMIT`、`LLM_MONTHLY_CALLS`。
 
 ## 设计流程
 

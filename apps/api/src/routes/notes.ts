@@ -1,8 +1,10 @@
-import { and, asc, desc, eq, isNotNull } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
+import { and, asc, desc, eq, isNotNull, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { routes } from '@takt/contract';
 import type { Db } from '../db/client.ts';
-import { noteSegments, notes } from '../db/schema.ts';
+import { llmUsage, noteSegments, notes } from '../db/schema.ts';
+import { chunkLines, type DraftChain, type ExtractLimits, type Extractor } from '../llm/extractor.ts';
 import { HttpError, route, type ResolveOwner } from '../http.ts';
 import {
   defaultTitle,
@@ -16,7 +18,14 @@ import { notePrefix, segmentObject, type AudioStore } from '../storage/audio-sto
 
 const READ_URL_TTL_SECONDS = 3600;
 
-export function noteRoutes(app: FastifyInstance, db: Db, owner: ResolveOwner, audio: AudioStore) {
+export function noteRoutes(
+  app: FastifyInstance,
+  db: Db,
+  owner: ResolveOwner,
+  audio: AudioStore,
+  extractor: Extractor,
+  limits: ExtractLimits,
+) {
   const full = async (row: Awaited<ReturnType<typeof loadNote>>) =>
     toNote(row, await loadSegments(db, row.id));
 
@@ -128,5 +137,81 @@ export function noteRoutes(app: FastifyInstance, db: Db, owner: ResolveOwner, au
       }),
     );
     return { segments };
+  });
+
+  route(app, owner, routes.extractNote, async ({ owner, params }) => {
+    const row = await loadNote(db, owner, params.noteId);
+    if (row.transcript.length === 0) throw new HttpError(400, 'empty_transcript', 'Transcript is empty');
+    if (row.transcriptHash !== null && row.transcriptHash === row.extractedHash) return full(row);
+    if (row.extractCount >= limits.perNote) {
+      throw new HttpError(429, 'extract_limit', 'Extraction limit for this note reached');
+    }
+    const month = new Date().toISOString().slice(0, 7);
+    const [usage] = await db
+      .select()
+      .from(llmUsage)
+      .where(and(eq(llmUsage.ownerId, owner), eq(llmUsage.month, month)));
+    if ((usage?.calls ?? 0) >= limits.monthlyCalls) {
+      throw new HttpError(429, 'budget_exceeded', 'Monthly extraction budget reached');
+    }
+
+    // The budget is checked once, before the run. A multi-chunk run that crosses it
+    // mid-way still finishes: failing half way would waste the calls already paid for.
+    const lastEnd = row.transcript.reduce((m, l) => Math.max(m, l.endMs), 0);
+    const clamp = (ms: number) => Math.min(Math.max(ms, 0), lastEnd);
+    const drafts: DraftChain[] = [];
+    try {
+      for (const lines of chunkLines(row.transcript)) {
+        try {
+          drafts.push(...(await extractor.extract({ locale: row.locale, speakers: row.speakers, lines })));
+        } finally {
+          // Count every call actually made, including one that failed.
+          await db
+            .insert(llmUsage)
+            .values({ ownerId: owner, month, calls: 1 })
+            .onConflictDoUpdate({
+              target: [llmUsage.ownerId, llmUsage.month],
+              set: { calls: sql`${llmUsage.calls} + 1` },
+            });
+        }
+      }
+    } catch (err) {
+      app.log.error(err, 'extraction failed');
+      throw new HttpError(502, 'llm_failed', 'Extraction failed');
+    }
+
+    // Model output is untrusted: fit it to the contract's limits instead of failing the response.
+    const text = (v: string) => v.trim().slice(0, 200);
+    const chains = drafts
+      .map((c) => ({
+        id: randomUUID(),
+        name: text(c.name),
+        steps: c.steps
+          .filter((s) => text(s.name) !== '')
+          .slice(0, 100)
+          .map((s) => ({
+            id: randomUUID(),
+            name: text(s.name),
+            place: s.place === null || text(s.place) === '' ? null : text(s.place),
+            quote: {
+              startMs: clamp(s.quote.startMs),
+              endMs: clamp(Math.max(s.quote.endMs, s.quote.startMs)),
+            },
+          })),
+      }))
+      .filter((c) => c.name !== '' && c.steps.length > 0)
+      .slice(0, 50);
+    const [updated] = await db
+      .update(notes)
+      .set({
+        extraction: { chains },
+        extractionVersion: row.extractionVersion + 1,
+        extractedHash: row.transcriptHash,
+        extractCount: row.extractCount + 1,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(notes.id, row.id), eq(notes.ownerId, owner)))
+      .returning();
+    return full(updated!);
   });
 }
