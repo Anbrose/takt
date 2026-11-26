@@ -280,6 +280,7 @@ public final class NotesModel {
         try await store.save(note)
         let id = note.id
         let store = store
+        await processor.recordingStarted(id)
         do {
             try capture.start(
                 segmentURL: { store.segmentFileURL(id, $0) },
@@ -291,6 +292,7 @@ public final class NotesModel {
                     MainActor.assumeIsolated { self?.recorderFailed(id) }
                 })
         } catch {
+            await processor.recordingEnded(id)
             try? await store.delete(id)
             throw error
         }
@@ -323,6 +325,7 @@ public final class NotesModel {
         if autoExtract, !autoPending.contains(key) { autoPending.append(key) }
         await pendingWrites?.value
         _ = try? await store.update(id) { $0.recording = false }
+        await processor.recordingEnded(id)
         locals = await store.all()
         rebuild()
         await processor.process(id)

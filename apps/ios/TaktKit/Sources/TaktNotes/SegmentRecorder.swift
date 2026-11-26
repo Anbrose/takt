@@ -15,19 +15,77 @@ public protocol AudioCapture: AnyObject {
 
 public enum RecorderError: Error {
     case couldNotStart
+    case emptyRecording
 }
 
-/// AVAudioRecorder writing AAC mono 16 kHz 32 kbps, one file per `segmentSeconds` (default 300) of audio.
-/// An interruption (call, Siri) pauses the current segment; it resumes when the system allows.
-public final class SegmentRecorder: AudioCapture {
-    public static let defaultSegmentSeconds = 300
+/// The files of one segment. While it records, the audio goes to `{index}.caf` as 16 kHz 16-bit PCM: a CAF file
+/// cut off by a kill is still readable up to its last written buffer (an `.m4a` has no index until it is closed and
+/// is lost whole). Once the segment closes it is encoded to `{index}.m4a` (AAC mono 16 kHz 32 kbps), the file that
+/// is transcribed, diarized and uploaded, and the `.caf` is removed.
+public enum SegmentFile {
+    static var pcmSettings: [String: Any] { [
+        AVFormatIDKey: kAudioFormatLinearPCM,
+        AVSampleRateKey: 16000,
+        AVNumberOfChannelsKey: 1,
+        AVLinearPCMBitDepthKey: 16,
+        AVLinearPCMIsFloatKey: false,
+        AVLinearPCMIsBigEndianKey: false,
+    ] }
 
-    private static let settings: [String: Any] = [
+    static var aacSettings: [String: Any] { [
         AVFormatIDKey: kAudioFormatMPEG4AAC,
         AVSampleRateKey: 16000,
         AVNumberOfChannelsKey: 1,
         AVEncoderBitRateKey: 32000,
-    ]
+    ] }
+
+    /// `{index}.caf` next to the segment's `{index}.m4a`.
+    public static func recordingURL(for segment: URL) -> URL {
+        segment.deletingPathExtension().appendingPathExtension("caf")
+    }
+
+    /// Encodes the PCM recording to `segment` (written beside it first, then moved in) and removes the recording.
+    /// Returns the audio's length in ms; throws when the recording is unreadable or empty (it is then kept).
+    @discardableResult
+    public static func encode(_ recording: URL, to segment: URL) throws -> Int {
+        let part = segment.deletingPathExtension().appendingPathExtension("part.m4a")
+        try? FileManager.default.removeItem(at: part)
+        let ms = try write(recording, to: part)
+        _ = try FileManager.default.replaceItemAt(segment, withItemAt: part)
+        try FileManager.default.removeItem(at: recording)
+        return ms
+    }
+
+    /// Length in ms of a readable audio file; nil when it can't be opened.
+    public static func durationMs(_ url: URL) -> Int? {
+        guard let f = try? AVAudioFile(forReading: url), f.fileFormat.sampleRate > 0 else { return nil }
+        return Int((Double(f.length) * 1000 / f.fileFormat.sampleRate).rounded())
+    }
+
+    /// Both files close when this returns (AVAudioFile finishes the `.m4a` on release).
+    private static func write(_ recording: URL, to part: URL) throws -> Int {
+        let input = try AVAudioFile(forReading: recording)
+        guard input.length > 0, input.fileFormat.sampleRate > 0 else { throw RecorderError.emptyRecording }
+        let output = try AVAudioFile(
+            forWriting: part, settings: aacSettings, commonFormat: input.processingFormat.commonFormat,
+            interleaved: input.processingFormat.isInterleaved)
+        let chunk: AVAudioFrameCount = 16000 * 10
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: input.processingFormat, frameCapacity: chunk) else {
+            throw RecorderError.emptyRecording
+        }
+        while input.framePosition < input.length {
+            try input.read(into: buffer, frameCount: min(chunk, AVAudioFrameCount(input.length - input.framePosition)))
+            guard buffer.frameLength > 0 else { break }
+            try output.write(from: buffer)
+        }
+        return Int((Double(input.length) * 1000 / input.fileFormat.sampleRate).rounded())
+    }
+}
+
+/// AVAudioRecorder writing one segment per `segmentSeconds` (default 300) of recorded audio, see `SegmentFile`.
+/// An interruption (call, Siri) pauses the current segment; it resumes when the system allows.
+public final class SegmentRecorder: AudioCapture {
+    public static let defaultSegmentSeconds = 300
 
     private var recorder: AVAudioRecorder?
     private var index = 0
@@ -37,6 +95,9 @@ public final class SegmentRecorder: AudioCapture {
     private var onError: ((Error) -> Void)?
     private var timer: Timer?
     private var observer: NSObjectProtocol?
+    /// Encoding of the segments closed so far, chained so they are reported in order.
+    private var encoding: Task<Void, Never>?
+    private var stopping = false
 
     public init() {}
 
@@ -49,6 +110,7 @@ public final class SegmentRecorder: AudioCapture {
         self.onSegment = onSegment
         self.onError = onError
         index = 0
+        stopping = false
         try begin(0)
         // Rotation follows recorded time (currentTime stops while paused), checked once a second.
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
@@ -59,11 +121,16 @@ public final class SegmentRecorder: AudioCapture {
 
     public func stop() async -> (index: Int, durationMs: Int)? {
         guard let recorder else { return nil }
-        let durationMs = Self.ms(recorder.currentTime)
+        stopping = true
         recorder.stop()
         self.recorder = nil
         end()
-        return (index, durationMs)
+        let last = index
+        await encoding?.value
+        encoding = nil
+        // Not encoded: the `.caf` stays and is recovered at the next launch.
+        guard let ms = await encode(last) else { return nil }
+        return (last, ms)
     }
 
     private func end() {
@@ -76,24 +143,44 @@ public final class SegmentRecorder: AudioCapture {
 
     private func begin(_ i: Int) throws {
         guard let url = segmentURL?(i) else { throw RecorderError.couldNotStart }
-        let r = try AVAudioRecorder(url: url, settings: Self.settings)
+        let r = try AVAudioRecorder(url: SegmentFile.recordingURL(for: url), settings: SegmentFile.pcmSettings)
         guard r.record() else { throw RecorderError.couldNotStart }
         recorder = r
         index = i
     }
 
+    /// Closes the full segment and starts the next one at once; the closed one is encoded meanwhile and then
+    /// reported. If the next can't start, or the closed one can't be encoded, recording ends (what is on disk is
+    /// recovered at the next launch).
     private func rotateIfFull() {
         guard let recorder, recorder.currentTime >= TimeInterval(segmentSeconds) else { return }
-        let finished = (index, Self.ms(recorder.currentTime))
+        let finished = index
         recorder.stop()
         self.recorder = nil
-        onSegment?(finished.0, finished.1)
-        do {
-            try begin(finished.0 + 1)
-        } catch {
-            end()
-            onError?(error)
+        var failure: Error?
+        do { try begin(finished + 1) } catch { failure = error }
+        if failure != nil { end() }
+        let previous = encoding
+        encoding = Task { [weak self] in
+            await previous?.value
+            guard let self else { return }
+            if let ms = await self.encode(finished) {
+                self.onSegment?(finished, ms)
+            } else if failure == nil {
+                failure = RecorderError.couldNotStart
+                self.recorder?.stop()
+                self.recorder = nil
+                self.end()
+            }
+            if let failure, !self.stopping { self.onError?(failure) }
         }
+    }
+
+    /// Encodes segment `i` off the main actor; its length in ms, or nil when it failed.
+    private func encode(_ i: Int) async -> Int? {
+        guard let url = segmentURL?(i) else { return nil }
+        let recording = SegmentFile.recordingURL(for: url)
+        return await Task.detached { try? SegmentFile.encode(recording, to: url) }.value
     }
 
     private static func ms(_ t: TimeInterval) -> Int { Int((t * 1000).rounded()) }

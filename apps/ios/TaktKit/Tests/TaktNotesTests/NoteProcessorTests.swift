@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Testing
 import TaktCore
@@ -44,6 +45,29 @@ final class FakeDiarizer: Diarizing, @unchecked Sendable {
         if let failures, n > failures { return result }
         throw DiarizeFailed()
     }
+}
+
+
+/// A PCM `.caf` as a kill leaves it: copied while the writer still has it open (no final header update),
+/// then cut mid-sample. Holds `seconds` of a tone, minus the cut.
+func killedRecording(at url: URL, seconds: Double, cutBytes: Int = 1001) throws {
+    let dir = FileManager.default.temporaryDirectory.appending(path: "rec-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let open = dir.appending(path: "open.caf")
+    let format = AVAudioFormat(standardFormatWithSampleRate: 16000, channels: 1)!
+    var writer: AVAudioFile? = try AVAudioFile(
+        forWriting: open, settings: SegmentFile.pcmSettings, commonFormat: .pcmFormatFloat32, interleaved: false)
+    let frames = AVAudioFrameCount(seconds * 16000)
+    let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames)!
+    buffer.frameLength = frames
+    for i in 0..<Int(frames) { buffer.floatChannelData![0][i] = sin(Float(i) * 0.05) * 0.3 }
+    try writer!.write(from: buffer)
+    try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try? FileManager.default.removeItem(at: url)
+    try FileManager.default.copyItem(at: open, to: url)
+    writer = nil
+    let data = try Data(contentsOf: url)
+    try data.prefix(data.count - cutBytes).write(to: url)
 }
 
 private let turns = [SpeakerTurn(speaker: "1", startMs: 0, endMs: 950), SpeakerTurn(speaker: "2", startMs: 1000, endMs: 3000)]
@@ -171,6 +195,80 @@ private func note(segments: Int, recording: Bool) -> LocalNote {
         #expect(d.calls.count == 1)
         #expect(saved.diarized)
         #expect(saved.lines?.map(\.speaker) == ["1", "2"])
+    }
+
+    @Test func recoversTheSegmentAKillCutOff() async throws {
+        let (store, root) = tempStore()
+        var n = note(segments: 1, recording: true)
+        n.segments[0].transcribed = true
+        n.tokens = [TimedText(startMs: 100, endMs: 500, text: "s0a")]
+        try await store.save(n)
+        // Killed 2 s into segment 1: only its recording file is there, unlisted and never closed.
+        let recording = SegmentFile.recordingURL(for: await store.segmentURL(n.id, 1))
+        try killedRecording(at: recording, seconds: 2)
+
+        let t = FakeTranscriber()
+        let relaunched = NoteStore(root: root)
+        await NoteProcessor(store: relaunched, transcriber: t, diarizer: FakeDiarizer(turns)).recoverAfterLaunch()
+
+        let saved = try #require(await relaunched.note(n.id))
+        #expect(!saved.recording)
+        #expect(saved.segments.map(\.index) == [0, 1])
+        let ms = saved.segments[1].durationMs
+        #expect((1900...2000).contains(ms), "all but the cut-off tail: \(ms) ms")
+        #expect(t.calls.map(\.file) == ["1"])
+        #expect(t.calls.map(\.offsetMs) == [1000])
+        #expect(saved.diarized)
+        #expect(FileManager.default.fileExists(atPath: recording.path) == false)
+        let encoded = try #require(SegmentFile.durationMs(await store.segmentURL(n.id, 1)))
+        #expect(abs(encoded - ms) < 100, "the .m4a holds the recovered audio")
+    }
+
+    @Test func recoversASegmentEncodedButNotListed() async throws {
+        let (store, _) = tempStore()
+        let n = note(segments: 1, recording: true)
+        try await store.save(n)
+        // Killed after segment 1 was encoded (and its recording removed) but before it was listed.
+        let segment = await store.segmentURL(n.id, 1)
+        let recording = SegmentFile.recordingURL(for: segment)
+        try killedRecording(at: recording, seconds: 1, cutBytes: 0)
+        try SegmentFile.encode(recording, to: segment)
+        // A half-written encode from the same kill is thrown away.
+        try Data("x".utf8).write(to: segment.deletingPathExtension().appendingPathExtension("part.m4a"))
+
+        await NoteProcessor(store: store, transcriber: FakeTranscriber(), diarizer: FakeDiarizer(turns)).recoverAfterLaunch()
+
+        let saved = try #require(await store.note(n.id))
+        #expect(saved.segments.map(\.index) == [0, 1])
+        #expect((950...1050).contains(saved.segments[1].durationMs))
+        let part = segment.deletingPathExtension().appendingPathExtension("part.m4a")
+        #expect(FileManager.default.fileExists(atPath: part.path) == false)
+    }
+
+    @Test func recoveryLeavesTheLiveRecordingAlone() async throws {
+        let (store, _) = tempStore()
+        let n = note(segments: 0, recording: true)
+        try await store.save(n)
+        let recording = SegmentFile.recordingURL(for: await store.segmentURL(n.id, 0))
+        try killedRecording(at: recording, seconds: 1)
+        let processor = NoteProcessor(store: store, transcriber: FakeTranscriber(), diarizer: FakeDiarizer(turns))
+        await processor.recordingStarted(n.id)
+        await processor.recoverAfterLaunch()
+        #expect(try #require(await store.note(n.id)).recording)
+        #expect(FileManager.default.fileExists(atPath: recording.path))
+    }
+
+    @Test func encodingKeepsTheLengthAndRemovesTheRecording() async throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "enc-\(UUID().uuidString)")
+        let recording = dir.appending(path: "0.caf"), segment = dir.appending(path: "0.m4a")
+        try killedRecording(at: recording, seconds: 3, cutBytes: 0)
+        let ms = try SegmentFile.encode(recording, to: segment)
+        #expect(ms == 3000)
+        #expect(FileManager.default.fileExists(atPath: recording.path) == false)
+        let encoded = try #require(SegmentFile.durationMs(segment))
+        #expect(abs(encoded - 3000) < 100)
+        let file = try AVAudioFile(forReading: segment)
+        #expect(file.fileFormat.settings[AVFormatIDKey] as? UInt32 == kAudioFormatMPEG4AAC)
     }
 
     @Test func resumesAfterRelaunch() async throws {

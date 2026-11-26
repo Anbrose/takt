@@ -68,17 +68,35 @@ public actor NoteProcessor {
         }
     }
 
-    /// Call once at launch, before a new recording starts: a note still marked recording was cut off by the app
-    /// being killed. It is marked stopped with the segments that finished (the killed session's partial file was
-    /// never listed), then every note with work left is processed.
+    /// The note being recorded now: recovery leaves it (and the file it is writing) alone.
+    private var live: UUID?
+
+    public func recordingStarted(_ id: UUID) { live = id }
+    public func recordingEnded(_ id: UUID) { if live == id { live = nil } }
+
+    /// Call at launch (and when the network returns): a note still marked recording was cut off by the app being
+    /// killed. Its segment in progress is recovered from its `.caf` up to the last buffer written (so at most a
+    /// few seconds are lost), the note is marked stopped, then every note with work left is processed.
     public func recoverAfterLaunch() async {
-        for note in await store.all() where note.recording {
+        for note in await store.all() where note.id != live {
+            let found = await store.recoverSegments(note.id, listed: Set(note.segments.map(\.index)))
+            guard note.recording || !found.isEmpty, note.id != live else { continue }
             _ = try? await store.update(note.id) { n in
                 n.recording = false
                 n.segments.removeAll { $0.durationMs <= 0 }
+                let known = Set(n.segments.map(\.index))
+                n.segments += found.filter { !known.contains($0.index) }
+                n.segments.sort { $0.index < $1.index }
+                if !found.isEmpty, n.lines != nil {
+                    // Found after the note was finished: the transcript is redone with the new audio.
+                    n.lines = nil
+                    n.diarized = false
+                    n.synced.transcriptSent = false
+                    n.synced.diarizedSent = false
+                }
             }
         }
-        for note in await store.all() where !note.diarized {
+        for note in await store.all() where !note.diarized && note.id != live {
             await process(note.id)
         }
     }
