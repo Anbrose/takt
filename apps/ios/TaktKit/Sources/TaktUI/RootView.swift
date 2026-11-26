@@ -19,12 +19,11 @@ public struct RootView: View {
     @State private var introOn = false
     /// A 录音 tap or note open is being handled; repeated taps meanwhile are ignored.
     @State private var recordBusy = false
-    @State private var opening = false
 
     struct Route: Identifiable {
         enum Kind {
             case notes, search
-            case note(NoteDetailModel)
+            case note(NoteDetailModel, ImportDockModel)
         }
         let id = UUID()
         let kind: Kind
@@ -146,9 +145,13 @@ public struct RootView: View {
             if #available(iOS 26, macOS 26, *), let notes {
                 NotesListScreen(notes: notes, onBack: pop, onOpen: openNote, onRecord: record)
             }
-        case .note(let detail):
-            if #available(iOS 26, macOS 26, *) {
-                NoteDetailScreen(detail: detail, onBack: pop)
+        case .note(let detail, let dock):
+            if #available(iOS 26, macOS 26, *), let notes {
+                NoteDetailScreen(
+                    detail: detail, dock: dock, item: notes.items.first { $0.id == detail.id },
+                    autoExtracting: notes.autoExtracting.contains(detail.id),
+                    processing: notes.items.first { $0.id == detail.id }?.processing ?? false,
+                    onBack: pop)
             }
         }
     }
@@ -168,15 +171,11 @@ public struct RootView: View {
         }
     }
 
+    /// Pushes at once; the detail loads itself and shows its loading state meanwhile.
     private func openNote(_ id: UUID) {
-        guard let notes, !opening else { return }
-        opening = true
-        Task {
-            let detail = await notes.open(id)
-            opening = false
-            if case .note = routes.last?.kind { return }
-            push(.note(detail))
-        }
+        guard let notes else { return }
+        if case .note = routes.last?.kind { return }
+        push(.note(notes.detail(id), notes.importDock()))
     }
 
     // MARK: Recording

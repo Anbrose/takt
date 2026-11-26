@@ -49,6 +49,8 @@ public struct AppRoot: View {
             // -demo: offline sample data (deterministic for UI tests).
             if demo {
                 let sample = await InMemoryBackend.sample()
+                // The 「长按拖到项目」 tip shows again on every demo launch.
+                UserDefaults.standard.removeObject(forKey: "notes.dragTipDone")
                 if #available(iOS 26, macOS 26, *) { notes = DemoNotes.model(backend: sample) }
                 backend = sample
             } else {

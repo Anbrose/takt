@@ -314,6 +314,8 @@ struct ProjectNameSheet: View {
     let title: String
     let action: String
     let initial: String
+    /// The small label over the field; nil = none (the title says it).
+    var fieldLabel: String? = "名称"
     let onSubmit: (String) async -> Bool
     @Environment(\.accessibilityReduceMotion) private var reduce
 
@@ -355,10 +357,13 @@ struct ProjectNameSheet: View {
     private var form: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(title).font(.system(size: 18, weight: .bold)).foregroundStyle(Palette.text)
-            LabeledField(label: "名称", text: $name)
-                .focused($focused)
-                .submitLabel(.done)
-                .onSubmit(submit)
+            Group {
+                if let fieldLabel { LabeledField(label: fieldLabel, text: $name) } else { InputField(text: $name) }
+            }
+            .focused($focused)
+            .submitLabel(.done)
+            .onSubmit(submit)
+            .accessibilityLabel(fieldLabel ?? title)
             HStack(spacing: 10) {
                 WideButton(title: "取消", kind: .secondary, height: 48, action: close)
                 WideButton(title: action, kind: .primary, height: 48, busy: submitting, action: submit)

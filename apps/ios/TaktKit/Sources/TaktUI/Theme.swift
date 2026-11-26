@@ -26,6 +26,11 @@ public enum Palette {
     public static let soft = Color(light: 0xFCE6EF, dark: 0x3A2230)
     public static let map = Color(light: 0xF7ECF1, dark: 0x202024)
     public static let grid = Color(light: 0xEBD8E0, dark: 0x2E2E34)
+    /// Speaker chips after the first (`--sp2*`, `--sp3*`); the first uses soft / accentText.
+    public static let sp2bg = Color(light: 0xE3EEFB, dark: 0x1F2C3D)
+    public static let sp2fg = Color(light: 0x1D5FB4, dark: 0x8DB8F2)
+    public static let sp3bg = Color(light: 0xE6F4EA, dark: 0x1E3326)
+    public static let sp3fg = Color(light: 0x1E7A3C, dark: 0x86D19C)
 }
 
 extension Color {
@@ -81,6 +86,15 @@ public enum Motion {
     public static let langSheet = Animation.timingCurve(0.32, 0.72, 0, 1, duration: 0.32)
     /// Full-screen recording view rising from the bottom.
     public static let cover = Animation.timingCurve(0.32, 0.72, 0, 1, duration: 0.42)
+    /// 「加入到项目」 dock rising, opening (72 → 440 pt) and closing (340 ms).
+    public static let dock = Animation.timingCurve(0.32, 0.72, 0, 1, duration: 0.34)
+    /// The dock's content sliding to another level (prototype `inR` / `inL`, 260 ms).
+    public static let dockLevel = Animation.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.26)
+    /// A cancelled drag's card flying back to where it was picked up.
+    public static let flyBack = Animation.timingCurve(0.32, 0.72, 0, 1, duration: 0.28)
+    /// 文字稿 ↔ 任务链 panes (320 ms) and the segmented highlight (260 ms), CSS `ease`.
+    public static let pane = Animation.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.32)
+    public static let segment = Animation.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.26)
 
     static func with<R>(_ animation: Animation, reduce: Bool, _ body: () throws -> R) rethrows -> R {
         try withAnimation(reduce ? nil : animation, body)
