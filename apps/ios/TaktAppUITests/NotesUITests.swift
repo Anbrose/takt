@@ -314,7 +314,7 @@ final class NotesUITests: XCTestCase {
     /// The VoiceOver path: a chain's / step's 「加入到项目」 action opens `ImportPicker`. XCUITest can't perform
     /// custom accessibility actions, so `-uitest-pick` opens the picker for these names in turn.
     func testVoiceOverImportPicker() {
-        app.launchArguments += ["-uitest-pick", "订京都站附近的酒店,京都第二天"]
+        app.launchArguments += ["-uitest-pick", "订京都站附近的酒店,京都第二天,预约二年坂荞麦面店"]
         openKyotoChains()
         // A step: 日本旅行 › 放这里 = the end of its first level.
         tapWhenHittable(el("picker.project.日本旅行"))
@@ -330,6 +330,19 @@ final class NotesUITests: XCTestCase {
         tapWhenHittable(el("confirm.nest"))
         waitForImported("岚山小火车", into: "北海道")
         XCTAssertFalse(el("chain.京都第二天").exists)
+
+        // In front of a task, as a drop on its top edge.
+        tapWhenHittable(el("picker.project.日本旅行"))
+        tapWhenHittable(el("picker.before.东京"))
+        XCTAssertFalse(el("confirm.nest").waitForExistence(timeout: 1), "before doesn't ask")
+        waitForImported("预约二年坂荞麦面店", into: "日本旅行")
+
+        backHome()
+        openTrip(app)
+        let row = { (n: String) in self.app.descendants(matching: .any)["row.\(n)"] }
+        XCTAssertTrue(row("预约二年坂荞麦面店").waitForExistence(timeout: 3))
+        let ys = ["大阪", "预约二年坂荞麦面店", "东京", "北海道", "订京都站附近的酒店"].map { row($0).frame.minY }
+        XCTAssertEqual(ys, ys.sorted(), "in front of 东京; 放这里 went to the end")
     }
 
     func testNoteDetailScreens() {

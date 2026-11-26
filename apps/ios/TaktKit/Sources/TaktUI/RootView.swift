@@ -151,7 +151,7 @@ public struct RootView: View {
                     detail: detail, dock: dock, item: notes.items.first { $0.id == detail.id },
                     autoExtracting: notes.autoExtracting.contains(detail.id),
                     processing: notes.items.first { $0.id == detail.id }?.processing ?? false,
-                    onBack: pop)
+                    isRecording: { notes.recording != nil }, onBack: pop)
             }
         }
     }

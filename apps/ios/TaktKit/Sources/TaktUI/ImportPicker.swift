@@ -2,7 +2,8 @@ import SwiftUI
 import TaktAPI
 
 /// 「加入到项目」 without dragging (the VoiceOver path, from a chain's or step's accessibility action): pick a
-/// Project, then 「放这里」 (the end of its first level) or a task to put it into (asks 「放入「X」？」 first).
+/// Project, then a slot in front of a task, 「放这里」 (the end of its first level) or a task to put it into
+/// (asks 「放入「X」？」 first).
 /// The same destinations as a drop; the result shows in the dock as 「✓ 名」.
 @available(iOS 26, macOS 26, *)
 struct ImportPicker: View {
@@ -66,14 +67,16 @@ struct ImportPicker: View {
             }
             if let item { Text(item.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.muted).lineLimit(1) }
             ScrollView {
-                VStack(spacing: 8) {
+                VStack(spacing: 4) {
                     if let opened = dock.opened {
-                        Button { place(.end(parent: opened.level.task.id), into: nil) } label: {
-                            row(name: "放这里", count: nil, icon: "arrow.down.to.line", strong: true)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("picker.here")
+                        let parent = opened.level.task.id
+                        // The drop's destinations: a slot in front of each task (behind one = in front of the
+                        // next), into a task, and 「放这里」 = the end (also behind the last task).
                         ForEach(opened.level.children, id: \.id) { t in
+                            Button { place(.before(parent: parent, task: t.id), into: nil) } label: { slot }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("放在「\(t.name)」前面")
+                                .accessibilityIdentifier("picker.before.\(t.name)")
                             Button { place(.into(task: t.id), into: t.name) } label: {
                                 row(name: t.name, count: t.childCount, icon: "plus", strong: false)
                             }
@@ -81,6 +84,12 @@ struct ImportPicker: View {
                             .accessibilityLabel("放入「\(t.name)」")
                             .accessibilityIdentifier("picker.task.\(t.name)")
                         }
+                        Button { place(.end(parent: parent), into: nil) } label: {
+                            row(name: "放这里", count: nil, icon: "arrow.down.to.line", strong: true)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 4)
+                        .accessibilityIdentifier("picker.here")
                     } else {
                         ForEach(dock.projects, id: \.id) { p in
                             Button { Task { await open(p.id) } } label: {
@@ -104,6 +113,21 @@ struct ImportPicker: View {
                 .ignoresSafeArea(edges: .bottom)
         }
         .accessibilityAddTraits(.isModal)
+    }
+
+    /// The insertion line from the dock, as a 28 pt target between rows.
+    private var slot: some View {
+        HStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 2).fill(Palette.accent).frame(height: 3)
+            Image(systemName: "plus.circle.fill")
+                .font(.system(size: 16))
+                .foregroundStyle(Palette.accentText)
+            RoundedRectangle(cornerRadius: 2).fill(Palette.accent).frame(height: 3)
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 28)
+        .frame(minHeight: 28)
+        .contentShape(Rectangle())
     }
 
     private func row(name: String, count: Int?, icon: String, strong: Bool) -> some View {

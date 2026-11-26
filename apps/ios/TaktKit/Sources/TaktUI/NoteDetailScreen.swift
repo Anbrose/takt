@@ -20,7 +20,7 @@ struct NoteDetailScreen: View {
     let onBack: () -> Void
 
     @State private var drag: ImportDrag
-    @State private var player = NotePlayer()
+    @State private var player: NotePlayer
     @State private var tab = Tab.text
     /// The rename sheet's subject; kept after closing so the title doesn't change while it slides away.
     @State private var naming = Naming.chain("", "")
@@ -43,8 +43,9 @@ struct NoteDetailScreen: View {
 
     init(
         detail: NoteDetailModel, dock: ImportDockModel, item: NoteItem?, autoExtracting: Bool, processing: Bool,
-        onBack: @escaping () -> Void
+        isRecording: @escaping () -> Bool = { false }, onBack: @escaping () -> Void
     ) {
+        _player = State(initialValue: NotePlayer(isRecording: isRecording))
         self.detail = detail
         self.item = item
         self.autoExtracting = autoExtracting
@@ -347,7 +348,8 @@ struct NoteDetailScreen: View {
     // MARK: Player
 
     private func play(from ms: Int) {
-        player.play(from: ms, duration: note?.durationMs ?? 0, detail: detail)
+        let detail = detail
+        player.play(from: ms, duration: note?.durationMs ?? 0) { await detail.audioURL(at: $0) }
     }
 
     private func jump(to ms: Int) {
@@ -360,7 +362,7 @@ struct NoteDetailScreen: View {
         let on = player.at != nil && !busy && !drag.dockShown
         ZStack(alignment: .bottom) {
             if on {
-                PlayerBar(player: player, duration: note?.durationMs ?? 0, detail: detail)
+                PlayerBar(player: player, duration: note?.durationMs ?? 0)
                     .padding(.horizontal, Metrics.gutter)
                     .padding(.bottom, 24)
                     .transition(reduce ? .opacity : .offset(y: 24).combined(with: .opacity))
@@ -687,104 +689,10 @@ private struct ImportedRow: View {
 
 // MARK: - Player
 
-/// Plays the recording from a transcript time. The clock runs on its own so the outlined line follows along
-/// across segments (each segment is its own file); the audio, where there is one, plays alongside.
-@available(iOS 26, macOS 26, *)
-@MainActor
-@Observable
-final class NotePlayer {
-    /// Current position in ms; nil = closed.
-    private(set) var at: Int?
-    private(set) var playing = false
-    /// Bumped when a step's time chip asks the transcript to scroll to the line.
-    var jumpSeq = 0
-    private var duration = 0
-    private var startedAt = Date()
-    private var startMs = 0
-    private var ticker: Task<Void, Never>?
-    private var audio: AVPlayer?
-    private var segmentEnd: NSObjectProtocol?
-    private weak var detail: NoteDetailModel?
-
-    func play(from ms: Int, duration: Int, detail: NoteDetailModel) {
-        self.detail = detail
-        self.duration = duration
-        startMs = max(0, min(ms, duration))
-        startedAt = Date()
-        at = startMs
-        playing = true
-        tick()
-        loadAudio(at: startMs)
-    }
-
-    func toggle() {
-        guard let at, let detail else { return }
-        if playing {
-            playing = false
-            ticker?.cancel()
-            audio?.pause()
-        } else {
-            play(from: at >= duration ? 0 : at, duration: duration, detail: detail)
-        }
-    }
-
-    func close() {
-        ticker?.cancel()
-        audio?.pause()
-        audio = nil
-        playing = false
-        at = nil
-    }
-
-    private func tick() {
-        ticker?.cancel()
-        ticker = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(250))
-                guard let self, self.playing else { return }
-                let now = self.startMs + Int(Date().timeIntervalSince(self.startedAt) * 1000)
-                if now >= self.duration {
-                    self.at = self.duration
-                    self.playing = false
-                    self.audio?.pause()
-                    return
-                }
-                self.at = now
-            }
-        }
-    }
-
-    private func loadAudio(at ms: Int) {
-        audio?.pause()
-        Task { [weak self] in
-            guard let self, let detail = self.detail, let (url, offset) = await detail.audioURL(at: ms), self.playing else {
-                return
-            }
-            let item = AVPlayerItem(url: url)
-            let p = AVPlayer(playerItem: item)
-            await p.seek(to: CMTime(seconds: offset, preferredTimescale: 600))
-            guard self.playing else { return }
-            self.audio = p
-            p.play()
-            if let segmentEnd = self.segmentEnd { NotificationCenter.default.removeObserver(segmentEnd) }
-            self.segmentEnd = NotificationCenter.default.addObserver(
-                forName: AVPlayerItem.didPlayToEndTimeNotification, object: item, queue: .main
-            ) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    // The next segment carries on from the clock.
-                    guard let self, self.playing, let at = self.at, at < self.duration else { return }
-                    self.loadAudio(at: at + 50)
-                }
-            }
-        }
-    }
-}
-
 @available(iOS 26, macOS 26, *)
 private struct PlayerBar: View {
     let player: NotePlayer
     let duration: Int
-    let detail: NoteDetailModel
 
     var body: some View {
         let at = player.at ?? 0
