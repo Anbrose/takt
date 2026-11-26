@@ -147,6 +147,79 @@ public actor InMemoryBackend: TaktBackend {
         throw notFound
     }
 
+    public func moveTask(_ id: String, to parent: String, before: String?) async throws -> (from: Level, to: Level) {
+        try check("moveTask \(id) \(parent) \(before ?? "-")")
+        guard let node = nodes[id], nodes[parent] != nil else { throw notFound }
+        if let before, nodes[before] == nil { throw notFound }
+        guard rootOf(id) == rootOf(parent) else {
+            throw BackendError.api(status: 400, code: "cross_project", message: "other project")
+        }
+        guard let from = node.parent else {
+            throw BackendError.api(status: 400, code: "root_task", message: "root")
+        }
+        var cur: String? = parent
+        while let c = cur {
+            if c == id { throw BackendError.api(status: 400, code: "move_into_self", message: "into itself") }
+            cur = nodes[c]?.parent
+        }
+        var target = nodes[parent]!.children.filter { $0 != id }
+        if let before {
+            guard before != id, let at = target.firstIndex(of: before) else {
+                throw BackendError.api(status: 400, code: "bad_before", message: "not a sibling")
+            }
+            target.insert(id, at: at)
+        } else {
+            target.append(id)
+        }
+        if from == parent {
+            nodes[parent]!.children = target
+            nodes[parent]!.version += 1
+        } else {
+            nodes[from]!.children.removeAll { $0 == id }
+            nodes[from]!.version += 1
+            nodes[parent]!.children = target
+            nodes[parent]!.version += 1
+            nodes[id]!.parent = parent
+        }
+        return (try levelOf(from), try levelOf(parent))
+    }
+
+    public func search(_ q: String) async throws -> SearchResult {
+        try check("search \(q)")
+        let hit: (String) -> Bool = { $0.range(of: q, options: [.caseInsensitive, .literal]) != nil }
+        let cap = 20
+        let projects = projectList.filter { hit($0.name) }
+            .sorted { $0.name < $1.name }.prefix(cap)
+            .map { SearchResult.ProjectsPayloadPayload(id: $0.id, name: $0.name) }
+        var tasks: [(name: String, hit: SearchResult.TasksPayloadPayload)] = []
+        for p in projectList {
+            var stack: [(id: String, path: [String])] = [(p.rootTaskId, [p.name])]
+            while let (id, path) = stack.popLast() {
+                guard let n = nodes[id] else { continue }
+                if let parent = n.parent, hit(n.summary.name) {
+                    tasks.append((n.summary.name, .init(
+                        id: id, name: n.summary.name, projectId: p.id, parentTaskId: parent, path: path)))
+                }
+                let below = n.parent == nil ? path : path + [n.summary.name]
+                stack += n.children.reversed().map { ($0, below) }
+            }
+        }
+        var notes: [SearchResult.NotesPayloadPayload] = []
+        let rows = noteRows.values.sorted { ($0.createdAt, $0.id) > ($1.createdAt, $1.id) }
+        for r in rows.prefix(cap) {
+            if hit(r.title) {
+                notes.append(.init(noteId: r.id, title: r.title, lineIndex: nil, startMs: nil, text: r.title))
+            }
+            for (i, l) in r.transcript.enumerated().filter({ hit($0.element.text) }).prefix(2) {
+                notes.append(.init(noteId: r.id, title: r.title, lineIndex: i, startMs: l.startMs, text: l.text))
+            }
+        }
+        return SearchResult(
+            projects: Array(projects),
+            tasks: tasks.sorted { $0.name < $1.name }.prefix(cap).map(\.hit),
+            notes: Array(notes.prefix(cap)))
+    }
+
     // MARK: Notes
 
     public func notes() async throws -> [NoteSummary] {
@@ -262,10 +335,15 @@ public actor InMemoryBackend: TaktBackend {
         return note(r)
     }
 
-    public func importNote(_ id: String, parent: String, picks: [ImportPick]) async throws -> (level: Level, note: Note) {
+    public func importNote(
+        _ id: String, parent: String, picks: [ImportPick], before: String?
+    ) async throws -> (level: Level, note: Note) {
         try check("importNote \(id)")
         var r = try row(id)
         guard nodes[parent] != nil else { throw notFound }
+        if let before, nodes[parent]!.children.contains(before) == false {
+            throw BackendError.api(status: 400, code: "bad_before", message: "not a child of the parent")
+        }
 
         // Validate every pick against the current draft before writing anything.
         let draft = Dictionary(r.chains.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
@@ -286,13 +364,15 @@ public actor InMemoryBackend: TaktBackend {
         let now = Date()
         for (chain, steps, places) in plan {
             // One step is a plain task; a chain of two or more becomes a parent with ordered children.
-            let group = steps.count >= 2 ? add(parent: parent, name: chain.name) : parent
+            let group = steps.count >= 2 ? add(parent: parent, before: before, name: chain.name) : parent
             for s in steps {
                 let task: String
                 if let p = places[s.id] {
-                    task = add(parent: group, name: s.name, place: p.place, address: p.address, lat: p.lat, lng: p.lng)
+                    task = add(
+                        parent: group, before: group == parent ? before : nil, name: s.name, place: p.place,
+                        address: p.address, lat: p.lat, lng: p.lng)
                 } else {
-                    task = add(parent: group, name: s.name, place: s.place ?? "")
+                    task = add(parent: group, before: group == parent ? before : nil, name: s.name, place: s.place ?? "")
                 }
                 r.imported.append(ImportedStep(
                     stepId: s.id, chainName: chain.name, stepName: s.name, taskId: task, parentTaskId: group,
@@ -354,7 +434,7 @@ public actor InMemoryBackend: TaktBackend {
     /// Adds a task (or a root when `parent` is nil); returns its id.
     @discardableResult
     public func add(
-        parent: String?, name: String, short: String? = nil, place: String = "", address: String = "",
+        parent: String?, before: String? = nil, name: String, short: String? = nil, place: String = "", address: String = "",
         lat: Double? = nil, lng: Double? = nil, prerequisites: [(String, Urgency)] = []
     ) -> String {
         let id = newId()
@@ -367,7 +447,11 @@ public actor InMemoryBackend: TaktBackend {
             parent: parent
         )
         if let parent {
-            nodes[parent]?.children.append(id)
+            if let before, let at = nodes[parent]?.children.firstIndex(of: before) {
+                nodes[parent]?.children.insert(id, at: at)
+            } else {
+                nodes[parent]?.children.append(id)
+            }
             nodes[parent]?.version += 1
         }
         return id
@@ -393,6 +477,13 @@ public actor InMemoryBackend: TaktBackend {
                 return s
             }
         )
+    }
+
+    /// The project root a task hangs under.
+    private func rootOf(_ id: String) -> String {
+        var cur = id
+        while let p = nodes[cur]?.parent { cur = p }
+        return cur
     }
 
     private func newId() -> String {

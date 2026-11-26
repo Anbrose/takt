@@ -242,8 +242,12 @@ final class LostCreateResponse: TaktBackend, @unchecked Sendable {
     func updateExtraction(note: String, version: Int, chains: [Chain]) async throws -> Note {
         try await inner.updateExtraction(note: note, version: version, chains: chains)
     }
-    func importNote(_ id: String, parent: String, picks: [ImportPick]) async throws -> (level: Level, note: Note) {
-        try await inner.importNote(id, parent: parent, picks: picks)
+    func moveTask(_ id: String, to parent: String, before: String?) async throws -> (from: Level, to: Level) {
+        try await inner.moveTask(id, to: parent, before: before)
+    }
+    func search(_ q: String) async throws -> SearchResult { try await inner.search(q) }
+    func importNote(_ id: String, parent: String, picks: [ImportPick], before: String?) async throws -> (level: Level, note: Note) {
+        try await inner.importNote(id, parent: parent, picks: picks, before: before)
     }
 }
 
@@ -345,8 +349,12 @@ private struct GatedBackend: TaktBackend {
     func updateExtraction(note: String, version: Int, chains: [Chain]) async throws -> Note {
         try await inner.updateExtraction(note: note, version: version, chains: chains)
     }
-    func importNote(_ id: String, parent: String, picks: [ImportPick]) async throws -> (level: Level, note: Note) {
-        try await inner.importNote(id, parent: parent, picks: picks)
+    func moveTask(_ id: String, to parent: String, before: String?) async throws -> (from: Level, to: Level) {
+        try await inner.moveTask(id, to: parent, before: before)
+    }
+    func search(_ q: String) async throws -> SearchResult { try await inner.search(q) }
+    func importNote(_ id: String, parent: String, picks: [ImportPick], before: String?) async throws -> (level: Level, note: Note) {
+        try await inner.importNote(id, parent: parent, picks: picks, before: before)
     }
 }
 

@@ -12,6 +12,8 @@ public typealias Crumb = Components.Schemas.Crumb
 public typealias CreateTaskBody = Components.Schemas.CreateTask
 public typealias NewPrerequisite = Components.Schemas.NewPrerequisite
 
+public typealias SearchResult = Components.Schemas.SearchResult
+
 public typealias NoteSummary = Components.Schemas.NoteSummary
 public typealias Note = Components.Schemas.Note
 public typealias TranscriptLine = Components.Schemas.TranscriptLine
@@ -70,6 +72,11 @@ public protocol TaktBackend: Sendable {
     /// 左滑删除: removes the task and everything under it; returns the parent level.
     func deleteTask(_ id: String) async throws -> Level
     func setPrerequisite(_ id: String, done: Bool) async throws -> Prerequisite
+    /// Moves a task under `parent`, before sibling `before` (else last). `from` and `to` are the same level
+    /// when the parent is unchanged. Errors: 404 not_found; 400 root_task, move_into_self, cross_project, bad_before.
+    func moveTask(_ id: String, to parent: String, before: String?) async throws -> (from: Level, to: Level)
+    /// Case-insensitive substring search over projects, tasks and notes.
+    func search(_ q: String) async throws -> SearchResult
 
     // Notes (录音笔记). Errors carry codes such as empty_transcript, extract_limit, budget_exceeded,
     // llm_failed, stale_draft, version_conflict.
@@ -89,8 +96,15 @@ public protocol TaktBackend: Sendable {
     func extract(note: String) async throws -> Note
     /// Replaces the draft; `version` is the one the edit was based on.
     func updateExtraction(note: String, version: Int, chains: [Chain]) async throws -> Note
-    /// Writes the picked steps into the level `parent`; returns that level and the updated note.
-    func importNote(_ id: String, parent: String, picks: [ImportPick]) async throws -> (level: Level, note: Note)
+    /// Writes the picked steps into the level `parent` (before its child `before`, else at the end);
+    /// returns that level and the updated note.
+    func importNote(_ id: String, parent: String, picks: [ImportPick], before: String?) async throws -> (level: Level, note: Note)
+}
+
+extension TaktBackend {
+    public func importNote(_ id: String, parent: String, picks: [ImportPick]) async throws -> (level: Level, note: Note) {
+        try await importNote(id, parent: parent, picks: picks, before: nil)
+    }
 }
 
 public struct LiveBackend: TaktBackend {
@@ -182,6 +196,27 @@ public struct LiveBackend: TaktBackend {
         case .ok(let r): return try r.body.json
         case .badRequest(let r): throw err(400, try r.body.json)
         case .notFound(let r): throw err(404, try r.body.json)
+        case .undocumented(let s, _): throw BackendError.unexpected(status: s)
+        }
+    }
+
+    public func moveTask(_ id: String, to parent: String, before: String?) async throws -> (from: Level, to: Level) {
+        switch try await client.moveTask(
+            path: .init(taskId: id), body: .json(.init(parentTaskId: parent, beforeTaskId: before))
+        ) {
+        case .ok(let r):
+            let result = try r.body.json
+            return (result.from, result.to)
+        case .badRequest(let r): throw err(400, try r.body.json)
+        case .notFound(let r): throw err(404, try r.body.json)
+        case .undocumented(let s, _): throw BackendError.unexpected(status: s)
+        }
+    }
+
+    public func search(_ q: String) async throws -> SearchResult {
+        switch try await client.search(query: .init(q: q)) {
+        case .ok(let r): return try r.body.json
+        case .badRequest(let r): throw err(400, try r.body.json)
         case .undocumented(let s, _): throw BackendError.unexpected(status: s)
         }
     }
@@ -286,9 +321,11 @@ public struct LiveBackend: TaktBackend {
         }
     }
 
-    public func importNote(_ id: String, parent: String, picks: [ImportPick]) async throws -> (level: Level, note: Note) {
+    public func importNote(
+        _ id: String, parent: String, picks: [ImportPick], before: String?
+    ) async throws -> (level: Level, note: Note) {
         switch try await client.importNote(
-            path: .init(noteId: id), body: .json(.init(parentTaskId: parent, picks: picks))
+            path: .init(noteId: id), body: .json(.init(parentTaskId: parent, beforeTaskId: before, picks: picks))
         ) {
         case .ok(let r):
             let result = try r.body.json
