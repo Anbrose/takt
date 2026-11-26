@@ -109,6 +109,17 @@ export const routes = {
     status: 200,
     errors: [400, 404, 409],
   },
+  moveTask: {
+    operationId: 'moveTask',
+    method: 'POST',
+    path: '/tasks/{taskId}/move',
+    summary: 'Move a task under another parent (nest, un-nest or reposition)',
+    params: S.TaskParams,
+    body: S.MoveTask,
+    response: S.MoveResult,
+    status: 200,
+    errors: [400, 404],
+  },
   getLevelPlan: {
     operationId: 'getLevelPlan',
     method: 'GET',

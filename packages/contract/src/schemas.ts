@@ -88,6 +88,13 @@ export const ReorderLevel = z
   .object({ ids: z.array(z.uuid()).max(500), version: z.int().min(0) })
   .meta({ id: 'ReorderLevel', description: 'The complete new order of the level (same ids, any order).' });
 
+export const MoveTask = z
+  .object({ parentTaskId: z.uuid(), beforeTaskId: z.uuid().optional() })
+  .meta({
+    id: 'MoveTask',
+    description: 'Moves a task under parentTaskId, before beforeTaskId, or at the end when omitted.',
+  });
+
 export const UpdatePrerequisite = z.object({ done: z.boolean() }).meta({ id: 'UpdatePrerequisite' });
 
 export const Objective = z.enum(['distance', 'time']).meta({ id: 'Objective' });
@@ -304,8 +311,16 @@ export const ImportPick = z
   .meta({ id: 'ImportPick', description: 'places is keyed by step id.' });
 
 export const ImportNote = z
-  .object({ parentTaskId: z.uuid(), picks: z.array(ImportPick).min(1).max(50) })
-  .meta({ id: 'ImportNote' });
+  .object({
+    parentTaskId: z.uuid(),
+    beforeTaskId: z.uuid().optional(),
+    picks: z.array(ImportPick).min(1).max(50),
+  })
+  .meta({ id: 'ImportNote', description: 'Inserted before beforeTaskId (a child of parentTaskId), else appended.' });
+
+export const MoveResult = z
+  .object({ from: Level, to: Level })
+  .meta({ id: 'MoveResult', description: 'from and to are the same level when the parent is unchanged.' });
 
 export const ImportResult = z.object({ level: Level, note: Note }).meta({ id: 'ImportResult' });
 

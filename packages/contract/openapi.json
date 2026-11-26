@@ -420,6 +420,66 @@
         }
       }
     },
+    "/tasks/{taskId}/move": {
+      "post": {
+        "operationId": "moveTask",
+        "summary": "Move a task under another parent (nest, un-nest or reposition)",
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveTask"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoveResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks/{taskId}/plan": {
       "get": {
         "operationId": "getLevelPlan",
@@ -1669,6 +1729,11 @@
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
+          "beforeTaskId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
           "picks": {
             "minItems": 1,
             "maxItems": 50,
@@ -1682,7 +1747,8 @@
           "parentTaskId",
           "picks"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Inserted before beforeTaskId (a child of parentTaskId), else appended."
       },
       "ImportPick": {
         "type": "object",
@@ -1921,6 +1987,43 @@
         ],
         "additionalProperties": false,
         "description": "Map + 准备清单 for one level and scope. Distances are straight-line until real routing lands; objective/travel are accepted but do not change results yet."
+      },
+      "MoveResult": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "$ref": "#/components/schemas/Level"
+          },
+          "to": {
+            "$ref": "#/components/schemas/Level"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "additionalProperties": false,
+        "description": "from and to are the same level when the parent is unchanged."
+      },
+      "MoveTask": {
+        "type": "object",
+        "properties": {
+          "parentTaskId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "beforeTaskId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "parentTaskId"
+        ],
+        "additionalProperties": false,
+        "description": "Moves a task under parentTaskId, before beforeTaskId, or at the end when omitted."
       },
       "NewPrerequisite": {
         "type": "object",

@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.ts';
-import { notes } from '../src/db/schema.ts';
+import { notes, tasks } from '../src/db/schema.ts';
 import { transcriptHash } from '../src/services/notes.ts';
 import { FakeExtractor, type DraftChain } from '../src/llm/extractor.ts';
 import { openDb, type DbHandle } from '../src/db/client.ts';
@@ -385,6 +385,38 @@ describe('draft edits and import', () => {
       taskId: kids.children[0].id,
     });
     expect(r.body.note.extraction.version).toBe(note.extraction.version + 1);
+  });
+
+  it('importBeforeTask', async () => {
+    const chain = (await draft()).extraction.chains[0];
+    const r = await doImport({
+      parentTaskId: root,
+      beforeTaskId: id('tokyo'),
+      picks: [{ chainId: chain.id, stepIds: chain.steps.map((s: { id: string }) => s.id) }],
+    });
+    expect(r.status).toBe(200);
+    expect(r.body.level.children.map((c: { name: string }) => c.name)).toEqual([
+      '大阪',
+      '京都一日游',
+      '东京',
+      '北海道',
+    ]);
+    const rows = await handle.db.select().from(tasks).where(eq(tasks.parentId, root));
+    expect(rows.map((x) => x.position).sort()).toEqual([0, 1, 2, 3]);
+  });
+
+  it('importBadBefore400', async () => {
+    const before = await draft();
+    const chain = before.extraction.chains[0];
+    const r = await doImport({
+      parentTaskId: root,
+      beforeTaskId: id('castle'),
+      picks: [{ chainId: chain.id, stepIds: [chain.steps[0].id] }],
+    });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toBe('bad_before');
+    expect((await children(root)).children).toHaveLength(3);
+    expect(await draft()).toEqual(before);
   });
 
   it('imports a single step as a plain task, with a picked place', async () => {

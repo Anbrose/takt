@@ -290,6 +290,8 @@ export function noteRoutes(
         return { chain, steps, places: pick.places ?? {} };
       });
 
+      // Every inserted chain lands before the same sibling, so the chains keep their pick order.
+      const before = body.beforeTaskId;
       const importedAt = new Date().toISOString();
       const imported: ImportedStep[] = [];
       for (const { chain, steps, places } of plan) {
@@ -300,9 +302,16 @@ export function noteRoutes(
             : { place: s.place ?? '' };
         };
         const parent =
-          steps.length >= 2 ? await insertTask(tx, body.parentTaskId, { name: chain.name }) : null;
+          steps.length >= 2
+            ? await insertTask(tx, body.parentTaskId, { name: chain.name }, before)
+            : null;
         for (const s of steps) {
-          const task = await insertTask(tx, parent?.id ?? body.parentTaskId, { name: s.name, ...fields(s) });
+          const task = await insertTask(
+            tx,
+            parent?.id ?? body.parentTaskId,
+            { name: s.name, ...fields(s) },
+            parent ? undefined : before,
+          );
           imported.push({
             stepId: s.id,
             chainName: chain.name,
