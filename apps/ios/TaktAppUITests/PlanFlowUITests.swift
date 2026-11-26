@@ -220,8 +220,11 @@ final class ProjectListUITests: XCTestCase {
         let trip = app.buttons["project.日本旅行"]
         XCTAssertTrue(trip.waitForExistence(timeout: 5))
 
-        // 新建 → pushes into the new (empty) project.
-        app.buttons["新建"].tap()
+        // ＋ → 新建 Project → pushes into the new (empty) project.
+        app.descendants(matching: .any)["fab.menu"].tap()
+        let new = app.descendants(matching: .any)["menu.new"]
+        XCTAssertTrue(new.waitForExistence(timeout: 2))
+        new.tap()
         let field = app.textFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 3))
         field.tap()

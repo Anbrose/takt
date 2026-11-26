@@ -21,6 +21,8 @@ public enum Palette {
     public static let onFill = Color(light: 0xFFFFFF, dark: 0x1A1A1D)
     /// 删除 (swipe action) — white text on it passes 4.5:1 in both themes.
     public static let danger = Color(light: 0xC62828, dark: 0xC62828)
+    /// Recording stop square — a graphic, so dark mode uses the canvas's brighter `--danger`.
+    public static let stop = Color(light: 0xC62828, dark: 0xFF6B6B)
     public static let soft = Color(light: 0xFCE6EF, dark: 0x3A2230)
     public static let map = Color(light: 0xF7ECF1, dark: 0x202024)
     public static let grid = Color(light: 0xEBD8E0, dark: 0x2E2E34)
@@ -70,6 +72,15 @@ public enum Motion {
     public static let push = Animation.timingCurve(0.32, 0.72, 0, 1, duration: 0.42)
     /// A list item opening / collapsing in place.
     public static let collapse = Animation.timingCurve(0.32, 0.72, 0, 1, duration: 0.34)
+    /// Switch knob, ＋ → × and other small controls (prototype 220–280 ms on the same curve).
+    public static let toggle = Animation.timingCurve(0.32, 0.72, 0, 1, duration: 0.22)
+    /// 悬浮按钮 menu items springing out (prototype 280 ms, staggered 40 ms).
+    public static let dial = Animation.timingCurve(0.32, 0.72, 0, 1, duration: 0.28)
+    /// First-recording intro sheet (340 ms) and the language sheet (320 ms).
+    public static let introSheet = Animation.timingCurve(0.32, 0.72, 0, 1, duration: 0.34)
+    public static let langSheet = Animation.timingCurve(0.32, 0.72, 0, 1, duration: 0.32)
+    /// Full-screen recording view rising from the bottom.
+    public static let cover = Animation.timingCurve(0.32, 0.72, 0, 1, duration: 0.42)
 
     static func with<R>(_ animation: Animation, reduce: Bool, _ body: () throws -> R) rethrows -> R {
         try withAnimation(reduce ? nil : animation, body)
