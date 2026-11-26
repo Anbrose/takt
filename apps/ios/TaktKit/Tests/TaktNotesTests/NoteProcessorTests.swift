@@ -30,6 +30,31 @@ final class FakeTranscriber: Transcribing, @unchecked Sendable {
 }
 
 struct DiarizeFailed: Error {}
+struct TranscribeFailed: Error {}
+
+/// FakeTranscriber's tokens, but segment files in `failing` throw (the first `times` calls each; nil: always),
+/// and `supported` false says the device can't do the language.
+final class FlakyTranscriber: Transcribing, @unchecked Sendable {
+    private let lock = NSLock()
+    private var failures: [String: Int] = [:]
+    private let inner = FakeTranscriber()
+    let failing: Set<String>
+    let times: Int?
+    let supported: Bool
+    init(failing: Set<String> = [], times: Int? = nil, supported: Bool = true) {
+        self.failing = failing; self.times = times; self.supported = supported
+    }
+    var calls: [(file: String, offsetMs: Int)] { inner.calls }
+    func supports(locale: String) async -> Bool { supported }
+    func isReady(locale: String) async -> Bool { true }
+    func prepare(locale: String) async throws {}
+    func transcribe(_ file: URL, locale: String, offsetMs: Int) async throws -> [TimedText] {
+        let name = file.deletingPathExtension().lastPathComponent
+        let n = lock.withLock { failures[name, default: 0] += 1; return failures[name]! }
+        if failing.contains(name), times.map({ n <= $0 }) ?? true { throw TranscribeFailed() }
+        return try await inner.transcribe(file, locale: locale, offsetMs: offsetMs)
+    }
+}
 
 /// Its models can't be downloaded (offline).
 struct OfflineDiarizer: Diarizing {
@@ -177,6 +202,75 @@ private func note(segments: Int, recording: Bool) -> LocalNote {
         #expect(saved.diarized)
         #expect(saved.lines == SpeakerAlign.align(saved.tokens, turns))
         #expect(saved.lines?.map(\.speaker) == ["1"])
+    }
+
+    @Test func aFailingSegmentDoesNotHoldBackTheRest() async throws {
+        let (store, _) = tempStore()
+        let n = note(segments: 3, recording: false)
+        try await store.save(n)
+        let t = FlakyTranscriber(failing: ["1"])
+        let d = FakeDiarizer(turns)
+        let processor = NoteProcessor(store: store, transcriber: t, diarizer: d)
+
+        await processor.process(n.id)
+        var saved = try #require(await store.note(n.id))
+        #expect(saved.segments.map(\.transcribed) == [true, false, true], "segment 2 went on without 1")
+        #expect(d.calls.isEmpty)
+
+        for _ in 1..<LocalSegment.maxAttempts { await processor.process(n.id) }
+        saved = try #require(await store.note(n.id))
+        #expect(saved.segments.map(\.attempts) == [1, LocalSegment.maxAttempts, 1])
+        #expect(saved.segments.allSatisfy { $0.transcribed }, "given up on after the cap")
+        #expect(saved.tokens.map(\.text) == ["s0a", "s0b", "s2a", "s2b"])
+        #expect(d.calls.count == 1, "diarization is no longer blocked")
+        #expect(saved.diarized)
+    }
+
+    @Test func aSegmentThatComesThroughLateKeepsTimeOrder() async throws {
+        let (store, _) = tempStore()
+        let n = note(segments: 2, recording: false)
+        try await store.save(n)
+        let processor = NoteProcessor(
+            store: store, transcriber: FlakyTranscriber(failing: ["0"], times: 1), diarizer: FakeDiarizer(turns))
+        await processor.process(n.id)
+        await processor.process(n.id)
+        let saved = try #require(await store.note(n.id))
+        #expect(saved.tokens.map(\.text) == ["s0a", "s0b", "s1a", "s1b"])
+        #expect(saved.diarized)
+    }
+
+    @Test func killedTranscriptionRunsUseUpAttempts() async throws {
+        let (store, _) = tempStore()
+        var n = note(segments: 1, recording: false)
+        n.segments[0].attempts = LocalSegment.maxAttempts  // the app was killed in each of them
+        try await store.save(n)
+        let t = FakeTranscriber()
+        await NoteProcessor(store: store, transcriber: t, diarizer: FakeDiarizer(turns)).process(n.id)
+        let saved = try #require(await store.note(n.id))
+        #expect(t.calls.isEmpty)
+        #expect(saved.lines == [])
+        #expect(saved.diarized)
+    }
+
+    @Test func unsupportedLanguageEndsWithAnEmptyTranscript() async throws {
+        let (store, _) = tempStore()
+        let n = note(segments: 2, recording: false)
+        try await store.save(n)
+        let t = FlakyTranscriber(supported: false)
+        let d = FakeDiarizer(turns)
+        await NoteProcessor(store: store, transcriber: t, diarizer: d).process(n.id)
+        let saved = try #require(await store.note(n.id))
+        #expect(t.calls.isEmpty)
+        #expect(d.calls.isEmpty, "nothing to label")
+        #expect(saved.segments.allSatisfy { $0.transcribed })
+        #expect(saved.lines == [])
+        #expect(saved.diarizationSettled)
+    }
+
+    @Test func oldSavedSegmentsStillLoad() throws {
+        let json = #"{"index":0,"durationMs":1000,"file":"0.m4a","transcribed":false,"uploaded":false}"#
+        let s = try JSONDecoder().decode(LocalSegment.self, from: Data(json.utf8))
+        #expect(s.attempts == 0)
     }
 
     @Test func stopsRetryingDiarizationAfterTheCap() async throws {

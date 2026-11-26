@@ -10,6 +10,12 @@ public protocol Transcribing: Sendable {
     func isReady(locale: String) async -> Bool
     /// Downloads and installs the model for `locale`.
     func prepare(locale: String) async throws
+    /// False when this device can't transcribe `locale` at all (no model to wait for).
+    func supports(locale: String) async -> Bool
+}
+
+public extension Transcribing {
+    func supports(locale: String) async -> Bool { true }
 }
 
 public enum TranscriptionError: Error, Equatable {
@@ -20,6 +26,11 @@ public enum TranscriptionError: Error, Equatable {
 @available(iOS 26, macOS 26, *)
 public struct AppleTranscriber: Transcribing {
     public init() {}
+
+    public func supports(locale: String) async -> Bool {
+        guard SpeechTranscriber.isAvailable else { return false }
+        return await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: locale)) != nil
+    }
 
     public func isReady(locale: String) async -> Bool {
         guard let module = try? await module(locale) else { return false }

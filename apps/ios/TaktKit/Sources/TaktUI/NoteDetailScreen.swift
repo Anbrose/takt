@@ -60,8 +60,11 @@ struct NoteDetailScreen: View {
     private var note: Note? { detail.note }
     private var chains: [Chain] { note?.extraction.chains ?? [] }
     private var stepsLeft: Int { chains.reduce(0) { $0 + $1.steps.count } }
-    /// Loading, or no transcript yet: the transcript pane's spinner.
-    private var busy: Bool { !loaded || (note.map { $0.transcript.isEmpty } ?? false) }
+    /// Loading, or no transcript yet while it is still being made: the transcript pane's spinner.
+    private var busy: Bool { !loaded || (processing && (note.map { $0.transcript.isEmpty } ?? false)) }
+    /// Finished with nothing recognised (silence, a language this device can't do, audio that failed): 「无法识别」,
+    /// and the player waits at 0:00 so the recording can still be heard.
+    private var unrecognized: Bool { loaded && !processing && note.map { $0.transcript.isEmpty } == true }
     private var autoBusy: Bool { autoExtracting && chains.isEmpty && !busy }
     private var canExtract: Bool {
         guard let n = note else { return false }
@@ -108,8 +111,11 @@ struct NoteDetailScreen: View {
                 let detail = detail
                 player.cue(at: cue, duration: n.durationMs) { await detail.audioURL(at: $0) }
                 player.jumpSeq += 1
+            } else if unrecognized {
+                cueStart()
             }
         }
+        .onChange(of: unrecognized) { _, now in if now { cueStart() } }
         .task(id: note?.imported.map(\.parentTaskId)) { await detail.loadTargets() }
         .task(id: chains.map(\.id)) { openTestPick() }
         .onChange(of: reduce) { _, r in drag.reduce = r }
@@ -254,13 +260,29 @@ struct NoteDetailScreen: View {
             .overlay {
                 // Only in the hierarchy while busy: a hidden spinner would still redraw every frame.
                 if busy && tab == .text { Spinner(size: 36, radius: 11.5, lineWidth: 3.2).transition(.opacity) }
+                if unrecognized && tab == .text { unrecognizedMark.transition(.opacity) }
             }
             .animation(.easeInOut(duration: 0.26), value: busy)
+            .animation(.easeInOut(duration: 0.26), value: unrecognized)
             .onChange(of: player.jumpSeq) { _, _ in
                 guard let i = activeLine else { return }
                 Motion.with(Motion.nav, reduce: reduce) { proxy.scrollTo(i, anchor: .center) }
             }
         }
+    }
+
+    /// 「无法识别」; a tap plays the recording from the start.
+    private var unrecognizedMark: some View {
+        Button { play(from: 0) } label: {
+            Text("无法识别")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Palette.muted)
+                .frame(minWidth: Metrics.hit, minHeight: Metrics.hit)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("播放")
+        .accessibilityIdentifier("note.unrecognized")
     }
 
     private func chipColors(_ speaker: String?) -> (Color, Color) {
@@ -358,6 +380,13 @@ struct NoteDetailScreen: View {
     private func play(from ms: Int) {
         let detail = detail
         player.play(from: ms, duration: note?.durationMs ?? 0) { await detail.audioURL(at: $0) }
+    }
+
+    /// The player bar, paused at 0:00, unless it is already open.
+    private func cueStart() {
+        guard player.at == nil, let n = note else { return }
+        let detail = detail
+        player.cue(at: 0, duration: n.durationMs) { await detail.audioURL(at: $0) }
     }
 
     private func jump(to ms: Int) {

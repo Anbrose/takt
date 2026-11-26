@@ -6,11 +6,30 @@ public struct LocalSegment: Codable, Equatable, Sendable {
     public var index: Int
     public var durationMs: Int
     public var file: String
+    /// Transcribed, or given up on after `maxAttempts` (then it has no tokens).
     public var transcribed: Bool
     public var uploaded: Bool
-    public init(index: Int, durationMs: Int, file: String, transcribed: Bool = false, uploaded: Bool = false) {
+    /// Transcription runs started for this segment.
+    public var attempts: Int
+    public init(index: Int, durationMs: Int, file: String, transcribed: Bool = false, uploaded: Bool = false,
+                attempts: Int = 0) {
         self.index = index; self.durationMs = durationMs; self.file = file
-        self.transcribed = transcribed; self.uploaded = uploaded
+        self.transcribed = transcribed; self.uploaded = uploaded; self.attempts = attempts
+    }
+
+    /// A segment whose transcription fails this many times is skipped.
+    public static let maxAttempts = 3
+
+    private enum CodingKeys: String, CodingKey { case index, durationMs, file, transcribed, uploaded, attempts }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        index = try c.decode(Int.self, forKey: .index)
+        durationMs = try c.decode(Int.self, forKey: .durationMs)
+        file = try c.decode(String.self, forKey: .file)
+        transcribed = try c.decode(Bool.self, forKey: .transcribed)
+        uploaded = try c.decode(Bool.self, forKey: .uploaded)
+        attempts = try c.decodeIfPresent(Int.self, forKey: .attempts) ?? 0
     }
 }
 

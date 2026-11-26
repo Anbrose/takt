@@ -33,23 +33,28 @@ public actor NoteProcessor {
     private func step(_ id: UUID) async {
         guard var note = await store.note(id) else { return }
         if note.segments.contains(where: { !$0.transcribed }) {
-            guard await transcriber.isReady(locale: note.locale) else { return }
-            for segment in note.segments.sorted(by: { $0.index < $1.index }) where !segment.transcribed {
-                let offset = note.segments.filter { $0.index < segment.index }.reduce(0) { $0 + $1.durationMs }
-                let url = await store.segmentURL(id, segment.index)
-                // A failed segment stays untranscribed; later segments wait so tokens stay in order.
-                guard let tokens = try? await transcriber.transcribe(url, locale: note.locale, offsetMs: offset),
-                      let saved = try? await store.update(id, { n in
-                          guard let i = n.segments.firstIndex(where: { $0.index == segment.index }),
-                                !n.segments[i].transcribed else { return }
-                          n.tokens += tokens
-                          n.segments[i].transcribed = true
-                      })
-                else { return }
+            if await !transcriber.supports(locale: note.locale) {
+                // This device can't transcribe this language: the note keeps its audio and an empty transcript.
+                guard let saved = try? await store.update(id, { n in
+                    for i in n.segments.indices { n.segments[i].transcribed = true }
+                }) else { return }
                 note = saved
+            } else {
+                guard await transcriber.isReady(locale: note.locale) else { return }
+                for segment in note.segments.sorted(by: { $0.index < $1.index }) where !segment.transcribed {
+                    if let saved = await transcribe(id, segment, of: note) { note = saved }
+                }
             }
         }
         guard !note.recording, !note.diarizationSettled, note.segments.allSatisfy(\.transcribed) else { return }
+        if note.tokens.isEmpty {
+            // Nothing was recognised (silence, or a language this device can't do): nothing to label.
+            _ = try? await store.update(id) { n in
+                n.lines = []
+                n.diarized = true
+            }
+            return
+        }
 
         var audio: [SegmentAudio] = []
         for segment in note.segments.sorted(by: { $0.index < $1.index }) {
@@ -77,6 +82,36 @@ public actor NoteProcessor {
             } else if n.lines == nil {
                 n.lines = SpeakerAlign.align(n.tokens, [])
             }
+        }
+    }
+
+    /// One segment's transcription, counted before it starts (a run the app is killed in counts too). A segment
+    /// that fails stays untranscribed and is retried on a later call; later segments go on meanwhile (tokens are
+    /// kept in time order). After `LocalSegment.maxAttempts` it is given up on, without tokens, so it never holds
+    /// back diarization. Returns the saved note, nil when nothing changed.
+    private func transcribe(_ id: UUID, _ segment: LocalSegment, of note: LocalNote) async -> LocalNote? {
+        let index = segment.index
+        let giveUp: @Sendable (inout LocalNote) -> Void = { n in
+            if let i = n.segments.firstIndex(where: { $0.index == index }) { n.segments[i].transcribed = true }
+        }
+        // Runs the app was killed in used the attempts up.
+        guard segment.attempts < LocalSegment.maxAttempts else { return try? await store.update(id, giveUp) }
+        guard (try? await store.update(id, { n in
+            if let i = n.segments.firstIndex(where: { $0.index == index }) { n.segments[i].attempts += 1 }
+        })) != nil else { return nil }
+        let offset = note.segments.filter { $0.index < index }.reduce(0) { $0 + $1.durationMs }
+        let url = await store.segmentURL(id, index)
+        guard let tokens = try? await transcriber.transcribe(url, locale: note.locale, offsetMs: offset) else {
+            guard segment.attempts + 1 >= LocalSegment.maxAttempts else { return nil }
+            return try? await store.update(id, giveUp)
+        }
+        return try? await store.update(id) { n in
+            guard let i = n.segments.firstIndex(where: { $0.index == index }), !n.segments[i].transcribed else { return }
+            n.tokens += tokens
+            if tokens.first.map({ t in n.tokens.contains { $0.startMs > t.startMs } }) == true {
+                n.tokens.sort { $0.startMs < $1.startMs }  // an earlier segment that failed before came through
+            }
+            n.segments[i].transcribed = true
         }
     }
 

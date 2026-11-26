@@ -40,6 +40,16 @@ actor GatedTranscriber: Transcribing {
     func open() { isOpen = true; waiters.forEach { $0.resume() }; waiters = [] }
 }
 
+/// A device that can't transcribe the language at all.
+struct UnsupportedTranscriber: Transcribing {
+    func supports(locale: String) async -> Bool { false }
+    func isReady(locale: String) async -> Bool { false }
+    func prepare(locale: String) async throws { throw TranscriptionError.unsupportedLocale(locale) }
+    func transcribe(_ file: URL, locale: String, offsetMs: Int) async throws -> [TimedText] {
+        throw TranscriptionError.unsupportedLocale(locale)
+    }
+}
+
 struct StubDiarizer: Diarizing {
     func turns(for segments: [SegmentAudio]) async throws -> [SpeakerTurn] {
         [SpeakerTurn(speaker: "1", startMs: 0, endMs: segments.reduce(0) { $0 + $1.durationMs })]
@@ -223,6 +233,21 @@ private func twoStepChain(_ b: InMemoryBackend) async throws -> Chain {
         #expect(server.segments.map(\.uploaded) == [true])
         #expect(r.model.items.map(\.id) == [id])
         #expect(r.model.items.first?.processing == false)
+    }
+
+    @Test func unrecognisedRecordingFinishesWithAnEmptyTranscript() async throws {
+        let r = Rig(transcriber: UnsupportedTranscriber())
+        try await r.model.startRecording()
+        let id = try #require(r.model.recording?.id)
+        await r.model.stopRecording()
+        // Not "processing" any more, so the detail shows 「无法识别」 and the player instead of a spinner.
+        #expect(r.model.items.first?.processing == false)
+        let server = try await r.backend.note(id.uuidString)
+        #expect(server.transcript.isEmpty)
+        #expect(server.segments.map(\.uploaded) == [true])
+        let d = await r.model.open(id)
+        #expect(d.note?.transcript.isEmpty == true)
+        #expect(await d.audioURL(at: 0) != nil, "the recording can still be played")
     }
 
     @Test func recorderErrorKeepsFinishedSegments() async throws {
