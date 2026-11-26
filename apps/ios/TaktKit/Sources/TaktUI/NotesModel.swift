@@ -15,6 +15,9 @@ public struct NoteItem: Equatable, Identifiable, Sendable {
     /// Known only once the server has the note.
     public var chainCount: Int?
     public var importedCount: Int?
+    /// Segments wait for a language model whose download failed (it is retried at launch, when the network
+    /// returns and when the app comes back).
+    public var waitingForModel = false
 }
 
 /// State of the notes list and of the recording in progress.
@@ -55,6 +58,8 @@ public final class NotesModel {
     public private(set) var installed: Set<String> = []
     /// Languages whose model is downloading now.
     public private(set) var preparing: Set<String> = []
+    /// Languages whose last model download failed; cleared when one succeeds.
+    public private(set) var downloadFailed: Set<String> = []
 
     public private(set) var items: [NoteItem] = []
     /// Notes whose 自动生成任务 extract call is running now (the detail shows a spinner meanwhile).
@@ -120,6 +125,7 @@ public final class NotesModel {
             await processor.processPending()
             await sync.syncAll()
             await self?.refresh()
+            await self?.retryDownloads()
         }
         await fetchSummaries()
     }
@@ -194,13 +200,30 @@ public final class NotesModel {
         guard let transcriber, !preparing.contains(locale) else { return }
         if await transcriber.isReady(locale: locale) {
             installed.insert(locale)
+            if downloadFailed.remove(locale) != nil { rebuild() }
             return
         }
+        guard await transcriber.supports(locale: locale) else { return }
         preparing.insert(locale)
-        defer { preparing.remove(locale) }
-        guard (try? await transcriber.prepare(locale: locale)) != nil else { return }
+        let ok = (try? await transcriber.prepare(locale: locale)) != nil
+        preparing.remove(locale)
+        guard ok else {
+            downloadFailed.insert(locale)
+            rebuild()
+            return
+        }
+        downloadFailed.remove(locale)
         installed.insert(locale)
+        rebuild()
         await resume()
+    }
+
+    /// Downloads the model of every language a note's segments are waiting for. At launch, when the network
+    /// returns and when the app becomes active, so a note recorded offline is transcribed without another
+    /// recording in that language.
+    public func retryDownloads() async {
+        let waiting = Set(await store.all().filter { $0.segments.contains { !$0.transcribed } }.map(\.locale))
+        for l in waiting.sorted() { await prepare(l) }
     }
 
     /// The language chip. During a recording it also applies to that recording (one language per note).
@@ -221,6 +244,7 @@ public final class NotesModel {
         await processor.recoverAfterLaunch()
         await sync.syncAll()
         await refresh()
+        await retryDownloads()
     }
 
     private func rebuild() {
@@ -230,15 +254,20 @@ public final class NotesModel {
             let l = local[id]
             return NoteItem(
                 id: id, title: s.title, durationMs: s.durationMs, locale: s.locale, createdAt: s.createdAt,
-                processing: l.map(Self.isProcessing) ?? false, chainCount: s.chainCount, importedCount: s.importedCount)
+                processing: l.map(Self.isProcessing) ?? false, chainCount: s.chainCount, importedCount: s.importedCount,
+                waitingForModel: l.map(waitsForModel) ?? false)
         }
         let known = Set(merged.map(\.id))
         merged += locals.filter { !known.contains($0.id) }.map { l in
             NoteItem(
                 id: l.id, title: l.title, durationMs: l.durationMs, locale: l.locale, createdAt: l.createdAt,
-                processing: true, chainCount: nil, importedCount: nil)
+                processing: true, chainCount: nil, importedCount: nil, waitingForModel: waitsForModel(l))
         }
         items = merged.filter { !deleting.contains($0.id) }.sorted { ($0.createdAt, $0.id.uuidString) > ($1.createdAt, $1.id.uuidString) }
+    }
+
+    private func waitsForModel(_ n: LocalNote) -> Bool {
+        downloadFailed.contains(n.locale) && n.segments.contains { !$0.transcribed }
     }
 
     private static func isProcessing(_ n: LocalNote) -> Bool {

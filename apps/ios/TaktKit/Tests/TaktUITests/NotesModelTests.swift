@@ -40,6 +40,23 @@ actor GatedTranscriber: Transcribing {
     func open() { isOpen = true; waiters.forEach { $0.resume() }; waiters = [] }
 }
 
+/// Its model is missing; the first `failures` downloads fail (offline).
+actor OfflineModelTranscriber: Transcribing {
+    private var ready = false
+    private var failures: Int
+    private(set) var downloads = 0
+    init(failures: Int) { self.failures = failures }
+    func isReady(locale: String) async -> Bool { ready }
+    func prepare(locale: String) async throws {
+        downloads += 1
+        if failures > 0 { failures -= 1; throw URLError(.notConnectedToInternet) }
+        ready = true
+    }
+    func transcribe(_ file: URL, locale: String, offsetMs: Int) async throws -> [TimedText] {
+        [TimedText(startMs: offsetMs + 100, endMs: offsetMs + 900, text: "先去伏见稻荷")]
+    }
+}
+
 /// A device that can't transcribe the language at all.
 struct UnsupportedTranscriber: Transcribing {
     func supports(locale: String) async -> Bool { false }
@@ -488,6 +505,31 @@ private func twoStepChain(_ b: InMemoryBackend) async throws -> Chain {
         let local = try #require(await r.store.note(noteId))
         #expect(local.diarized)
         #expect(try await r.backend.note(noteId.uuidString).transcript.map(\.text) == ["先去伏见稻荷"])
+    }
+
+    @Test func noteRecordedOfflineGetsItsModelWhenTheNetworkReturns() async throws {
+        let t = OfflineModelTranscriber(failures: 1)
+        let r = Rig(transcriber: t)
+        try await r.store.save(LocalNote(
+            id: noteId, title: "t", locale: "ja_JP",
+            segments: [LocalSegment(index: 0, durationMs: 2000, file: "0.m4a")], recording: false))
+        try Data("a".utf8).write(to: r.store.segmentFileURL(noteId, 0))
+
+        // Launch, offline: the download is tried and fails visibly.
+        await r.model.load()
+        await r.model.syncTask?.value
+        #expect(await t.downloads == 1)
+        #expect(r.model.downloadFailed == ["ja_JP"])
+        #expect(r.model.items.first?.waitingForModel == true)
+
+        // Network back: tried again without recording in that language.
+        await r.model.resume()
+        #expect(await t.downloads == 2)
+        #expect(r.model.downloadFailed.isEmpty)
+        #expect(r.model.items.first?.waitingForModel == false)
+        #expect(try #require(await r.store.note(noteId)).diarized)
+        #expect(try await r.backend.note(noteId.uuidString).transcript.map(\.text) == ["先去伏见稻荷"])
+        #expect(r.model.items.first?.processing == false)
     }
 
     @Test func localeChosenWhileRecordingAppliesToThatNote() async throws {

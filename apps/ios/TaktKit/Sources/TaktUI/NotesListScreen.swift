@@ -162,8 +162,10 @@ private struct NoteRow: View {
 
     private var title: String { NoteLanguage.title(item.title, createdAt: item.createdAt) }
     private var chains: Int { item.chainCount ?? 0 }
-    private var busy: Bool { item.processing }
-    private var done: Bool { !busy && chains == 0 && (item.importedCount ?? 0) > 0 }
+    /// Waiting for a language model that failed to download: the download mark instead of the spinner.
+    private var waiting: Bool { item.processing && item.waitingForModel }
+    private var busy: Bool { item.processing && !waiting }
+    private var done: Bool { !item.processing && chains == 0 && (item.importedCount ?? 0) > 0 }
 
     var body: some View {
         ZStack(alignment: .trailing) {
@@ -193,7 +195,7 @@ private struct NoteRow: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(title)
-            .accessibilityValue(busy ? "处理中" : chains > 0 ? "\(chains)" : "")
+            .accessibilityValue(waiting ? "需下载" : busy ? "处理中" : chains > 0 ? "\(chains)" : "")
             .accessibilityIdentifier("note.\(title)")
 
             if swiped {
@@ -228,10 +230,14 @@ private struct NoteRow: View {
                 .frame(width: 28, height: 28)
                 .background(Palette.soft, in: Circle())
                 .contentTransition(.numericText())
-                .opacity(!busy && chains > 0 ? 1 : 0)
-                .scaleEffect(!busy && chains > 0 ? 1 : 0.6)
+                .opacity(!item.processing && chains > 0 ? 1 : 0)
+                .scaleEffect(!item.processing && chains > 0 ? 1 : 0.6)
             // Only in the hierarchy while busy: a hidden spinner would still redraw every frame.
             if busy { Spinner().transition(.opacity) }
+            Image(systemName: "arrow.down.to.line")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Palette.muted)
+                .opacity(waiting ? 1 : 0)
             Image(systemName: "checkmark")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Palette.muted)
@@ -239,6 +245,7 @@ private struct NoteRow: View {
         }
         .frame(width: 28, height: 28)
         .animation(.easeInOut(duration: 0.24), value: busy)
+        .animation(.easeInOut(duration: 0.24), value: waiting)
         .animation(.easeInOut(duration: 0.24), value: chains)
         .animation(.easeInOut(duration: 0.24), value: done)
         .accessibilityHidden(true)

@@ -59,6 +59,8 @@ struct RecordingView: View {
     }
 
     private var downloading: Bool { notes.preparing.contains(notes.locale) }
+    /// The model download failed: the download mark replaces the chevron (choosing the language again retries).
+    private var failed: Bool { !downloading && notes.downloadFailed.contains(notes.locale) }
 
     private var chip: some View {
         Button { Motion.with(Motion.langSheet, reduce: reduce) { picking = true } } label: {
@@ -71,13 +73,18 @@ struct RecordingView: View {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(Palette.muted)
-                        .opacity(downloading ? 0 : 1)
+                        .opacity(downloading || failed ? 0 : 1)
+                    Image(systemName: "arrow.down.to.line")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Palette.muted)
+                        .opacity(failed ? 1 : 0)
                     if downloading {
                         Spinner(size: 16, radius: 6, lineWidth: 2).transition(.opacity)
                     }
                 }
                 .frame(width: 16, height: 16)
                 .animation(.easeInOut(duration: 0.2), value: downloading)
+                .animation(.easeInOut(duration: 0.2), value: failed)
             }
             .padding(.leading, 16)
             .padding(.trailing, 12)
