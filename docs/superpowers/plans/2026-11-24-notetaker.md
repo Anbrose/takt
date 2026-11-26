@@ -512,7 +512,7 @@ func importNote(_ id: String, parent: String, picks: [ImportPick], before: Strin
 ```
 InMemoryBackend mirrors the API rules and errors (move into descendant / root / cross project throw `BackendError.badRequest`), and searches its seeded projects, tasks and notes the same way.
 
-- [ ] **Step 1: Failing tests:** `dropTargetIntoNextRow` (heights 60, gap 10, offset 40 → `.into(1)`); `dropTargetPastBand` (offset 60 → `.reorder(to: 1)`); `dropTargetUpward` (from 2, offset −40 → `.into(1)`); `dropTargetEdgesUnchanged` (first/last rows); in-memory `moveIntoAndBack`, `moveIntoDescendantThrows`, `importBefore`, `searchGroups`.
+- [ ] **Step 1: Failing tests:** `dropTargetGapKeepsSlot` (heights 60, gap 10, from 0, offset 40 → `.reorder(to: 0)`); `dropTargetIntoNextRow` (offset 70 → `.into(1)`); `dropTargetPastBand` (offset 90 → `.reorder(to: 1)`); `dropTargetUpward` (from 2, offset −70 → `.into(1)`); `dropTargetEdgesUnchanged` (first/last rows); in-memory `moveIntoAndBack`, `moveIntoDescendantThrows`, `importBefore`, `searchGroups`.
 - [ ] **Step 2–4:** FAIL → implement → `swift test` PASS.
 - [ ] **Step 5:** Commit `iOS: drop targets, move/search client`.
 
