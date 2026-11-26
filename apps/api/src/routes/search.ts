@@ -108,16 +108,21 @@ export function searchRoutes(app: FastifyInstance, db: Db, owner: ResolveOwner) 
         parentTaskId: t.parentId!,
         path: pathOf(t),
       })),
-      notes: noteRows.flatMap((n) => [
-        ...(n.title_hit ? [{ noteId: n.id, title: n.title, lineIndex: null, startMs: null, text: n.title }] : []),
-        ...(lines.get(n.id) ?? []).map((h) => ({
-          noteId: n.id,
-          title: n.title,
-          lineIndex: h.idx,
-          startMs: h.start_ms,
-          text: h.text,
-        })),
-      ]),
+      // The cap is on rows: each note yields a title row plus up to 2 line rows, newest note first.
+      notes: noteRows
+        .flatMap((n) => [
+          ...(n.title_hit
+            ? [{ noteId: n.id, title: n.title, lineIndex: null, startMs: null, text: n.title }]
+            : []),
+          ...(lines.get(n.id) ?? []).map((h) => ({
+            noteId: n.id,
+            title: n.title,
+            lineIndex: h.idx,
+            startMs: h.start_ms,
+            text: h.text,
+          })),
+        ])
+        .slice(0, CAP),
     };
   });
 }

@@ -110,6 +110,15 @@ describe('search', () => {
     expect(body.notes[0].title).toBe('zz note 24');
   });
 
+  it('capsNoteRowsAt20', async () => {
+    for (let i = 0; i < 15; i++) {
+      await addNote(`qq ${i}`, [line('qq a'), line('qq b'), line('qq c')], 'local', new Date(2026, 0, 1, 0, i));
+    }
+    const { body } = await search('qq');
+    expect(body.notes).toHaveLength(20);
+    expect(body.notes[0].title).toBe('qq 14');
+  });
+
   it('ownerScoped', async () => {
     await addNote('私密', [line('大阪')], 'someone');
     const { body } = await search('大阪', 'stranger');
