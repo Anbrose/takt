@@ -85,9 +85,10 @@ export function noteRoutes(
 
   route(app, owner, routes.deleteNote, async ({ owner, params }) => {
     const row = await loadNote(db, owner, params.noteId);
+    // Audio first: if it fails the row stays, so a retry finds the note and deletes the audio again.
+    await audio.deletePrefix(notePrefix(owner, row.id));
     // note_segments go with it (ON DELETE CASCADE).
     await db.delete(notes).where(and(eq(notes.id, row.id), eq(notes.ownerId, owner)));
-    await audio.deletePrefix(notePrefix(owner, row.id));
     return { id: row.id };
   });
 

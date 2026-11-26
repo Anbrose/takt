@@ -105,6 +105,21 @@ describe('notes CRUD', () => {
     expect((await call('DELETE', `/notes/${NOTE}`)).body).toEqual({ id: NOTE });
     expect((await call('GET', `/notes/${NOTE}`)).status).toBe(404);
   });
+
+  it('keeps the note when deleting its audio fails, so a retry still deletes the audio', async () => {
+    await call('POST', '/notes', { id: NOTE, locale: 'zh_CN' });
+    store.put(segmentObject('local', NOTE, 0), 1000);
+    const real = store.deletePrefix.bind(store);
+    store.deletePrefix = async () => {
+      throw new Error('gcs down');
+    };
+    expect((await call('DELETE', `/notes/${NOTE}`)).status).toBe(500);
+    expect((await call('GET', `/notes/${NOTE}`)).status).toBe(200);
+    store.deletePrefix = real;
+    expect((await call('DELETE', `/notes/${NOTE}`)).status).toBe(200);
+    expect(await store.stat(segmentObject('local', NOTE, 0))).toBeNull();
+    expect((await call('GET', `/notes/${NOTE}`)).status).toBe(404);
+  });
 });
 
 describe('note audio', () => {
