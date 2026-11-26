@@ -11,11 +11,13 @@ final class FakeUploader: SegmentUploading, @unchecked Sendable {
     private let lock = NSLock()
     private var _failing: Bool
     private var _uploads: [String] = []
-    init(failing: Bool = false) { _failing = failing }
+    /// File names whose upload always fails (e.g. a segment GCS keeps rejecting).
+    let rejects: Set<String>
+    init(failing: Bool = false, rejects: Set<String> = []) { _failing = failing; self.rejects = rejects }
     var failing: Bool { get { lock.withLock { _failing } } set { lock.withLock { _failing = newValue } } }
     var uploads: [String] { lock.withLock { _uploads } }
     func upload(_ file: URL, to sessionURL: URL) async throws {
-        if failing { throw Offline() }
+        if failing || rejects.contains(file.lastPathComponent) { throw Offline() }
         lock.withLock { _uploads.append(file.lastPathComponent) }
     }
 }
@@ -53,7 +55,7 @@ private func exists(_ store: NoteStore, _ n: LocalNote, _ i: Int) async -> Bool 
         await NoteSync(store: store, backend: backend, uploader: up).sync(n.id)
 
         let calls = await backend.calls.filter { $0.contains(n.id.uuidString) }.map { $0.split(separator: " ").first.map(String.init)! }
-        #expect(calls == ["createNote", "uploadTicket", "completeSegment", "uploadTicket", "completeSegment", "updateNote"])
+        #expect(calls == ["createNote", "updateNote", "uploadTicket", "completeSegment", "uploadTicket", "completeSegment"])
         #expect(up.uploads == ["0.m4a", "1.m4a"])
         let server = try await backend.note(n.id.uuidString)
         #expect(server.segments.map(\.uploaded) == [true, true])
@@ -109,12 +111,40 @@ private func exists(_ store: NoteStore, _ n: LocalNote, _ i: Int) async -> Bool 
         let kept0 = await exists(store, n, 0), kept1 = await exists(store, n, 1)
         #expect(kept0 && kept1)
         #expect(await store.note(n.id)?.segments.contains { $0.uploaded } == false)
-        #expect(try await backend.note(n.id.uuidString).transcript.isEmpty)
 
         up.failing = false
         await sync.sync(n.id)
         #expect(await exists(store, n, 0) == false)
-        #expect(try await backend.note(n.id.uuidString).transcript.count == 3)
+        #expect(try await backend.note(n.id.uuidString).segments.map(\.uploaded) == [true, true])
+    }
+
+    @Test func transcriptDoesNotWaitForAudio() async throws {
+        let (store, _) = tempStore()
+        let backend = InMemoryBackend()
+        let n = try await seed(store, lines: lines, diarized: true)
+        await NoteSync(store: store, backend: backend, uploader: FakeUploader(failing: true)).sync(n.id)
+
+        let server = try await backend.note(n.id.uuidString)
+        #expect(server.transcript.map(\.text) == ["你好", "好", "嗯"], "extraction can start while the audio waits")
+        #expect(server.segments.isEmpty)
+        #expect(await store.note(n.id)?.synced.transcriptSent == true)
+        let kept0 = await exists(store, n, 0), kept1 = await exists(store, n, 1)
+        #expect(kept0 && kept1)
+    }
+
+    @Test func failedSegmentIsSkippedNotBlocking() async throws {
+        let (store, _) = tempStore()
+        let backend = InMemoryBackend()
+        let n = try await seed(store, segments: 3, lines: lines, diarized: true)
+        await NoteSync(store: store, backend: backend, uploader: FakeUploader(rejects: ["0.m4a"])).sync(n.id)
+
+        let local = try #require(await store.note(n.id))
+        #expect(local.segments.map(\.uploaded) == [false, true, true])
+        #expect(await exists(store, n, 0), "unconfirmed audio stays on the phone")
+        #expect(await exists(store, n, 1) == false)
+        let server = try await backend.note(n.id.uuidString)
+        #expect(server.segments.map(\.index) == [1, 2])
+        #expect(server.durationMs == 3000, "the phone's full duration, not just the uploaded part")
     }
 
     @Test func doesNotDuplicateOnRetryAfterCreate() async throws {

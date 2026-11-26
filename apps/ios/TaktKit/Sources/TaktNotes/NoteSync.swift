@@ -88,7 +88,9 @@ public struct GCSUploader: SegmentUploading {
     }
 }
 
-/// Pushes local notes to the server: note → segment audio → transcript. Safe to re-run; stops at the first failure.
+/// Pushes local notes to the server: note → transcript → segment audio. Safe to re-run. Without the note nothing
+/// else is tried; after that the transcript and each segment go independently, so a segment that keeps failing
+/// holds back neither the transcript (and extraction) nor the segments after it.
 public actor NoteSync {
     private let store: NoteStore
     private let backend: any TaktBackend
@@ -126,26 +128,29 @@ public actor NoteSync {
             note = try await store.update(id) { $0.synced.created = true } ?? note
         }
 
+        var failure: Error?
+        do { try await sendTranscript(id, key) } catch { failure = error }
+
+        var serverMs: Int?
         for seg in note.segments {
-            var uploaded = seg.uploaded
-            if !uploaded {
-                let file = await store.segmentURL(id, seg.index)
-                guard FileManager.default.fileExists(atPath: file.path) else { continue }
-                let ticket = try await backend.uploadTicket(note: key, segment: seg.index)
-                guard let url = URL(string: ticket.uploadUrl) else { throw URLError(.badURL) }
-                try await uploader.upload(file, to: url)
-                _ = try await backend.completeSegment(note: key, segment: seg.index, durationMs: seg.durationMs)
-                try await store.update(id) { n in
-                    if let i = n.segments.firstIndex(where: { $0.index == seg.index }) { n.segments[i].uploaded = true }
-                }
-                uploaded = true
-            }
-            // Diarization reads the local audio, so it stays until the note is diarized.
-            if uploaded, let current = await store.note(id), current.diarized {
-                try await store.deleteAudio(id, seg.index)
+            do {
+                if let ms = try await upload(id, key, seg) { serverMs = ms }
+            } catch {
+                failure = failure ?? error  // this segment waits for the next pass; the rest go on
             }
         }
 
+        // The server totals the uploaded segments; while one is missing that is short of the recording.
+        if let serverMs, let latest = await store.note(id), latest.synced.transcriptSent, serverMs != latest.durationMs {
+            do {
+                _ = try await backend.updateNote(key, title: nil, durationMs: latest.durationMs, transcript: nil, speakers: nil)
+            } catch { failure = failure ?? error }
+        }
+        if let failure { throw failure }
+    }
+
+    /// Sends the lines once they exist, and again once they carry speakers.
+    private func sendTranscript(_ id: UUID, _ key: String) async throws {
         guard let latest = await store.note(id), let lines = latest.lines else { return }
         let needsSend = !latest.synced.transcriptSent || (latest.diarized && !latest.synced.diarizedSent)
         guard needsSend else { return }
@@ -160,5 +165,29 @@ public actor NoteSync {
             n.synced.transcriptSent = true
             if wasDiarized { n.synced.diarizedSent = true }
         }
+    }
+
+    /// Uploads one segment unless the server has it, then frees its local audio once the note is diarized.
+    /// Returns the server's note duration when this call completed the upload.
+    private func upload(_ id: UUID, _ key: String, _ seg: LocalSegment) async throws -> Int? {
+        var uploaded = seg.uploaded
+        var serverMs: Int?
+        if !uploaded {
+            let file = await store.segmentURL(id, seg.index)
+            guard FileManager.default.fileExists(atPath: file.path) else { return nil }
+            let ticket = try await backend.uploadTicket(note: key, segment: seg.index)
+            guard let url = URL(string: ticket.uploadUrl) else { throw URLError(.badURL) }
+            try await uploader.upload(file, to: url)
+            serverMs = try await backend.completeSegment(note: key, segment: seg.index, durationMs: seg.durationMs).durationMs
+            try await store.update(id) { n in
+                if let i = n.segments.firstIndex(where: { $0.index == seg.index }) { n.segments[i].uploaded = true }
+            }
+            uploaded = true
+        }
+        // Diarization reads the local audio, so it stays until the note is diarized.
+        if uploaded, let current = await store.note(id), current.diarized {
+            try await store.deleteAudio(id, seg.index)
+        }
+        return serverMs
     }
 }
