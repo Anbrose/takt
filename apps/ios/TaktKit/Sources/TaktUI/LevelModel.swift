@@ -37,9 +37,10 @@ public final class LevelModel {
     public private(set) var drag: Drag?
     /// Measured row heights, used to decide where a dragged row lands.
     public var rowHeights: [String: Double] = [:]
-    /// Row heights as they were when the drag began (prototype: measured on pointer down). The order rail
-    /// narrows the rows while dragging, which can make them taller; the drop maths keeps the first layout.
-    private var dragHeights: [Double] = []
+    /// Where the dragged row's slot started (from the list top) when the drag began. The order rail narrows
+    /// the rows while dragging and they can grow; the rows above then push the slot down, and the finger's
+    /// travel is corrected by that drift so the card stays under it (prototype `layoutTop(...) - top0`).
+    private var dragSlotTop: Double = 0
     /// Id of the task just created, for its entry animation.
     public private(set) var lastAdded: String?
     /// Row the dragged task would go into if released now (its middle band); highlighted.
@@ -106,6 +107,11 @@ public final class LevelModel {
         Order.move(items.map(\.id), from: drag.from, to: drag.to)
     }
 
+    /// Top of row `i` from the list top, by the measured heights.
+    private func slotTop(_ i: Int) -> Double {
+        items.prefix(i).reduce(0) { $0 + (rowHeights[$1.id] ?? 0) + Self.rowGap }
+    }
+
     /// Vertical shift for a row while another row is being dragged (others 让位).
     public func shift(for id: String) -> Double {
         guard let drag, id != drag.id, let i = items.firstIndex(where: { $0.id == id }) else { return 0 }
@@ -141,18 +147,22 @@ public final class LevelModel {
     public func beginDrag(_ id: String) {
         guard drag == nil, let i = items.firstIndex(where: { $0.id == id }) else { return }
         notice = nil
-        dragHeights = items.map { rowHeights[$0.id] ?? 0 }
+        dragSlotTop = slotTop(i)
         drag = Drag(id: id, from: i, to: i, offset: 0)
     }
 
+    /// `offset` is the finger's travel since touch-down. Rows are measured live (as on screen); the dragged
+    /// card's offset from its slot is that travel minus how far the slot itself has moved since.
     public func updateDrag(offset: Double) {
         guard var d = drag else { return }
+        let offset = offset - (slotTop(d.from) - dragSlotTop)
         d.offset = offset
         if upZoneHot {
             d.to = d.from
             nestTarget = nil
         } else {
-            switch Order.dropTarget(heights: dragHeights, gap: Self.rowGap, from: d.from, offset: offset) {
+            let heights = items.map { rowHeights[$0.id] ?? 0 }
+            switch Order.dropTarget(heights: heights, gap: Self.rowGap, from: d.from, offset: offset) {
             case .reorder(let to):
                 d.to = to
                 nestTarget = nil

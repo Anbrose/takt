@@ -58,7 +58,10 @@ public struct PlanScreen: View {
         ZStack {
             if let up = upTarget {
                 UpZone(name: up.name, hot: level.upZoneHot)
-                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY } action: { upZoneBottom = $0 }
+                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY } action: { bottom in
+                        // Not while it slides away.
+                        if upTarget != nil { upZoneBottom = bottom }
+                    }
                     .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: -12)))
             }
         }
@@ -66,6 +69,8 @@ public struct PlanScreen: View {
         .padding(.top, 4)
         .allowsHitTesting(false)
         .animation(reduce ? Motion.fade : Motion.upZone, value: upTarget?.id)
+        // Hidden: forget its frame, so the next drag never goes by an old one.
+        .onChange(of: upTarget == nil) { _, hidden in if hidden { upZoneBottom = nil } }
     }
 
     @ViewBuilder private var nestConfirm: some View {
@@ -166,8 +171,14 @@ struct LevelList: View {
     /// Whether a finger at this global y is over the 「移到「父任务」」 zone.
     var overUpZone: (CGFloat) -> Bool = { _ in false }
     @Environment(\.accessibilityReduceMotion) private var reduce
+    /// The finger has moved since touch-down in this drag. Until then the up zone doesn't count: the handle
+    /// takes touches at once, and a tap on a handle near the top must not move the task up a level.
+    @State private var travelled = false
     /// Row whose 删除 button is showing (左滑); one at a time.
     @State private var swiped: String?
+
+    /// Points the finger must move before a drag counts as one (for the up zone).
+    static let travel: CGFloat = 6
 
     /// Tasks in the order a release would give (live drag preview → 预览中 numbers).
     private var previewTasks: [TaskSummary] {
@@ -272,8 +283,12 @@ struct LevelList: View {
                     onDelete: { delete(task.id) },
                     onDragChanged: { dy, y in
                         if swiped != nil { swiped = nil }
-                        if model.drag == nil { Motion.with(Motion.sheet, reduce: reduce) { model.beginDrag(task.id) } }
-                        let up = overUpZone(y)
+                        if model.drag == nil {
+                            travelled = false
+                            Motion.with(Motion.sheet, reduce: reduce) { model.beginDrag(task.id) }
+                        }
+                        if abs(dy) > LevelList.travel { travelled = true }
+                        let up = travelled && overUpZone(y)
                         if model.upZoneHot != up { model.upZoneHot = up }
                         model.updateDrag(offset: dy)
                     },

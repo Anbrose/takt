@@ -125,6 +125,31 @@ final class NestingUITests: XCTestCase {
         XCTAssertTrue(app.buttons["project.日本旅行"].waitForExistence(timeout: 3))
     }
 
+    /// The handle takes touches at once; a tap on one that sits under where the 移到 zone appears must not
+    /// move the task up a level (only a drag that has moved counts), even after an earlier drag showed the zone.
+    func testTapOnHandleNearTopDoesNotPromote() {
+        launch()
+        let listTop = app.buttons["地图"].frame.minY - 4
+        // A short drag that stays in place: the zone shows (and is measured), then 取消.
+        dragRow(app, "通天阁", centreAt: row("通天阁").frame.midY - 20)
+        tapWhenHittable(app.buttons["取消"])
+        XCTAssertTrue(app.buttons["保存"].waitForNonExistence(timeout: 2))
+
+        // Scroll so 大阪城天守阁's handle sits within the zone's reach (its bottom + 6 = list top + 66).
+        row("海游馆").swipeUp()
+        sleep(1)
+        let handle = el("handle.大阪城天守阁")
+        XCTAssertLessThan(handle.frame.midY, listTop + 66, "handle under the zone")
+        XCTAssertGreaterThan(handle.frame.midY, listTop + 10, "and still in the list")
+        handle.tap()
+        XCTAssertFalse(app.buttons["进入 大阪，5 项"].waitForExistence(timeout: 1))
+        XCTAssertTrue(row("大阪城天守阁").exists, "still on this level")
+        if app.buttons["取消"].exists { app.buttons["取消"].tap() }
+        tapWhenHittable(app.buttons["返回"])
+        XCTAssertTrue(app.buttons["进入 大阪，6 项"].waitForExistence(timeout: 3))
+        XCTAssertFalse(row("大阪城天守阁").exists, "not moved up")
+    }
+
     func testNestingScreensDark() {
         launch(theme: "dark")
         nestCastleIntoUSJ()

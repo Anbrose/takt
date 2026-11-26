@@ -383,14 +383,22 @@ private func names(_ m: LevelModel) -> [String] { m.items.map(\.name) }
         #expect(root.items[0].childCount == 5)
     }
 
-    @Test func dropMathsKeepsTheHeightsFromTheStartOfTheDrag() async throws {
+    @Test func dropMathsFollowsTheRowsAsTheyGrow() async throws {
         let (m, _) = try await osakaModel()
         let ids = m.items.map(\.id)
-        m.beginDrag(ids[0])
-        // The rail narrows the rows and they grow; the drop still goes by the first layout.
-        for id in ids { m.rowHeights[id] = 120 }
-        m.updateDrag(offset: 160)
-        #expect(m.drag?.to == 2 && m.nestTarget == nil)
+        m.beginDrag(ids[2])
+        // The rail narrows the rows and the two above grow by 30 each: row 2's slot is now 60 lower, so the
+        // card's offset from it is the finger's travel minus 60, and the bands are the rows as they now are.
+        m.rowHeights[ids[0]] = 90
+        m.rowHeights[ids[1]] = 90
+        m.updateDrag(offset: -75)
+        #expect(m.drag?.offset == -135)
+        // Centre 200 + 30 - 135 = 95: between 72% of row 0 (64.8) and 28% of row 1 (125.2) → before row 1.
+        // Without the correction it would be 155, the middle of row 1.
+        #expect(m.drag?.to == 1 && m.nestTarget == nil)
+        #expect(m.shift(for: ids[1]) == 70)
+        m.updateDrag(offset: -10) // centre 160: row 1's middle band as it now is
+        #expect(m.nestTarget == ids[1])
     }
 
     @Test func revealOpensALevelAtDepthWithTheRowFlashed() async throws {

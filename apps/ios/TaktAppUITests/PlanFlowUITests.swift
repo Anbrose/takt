@@ -26,9 +26,9 @@ func dragRow(_ app: XCUIApplication, _ name: String, into target: String) {
     dragRow(app, name, centreAt: app.descendants(matching: .any)["row.\(target)"].frame.midY)
 }
 
-/// Drags `name` just below `target` (the gap after it: a reorder, not a nest).
-func dragRow(_ app: XCUIApplication, _ name: String, below target: String) {
-    dragRow(app, name, centreAt: app.descendants(matching: .any)["row.\(target)"].frame.maxY + 5)
+/// Drags `name` just above `target` (the gap before it: a reorder, not a nest).
+func dragRow(_ app: XCUIApplication, _ name: String, above target: String) {
+    dragRow(app, name, centreAt: app.descendants(matching: .any)["row.\(target)"].frame.minY - 5)
 }
 
 /// End-to-end checks of 规划模式 in the simulator against the in-memory demo backend.
@@ -85,12 +85,12 @@ final class PlanFlowUITests: XCTestCase {
         let names = ["大阪城天守阁", "日本环球影城", "道顿堀"]
         XCTAssertEqual(visibleOrder(names), names)
 
-        dragRow(app, "大阪城天守阁", below: "道顿堀")
+        dragRow(app, "道顿堀", above: "日本环球影城")
 
         let save = app.buttons["保存"]
         XCTAssertFalse(app.descendants(matching: .any)["confirm.nest"].exists, "an edge reorders, no 放入 question")
         XCTAssertTrue(save.waitForExistence(timeout: 2))
-        XCTAssertEqual(visibleOrder(names), ["日本环球影城", "道顿堀", "大阪城天守阁"], "dragged row went after 道顿堀")
+        XCTAssertEqual(visibleOrder(names), ["大阪城天守阁", "道顿堀", "日本环球影城"], "dragged row went before 日本环球影城")
         snap("after drag (unsaved)")
 
         app.buttons["取消"].tap()
@@ -100,13 +100,13 @@ final class PlanFlowUITests: XCTestCase {
 
     func testDragThenSavePersistsAcrossNavigation() {
         enterOsaka()
-        dragRow(app, "大阪城天守阁", below: "道顿堀")
+        dragRow(app, "道顿堀", above: "日本环球影城")
         app.buttons["保存"].tap()
 
         app.buttons["返回"].tap()
         enterOsaka()
         let names = ["大阪城天守阁", "日本环球影城", "道顿堀"]
-        XCTAssertEqual(visibleOrder(names), ["日本环球影城", "道顿堀", "大阪城天守阁"])
+        XCTAssertEqual(visibleOrder(names), ["大阪城天守阁", "道顿堀", "日本环球影城"])
         snap("saved order")
     }
 
