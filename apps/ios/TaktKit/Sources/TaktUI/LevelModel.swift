@@ -35,6 +35,16 @@ public final class LevelModel {
     public var rowHeights: [String: Double] = [:]
     /// Id of the task just created, for its entry animation.
     public private(set) var lastAdded: String?
+    /// Row the dragged task would go into if released now (its middle band); highlighted.
+    public private(set) var nestTarget: String?
+    /// The view sets this while the drag is over the 「移到「上一级」」 zone; the rows then neither reorder nor nest.
+    public var upZoneHot = false {
+        didSet { if upZoneHot { nestTarget = nil } }
+    }
+    /// Released onto a row: waits for 「放入「X」？」.
+    public private(set) var pendingNest: (id: String, into: String)?
+    /// The move started by releasing in the up zone (test seam).
+    public private(set) var moving: Task<Void, Never>?
 
     public init(taskId: String, backend: any TaktBackend, level: Level? = nil) {
         self.taskId = taskId
@@ -46,6 +56,8 @@ public final class LevelModel {
 
     public var name: String { level?.task.name ?? "" }
     public var breadcrumb: [Crumb] { level?.breadcrumb ?? [] }
+    /// The level containing this one (「上一级」). The breadcrumb ends with this level itself; nil on the first level.
+    public var parentCrumb: Crumb? { breadcrumb.dropLast().last }
     public var isEditing: Bool { drag != nil || draft != nil }
 
     /// Tasks in the order currently shown (draft if any, else saved).
@@ -60,9 +72,12 @@ public final class LevelModel {
 
     /// Ids in the order they'd have if the current drag were released now.
     public var liveOrder: [String] {
-        let ids = items.map(\.id)
-        guard let drag else { return ids }
-        return Order.move(ids, from: drag.from, to: drag.to)
+        guard let drag else { return items.map(\.id) }
+        return liveOrder(of: drag)
+    }
+
+    private func liveOrder(of drag: Drag) -> [String] {
+        Order.move(items.map(\.id), from: drag.from, to: drag.to)
     }
 
     /// Vertical shift for a row while another row is being dragged (others 让位).
@@ -105,17 +120,78 @@ public final class LevelModel {
 
     public func updateDrag(offset: Double) {
         guard var d = drag else { return }
-        let heights = items.map { rowHeights[$0.id] ?? 0 }
         d.offset = offset
-        d.to = Order.dropIndex(heights: heights, gap: Self.rowGap, from: d.from, offset: offset)
+        if upZoneHot {
+            nestTarget = nil
+        } else {
+            let heights = items.map { rowHeights[$0.id] ?? 0 }
+            switch Order.dropTarget(heights: heights, gap: Self.rowGap, from: d.from, offset: offset) {
+            case .reorder(let to):
+                d.to = to
+                nestTarget = nil
+            case .into(let i):
+                nestTarget = items[i].id
+            }
+        }
         drag = d
     }
 
-    /// Releases the drag: the new order becomes the draft (not saved yet).
+    /// Releases the drag. Over a row's middle → asks before nesting; over the up zone → moves up a level at once;
+    /// otherwise the new order becomes the draft (not saved yet).
     public func endDrag() {
-        guard drag != nil else { return }
-        draft = liveOrder
+        guard let d = drag else { return }
+        let into = nestTarget
         drag = nil
+        nestTarget = nil
+        if upZoneHot {
+            upZoneHot = false
+            moving = Task { await promote(d.id) }
+        } else if let into {
+            pendingNest = (d.id, into)
+        } else {
+            draft = liveOrder(of: d)
+        }
+    }
+
+    /// 放入: the task becomes the last child of the row it was dropped on. Saved at once.
+    public func confirmNest() async {
+        guard let p = pendingNest else { return }
+        pendingNest = nil
+        await move(p.id, to: p.into, before: nil)
+    }
+
+    public func cancelNest() { pendingNest = nil }
+
+    /// Moves a child of this level up into the containing level, right after this level's own task.
+    public func promote(_ id: String) async {
+        guard let up = parentCrumb else { return }
+        notice = nil
+        do {
+            let siblings = try await backend.level(up.id).children.map(\.id)
+            let next = siblings.firstIndex(of: taskId).map { $0 + 1 }.flatMap { siblings.indices.contains($0) ? siblings[$0] : nil }
+            await move(id, to: up.id, before: next)
+        } catch {
+            notice = "移动失败"
+        }
+    }
+
+    /// Moves are saved right away; an unsaved order of this level keeps everything but the moved task.
+    private func move(_ id: String, to parent: String, before: String?) async {
+        notice = nil
+        status = .saving
+        defer { status = .idle }
+        do {
+            let r = try await backend.moveTask(id, to: parent, before: before)
+            draft?.removeAll { $0 == id }
+            selection.remove(id)
+            level = r.from
+            pruneSelection()
+        } catch let e as BackendError where e.code == "not_found" || e.isVersionConflict {
+            notice = "已在别处修改"
+            await load()
+        } catch {
+            notice = "移动失败"
+        }
     }
 
     /// Keyboard / VoiceOver: move one row up (-1) or down (+1).

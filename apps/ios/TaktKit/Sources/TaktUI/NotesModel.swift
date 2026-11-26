@@ -23,6 +23,9 @@ public struct NoteItem: Equatable, Identifiable, Sendable {
 public final class NotesModel {
     private static let localeKey = "notes.locale"
     private static let fallbackLocale = "zh_CN"
+    private static let autoExtractKey = "notes.autoExtract"
+    private static let introSeenKey = "notes.introSeen"
+    private static let autoPendingKey = "notes.autoPending"
 
     private let backend: any TaktBackend
     private let store: NoteStore
@@ -49,6 +52,14 @@ public final class NotesModel {
         didSet { if !applyingDefault { defaults.set(locale, forKey: Self.localeKey) } }
     }
     public private(set) var recording: (id: UUID, startedAt: Date)?
+    /// 自动生成任务: once a recording's transcript is on the server, extract is called for it once. Device-local.
+    public var autoExtract: Bool {
+        didSet { defaults.set(autoExtract, forKey: Self.autoExtractKey) }
+    }
+    /// The first-recording intro was finished with 「开始录音」 (closing it by the backdrop doesn't count).
+    public var introSeen: Bool {
+        didSet { defaults.set(introSeen, forKey: Self.introSeenKey) }
+    }
     /// Short, user-facing message for the last failure. Cleared on the next action.
     public var notice: String?
 
@@ -62,6 +73,8 @@ public final class NotesModel {
         self.capture = capture; self.defaults = defaults
         self.deviceLocale = deviceLocale; self.supportedLocales = supportedLocales
         locale = defaults.string(forKey: Self.localeKey) ?? Self.fallbackLocale
+        autoExtract = defaults.object(forKey: Self.autoExtractKey) as? Bool ?? true
+        introSeen = defaults.bool(forKey: Self.introSeenKey)
     }
 
     /// Identifiers (`zh_CN`) of the languages on-device transcription supports; empty before iOS 26.
@@ -116,6 +129,31 @@ public final class NotesModel {
             notice = "加载失败"
         }
         rebuild()
+        await runAutoExtract()
+    }
+
+    // MARK: 自动生成任务
+
+    /// Notes recorded with 自动生成任务 on that haven't had their one extract call yet.
+    private var autoPending: [String] {
+        get { defaults.stringArray(forKey: Self.autoPendingKey) ?? [] }
+        set { defaults.set(newValue, forKey: Self.autoPendingKey) }
+    }
+
+    /// One extract call per pending note whose transcript has reached the server. The id is dropped before the
+    /// call, so a failure (or a kill mid-call) is never retried; failures stay silent — 「提取」 is still there.
+    private func runAutoExtract() async {
+        // Postgres hands uuids back in lower case; the device writes them in upper case.
+        let pending = Set(autoPending)
+        let due = summaries.filter { $0.hasTranscript && pending.contains($0.id.lowercased()) }.map(\.id)
+        guard !due.isEmpty else { return }
+        let done = Set(due.map { $0.lowercased() })
+        autoPending.removeAll { done.contains($0) }
+        for id in due { _ = try? await backend.extract(note: id) }
+        if let fresh = try? await backend.notes() {
+            summaries = fresh
+            rebuild()
+        }
     }
 
     private func rebuild() {
@@ -141,6 +179,20 @@ public final class NotesModel {
     }
 
     // MARK: Recording
+
+    /// The 录音 button. Before the intro has been seen it starts nothing and returns false: show the intro.
+    public func requestRecording() async throws -> Bool {
+        guard introSeen else { return false }
+        try await startRecording()
+        return true
+    }
+
+    /// 「开始录音」 in the first-recording intro.
+    public func finishIntro(autoExtract: Bool) async throws {
+        self.autoExtract = autoExtract
+        introSeen = true
+        try await startRecording()
+    }
 
     /// Creates the local note and starts the recorder. Segments are saved (and transcribed) as they finish.
     public func startRecording() async throws {
@@ -188,6 +240,8 @@ public final class NotesModel {
 
     /// Waits for queued segment writes, marks the note stopped, then processes and syncs it.
     private func finish(_ id: UUID) async {
+        let key = id.uuidString.lowercased()
+        if autoExtract, !autoPending.contains(key) { autoPending.append(key) }
         await pendingWrites?.value
         _ = try? await store.update(id) { $0.recording = false }
         locals = await store.all()

@@ -3,6 +3,14 @@ import Observation
 import TaktAPI
 import TaktNotes
 
+/// Where a dragged chain or step was released: the end of a level (also a Project row = its first level),
+/// in front of a task of that level, or into a task (as its last child).
+public enum DropDestination: Equatable, Sendable {
+    case end(parent: String)
+    case before(parent: String, task: String)
+    case into(task: String)
+}
+
 /// One opened note: transcript, speakers, extracted draft, import and audio lookup.
 @MainActor
 @Observable
@@ -104,12 +112,33 @@ public final class NoteDetailModel {
     /// Writes the picked steps into `parent`. On a stale draft (409) or a missing target (404) nothing was
     /// written; the note is reloaded.
     public func importPicks(_ picks: [ImportPick], into parent: String) async -> Bool {
-        guard !isLocalOnly else { return false }
+        await runImport(picks, parent: parent, before: nil) != nil
+    }
+
+    /// Imports a dragged chain (`step` nil = all its steps) or one step. Returns the name for 「✓ 名」: the level
+    /// it landed in — the task for `.into`, the Project for its first level (the hidden root mirrors the
+    /// Project name). nil when nothing was written.
+    public func importDragged(chain: String, step: String?, to destination: DropDestination) async -> String? {
+        guard let c = note?.extraction.chains.first(where: { $0.id == chain }) else { return nil }
+        let stepIds = step.map { s in c.steps.contains { $0.id == s } ? [s] : [] } ?? c.steps.map(\.id)
+        guard !stepIds.isEmpty else { return nil }
+        let pick = ImportPick(chainId: c.id, stepIds: stepIds, places: [:])
+        let (parent, before): (String, String?) = switch destination {
+        case .end(let parent): (parent, nil)
+        case .before(let parent, let task): (parent, task)
+        case .into(let task): (task, nil)
+        }
+        return await runImport([pick], parent: parent, before: before)?.task.name
+    }
+
+    private func runImport(_ picks: [ImportPick], parent: String, before: String?) async -> Level? {
+        guard !isLocalOnly else { return nil }
         notice = nil
         do {
-            note = try await backend.importNote(id.uuidString, parent: parent, picks: picks).note
+            let r = try await backend.importNote(id.uuidString, parent: parent, picks: picks, before: before)
+            note = r.note
             onChange()
-            return true
+            return r.level
         } catch let e as BackendError {
             if case .api(409, _, _) = e {
                 notice = "已在别处修改"
@@ -120,10 +149,10 @@ public final class NoteDetailModel {
             } else {
                 notice = "导入失败"
             }
-            return false
+            return nil
         } catch {
             notice = "导入失败"
-            return false
+            return nil
         }
     }
 

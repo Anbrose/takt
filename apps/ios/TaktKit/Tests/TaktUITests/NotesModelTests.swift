@@ -85,6 +85,18 @@ private func serverNote(_ b: InMemoryBackend, lines: [TranscriptLine]? = nil) as
     }
 }
 
+/// A server note whose draft is one chain 「京都一日」 with two steps.
+private func twoStepChain(_ b: InMemoryBackend) async throws -> Chain {
+    try await serverNote(b, lines: [line(0, "先去伏见稻荷"), line(1, "再订旅馆")])
+    let chain = Chain(
+        id: UUID().uuidString, name: "京都一日",
+        steps: [ChainStep(id: UUID().uuidString, name: "去伏见稻荷", quote: Quote(startMs: 0, endMs: 5800)),
+                ChainStep(id: UUID().uuidString, name: "订旅馆", quote: Quote(startMs: 6000, endMs: 11800))])
+    let n = try await b.note(noteId.uuidString)
+    _ = try await b.updateExtraction(note: noteId.uuidString, version: n.extraction.version, chains: [chain])
+    return chain
+}
+
 @MainActor
 @Suite struct NotesModelTests {
     @Test func localeRemembered() {
@@ -274,6 +286,100 @@ private func serverNote(_ b: InMemoryBackend, lines: [TranscriptLine]? = nil) as
         #expect(d.notice == "已在别处修改")
         #expect(d.note?.extraction.chains.map(\.name) == ["x"])
         #expect(try await r.backend.level(project.rootTaskId).children.isEmpty)
+    }
+
+    @Test func firstRecordingNeedsIntro() async throws {
+        let r = Rig()
+        #expect(r.model.introSeen == false)
+        #expect(r.model.autoExtract)
+        #expect(try await r.model.requestRecording() == false)
+        #expect(r.model.recording == nil)
+
+        try await r.model.finishIntro(autoExtract: false)
+        #expect(r.model.recording != nil)
+        #expect(r.model.introSeen && !r.model.autoExtract)
+        #expect(r.defaults.bool(forKey: "notes.introSeen"))
+        #expect(r.defaults.object(forKey: "notes.autoExtract") as? Bool == false)
+        await r.model.stopRecording()
+
+        #expect(try await r.model.requestRecording())
+        #expect(r.model.recording != nil)
+        await r.model.stopRecording()
+        let again = NotesModel(
+            backend: r.backend, store: r.store,
+            processor: NoteProcessor(store: r.store, transcriber: StubTranscriber(), diarizer: StubDiarizer()),
+            sync: NoteSync(store: r.store, backend: r.backend, uploader: StubUploader()),
+            capture: r.capture, defaults: r.defaults)
+        #expect(again.introSeen && !again.autoExtract)
+    }
+
+    @Test func autoExtractRunsOncePerNote() async throws {
+        let r = Rig()
+        try await r.model.startRecording()
+        let id = try #require(r.model.recording?.id)
+        await r.model.stopRecording()
+        #expect(await r.backend.calls.filter { $0 == "extract \(id.uuidString)" }.count == 1)
+        #expect(r.model.items.first?.chainCount == 1)
+        #expect(r.defaults.stringArray(forKey: "notes.autoPending") ?? [] == [])
+        await r.model.load()
+        await r.model.syncTask?.value
+        #expect(await r.backend.calls.filter { $0.hasPrefix("extract") }.count == 1)
+    }
+
+    @Test func autoExtractOffSkips() async throws {
+        let r = Rig()
+        r.model.autoExtract = false
+        try await r.model.startRecording()
+        await r.model.stopRecording()
+        await r.model.load()
+        await r.model.syncTask?.value
+        #expect(await r.backend.calls.contains { $0.hasPrefix("extract") } == false)
+        #expect(r.defaults.stringArray(forKey: "notes.autoPending") ?? [] == [])
+        #expect(r.model.items.first?.chainCount == 0)
+    }
+
+    @Test func autoExtractFailureNotRetried() async throws {
+        let r = Rig()
+        await r.backend.failNextExtract(with: "llm_failed", status: 502)
+        try await r.model.startRecording()
+        await r.model.stopRecording()
+        #expect(await r.backend.calls.filter { $0.hasPrefix("extract") }.count == 1)
+        #expect(r.model.notice == nil)
+        await r.model.load()
+        await r.model.syncTask?.value
+        #expect(await r.backend.calls.filter { $0.hasPrefix("extract") }.count == 1)
+        #expect(r.model.items.first?.chainCount == 0)
+    }
+
+    @Test func importDraggedStepBefore() async throws {
+        let r = Rig()
+        let project = try await r.backend.createProject(name: "京都")
+        await r.backend.add(parent: project.rootTaskId, name: "A")
+        let b = await r.backend.add(parent: project.rootTaskId, name: "B")
+        let chain = try await twoStepChain(r.backend)
+        let d = await r.model.open(noteId)
+        let name = await d.importDragged(chain: chain.id, step: chain.steps[1].id, to: .before(parent: project.rootTaskId, task: b))
+        #expect(name == "京都")
+        #expect(d.notice == nil)
+        #expect(try await r.backend.level(project.rootTaskId).children.map(\.name) == ["A", "订旅馆", "B"])
+        #expect(d.note?.extraction.chains.first?.steps.map(\.name) == ["去伏见稻荷"])
+        #expect(d.note?.imported.map(\.stepName) == ["订旅馆"])
+    }
+
+    @Test func importDraggedChainInto() async throws {
+        let r = Rig()
+        let project = try await r.backend.createProject(name: "京都")
+        let a = await r.backend.add(parent: project.rootTaskId, name: "A")
+        let chain = try await twoStepChain(r.backend)
+        let d = await r.model.open(noteId)
+        #expect(await d.importDragged(chain: chain.id, step: nil, to: .into(task: a)) == "A")
+        let inA = try await r.backend.level(a)
+        #expect(inA.children.map(\.name) == ["京都一日"])
+        #expect(try await r.backend.level(inA.children[0].id).children.map(\.name) == ["去伏见稻荷", "订旅馆"])
+        #expect(d.note?.extraction.chains.isEmpty == true)
+        // The chain is gone from the draft now: dragging it again writes nothing.
+        #expect(await d.importDragged(chain: chain.id, step: nil, to: .end(parent: project.rootTaskId)) == nil)
+        #expect(try await r.backend.level(project.rootTaskId).children.map(\.name) == ["A"])
     }
 
     @Test func editConflictReloads() async throws {
