@@ -377,7 +377,8 @@ public final class NotesModel {
         items.remove(at: before)
         deleting.insert(id)
         defer { deleting.remove(id) }
-        let onServer = summaries.contains { $0.id == id.uuidString }
+        // The server's ids are lower case; compare as UUIDs.
+        let onServer = summaries.contains { UUID(uuidString: $0.id) == id }
         do {
             if onServer { try await backend.deleteNote(id.uuidString) }
         } catch let e as BackendError where e.code == "not_found" {
@@ -388,7 +389,7 @@ public final class NotesModel {
             notice = "删除失败"
             return
         }
-        summaries.removeAll { $0.id == id.uuidString }
+        summaries.removeAll { UUID(uuidString: $0.id) == id }
         locals.removeAll { $0.id == id }
         try? await store.delete(id)
     }

@@ -257,7 +257,7 @@ private func twoStepChain(_ b: InMemoryBackend) async throws -> Chain {
 
         await r.model.delete(other)
         #expect(r.model.items.map(\.id) == [noteId])
-        #expect(try await r.backend.notes().map(\.id) == [noteId.uuidString])
+        #expect(try await r.backend.notes().map(\.id) == [noteId.uuidString.lowercased()])
     }
 
     @Test func extractLimitShowsNotice() async throws {
@@ -351,7 +351,7 @@ private func twoStepChain(_ b: InMemoryBackend) async throws -> Chain {
         let id = try #require(r.model.recording?.id)
         await r.model.stopRecording()
         await r.model.autoExtractTask?.value
-        #expect(await r.backend.calls.filter { $0 == "extract \(id.uuidString)" }.count == 1)
+        #expect(await r.backend.calls.filter { $0 == "extract \(id.uuidString.lowercased())" }.count == 1)
         #expect(r.model.items.first?.chainCount == 1)
         #expect(r.defaults.stringArray(forKey: "notes.autoPending") ?? [] == [])
         await r.model.load()
@@ -400,7 +400,7 @@ private func twoStepChain(_ b: InMemoryBackend) async throws -> Chain {
         #expect(r.model.items.first?.id == id)
         #expect(r.model.items.first?.processing == false)
         #expect(r.model.items.first?.chainCount == 0)
-        for _ in 0..<1000 where await !r.backend.calls.contains("extract \(id.uuidString)") { await Task.yield() }
+        for _ in 0..<1000 where await !r.backend.calls.contains("extract \(id.uuidString.lowercased())") { await Task.yield() }
         #expect(r.model.autoExtracting == [id], "the detail's spinner shows while the call runs")
         open.yield()
         open.finish()

@@ -235,6 +235,7 @@ public actor InMemoryBackend: TaktBackend {
 
     public func createNote(id: String, title: String?, locale: String, createdAt: Date) async throws -> Note {
         try check("createNote \(id)")
+        let id = Self.key(id)
         if let existing = noteRows[id] { return note(existing) }
         noteRows[id] = NoteRow(id: id, title: title ?? Self.defaultTitle(createdAt), locale: locale, createdAt: createdAt)
         return note(noteRows[id]!)
@@ -242,6 +243,7 @@ public actor InMemoryBackend: TaktBackend {
 
     public func note(_ id: String) async throws -> Note {
         try check("note \(id)")
+        let id = Self.key(id)
         return note(try row(id))
     }
 
@@ -249,6 +251,7 @@ public actor InMemoryBackend: TaktBackend {
         _ id: String, title: String?, durationMs: Int?, transcript: [TranscriptLine]?, speakers: [Speaker]?
     ) async throws -> Note {
         try check("updateNote \(id)")
+        let id = Self.key(id)
         var r = try row(id)
         if let title { r.title = title }
         if let durationMs { r.durationMs = durationMs }
@@ -260,6 +263,7 @@ public actor InMemoryBackend: TaktBackend {
 
     public func deleteNote(_ id: String) async throws {
         try check("deleteNote \(id)")
+        let id = Self.key(id)
         _ = try row(id)
         noteRows[id] = nil
         ticketed = ticketed.filter { !$0.hasPrefix("\(id)/") }
@@ -267,6 +271,7 @@ public actor InMemoryBackend: TaktBackend {
 
     public func uploadTicket(note id: String, segment: Int) async throws -> UploadTicket {
         try check("uploadTicket \(id) \(segment)")
+        let id = Self.key(id)
         _ = try row(id)
         ticketed.insert("\(id)/\(segment)")
         let now = Date()
@@ -275,6 +280,7 @@ public actor InMemoryBackend: TaktBackend {
 
     public func completeSegment(note id: String, segment: Int, durationMs: Int) async throws -> Note {
         try check("completeSegment \(id) \(segment)")
+        let id = Self.key(id)
         var r = try row(id)
         guard ticketed.contains("\(id)/\(segment)") else {
             throw BackendError.api(status: 409, code: "segment_missing", message: "not uploaded")
@@ -287,6 +293,7 @@ public actor InMemoryBackend: TaktBackend {
 
     public func noteAudio(_ id: String) async throws -> AudioUrls {
         try check("noteAudio \(id)")
+        let id = Self.key(id)
         let r = try row(id)
         let expires = Date().addingTimeInterval(3600)
         return AudioUrls(segments: r.segments.sorted { $0.key < $1.key }.map {
@@ -298,6 +305,7 @@ public actor InMemoryBackend: TaktBackend {
     /// 去 / 订 / 买, with that line as its only step.
     public func extract(note id: String) async throws -> Note {
         try check("extract \(id)")
+        let id = Self.key(id)
         if let extractDelay { await extractDelay() }
         if let e = failNextExtractError {
             failNextExtractError = nil
@@ -333,6 +341,7 @@ public actor InMemoryBackend: TaktBackend {
 
     public func updateExtraction(note id: String, version: Int, chains: [Chain]) async throws -> Note {
         try check("updateExtraction \(id)")
+        let id = Self.key(id)
         var r = try row(id)
         guard version == r.extractionVersion else {
             throw BackendError.api(status: 409, code: "version_conflict", message: "changed")
@@ -351,6 +360,7 @@ public actor InMemoryBackend: TaktBackend {
         _ id: String, parent: String, picks: [ImportPick], before: String?
     ) async throws -> (level: Level, note: Note) {
         try check("importNote \(id)")
+        let id = Self.key(id)
         var r = try row(id)
         guard nodes[parent] != nil else { throw notFound }
         if let before, nodes[parent]!.children.contains(before) == false {
@@ -401,15 +411,15 @@ public actor InMemoryBackend: TaktBackend {
 
     /// Stores a ready-made note (demo data, tests).
     public func seed(_ n: Note) {
-        noteRows[n.id] = NoteRow(
-            id: n.id, title: n.title, locale: n.locale, createdAt: n.createdAt, durationMs: n.durationMs,
+        noteRows[Self.key(n.id)] = NoteRow(
+            id: Self.key(n.id), title: n.title, locale: n.locale, createdAt: n.createdAt, durationMs: n.durationMs,
             transcript: n.transcript, speakers: n.speakers,
             segments: Dictionary(n.segments.filter(\.uploaded).map { ($0.index, $0.durationMs) }, uniquingKeysWith: { a, _ in a }),
             chains: n.extraction.chains, extractionVersion: n.extraction.version, imported: n.imported)
     }
 
     private func row(_ id: String) throws -> NoteRow {
-        guard let r = noteRows[id] else { throw notFound }
+        guard let r = noteRows[Self.key(id)] else { throw notFound }
         return r
     }
 
@@ -429,6 +439,9 @@ public actor InMemoryBackend: TaktBackend {
             },
             extraction: .init(version: r.extractionVersion, chains: r.chains), imported: r.imported)
     }
+
+    /// Postgres stores note ids as uuid and hands them back in lower case, whatever case the phone sent.
+    private static func key(_ id: String) -> String { id.lowercased() }
 
     private static func audioURL(_ note: String, _ segment: Int) -> String { "memory://notes/\(note)/\(segment).m4a" }
 
