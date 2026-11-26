@@ -11,6 +11,12 @@ public protocol AudioCapture: AnyObject {
                onError: @escaping (Error) -> Void) throws
     /// Closes the current segment and returns it; nil when nothing was recording.
     func stop() async -> (index: Int, durationMs: Int)?
+    /// Audio recorded so far, all segments together: it stands still while paused.
+    var recordedMs: Int { get }
+    /// Recording, but paused by an interruption (a call, Siri) that hasn't been resumed.
+    var isPaused: Bool { get }
+    /// Resumes a paused recording; false when the system still refuses (the call is still on).
+    @discardableResult func resume() -> Bool
 }
 
 public enum RecorderError: Error {
@@ -83,7 +89,8 @@ public enum SegmentFile {
 }
 
 /// AVAudioRecorder writing one segment per `segmentSeconds` (default 300) of recorded audio, see `SegmentFile`.
-/// An interruption (call, Siri) pauses the current segment; it resumes when the system allows.
+/// An interruption (call, Siri) pauses the current segment. It resumes when the interruption ends, or — iOS doesn't
+/// always say it ended — when `resume()` is called (the app coming back to the foreground).
 public final class SegmentRecorder: AudioCapture {
     public static let defaultSegmentSeconds = 300
 
@@ -98,6 +105,8 @@ public final class SegmentRecorder: AudioCapture {
     /// Encoding of the segments closed so far, chained so they are reported in order.
     private var encoding: Task<Void, Never>?
     private var stopping = false
+    /// Recorded seconds of the segments already closed.
+    private var closedSeconds: TimeInterval = 0
 
     public init() {}
 
@@ -111,12 +120,25 @@ public final class SegmentRecorder: AudioCapture {
         self.onError = onError
         index = 0
         stopping = false
+        closedSeconds = 0
         try begin(0)
         // Rotation follows recorded time (currentTime stops while paused), checked once a second.
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.rotateIfFull() }
         }
         observeInterruptions()
+    }
+
+    public var recordedMs: Int { Self.ms(closedSeconds + (recorder?.currentTime ?? 0)) }
+
+    public var isPaused: Bool { recorder.map { !$0.isRecording } ?? false }
+
+    @discardableResult
+    public func resume() -> Bool {
+        guard let recorder else { return false }
+        if recorder.isRecording { return true }
+        Self.reactivateSession()
+        return recorder.record()
     }
 
     public func stop() async -> (index: Int, durationMs: Int)? {
@@ -155,6 +177,7 @@ public final class SegmentRecorder: AudioCapture {
     private func rotateIfFull() {
         guard let recorder, recorder.currentTime >= TimeInterval(segmentSeconds) else { return }
         let finished = index
+        closedSeconds += recorder.currentTime
         recorder.stop()
         self.recorder = nil
         var failure: Error?
@@ -196,6 +219,10 @@ public final class SegmentRecorder: AudioCapture {
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
+    private static func reactivateSession() {
+        try? AVAudioSession.sharedInstance().setActive(true)
+    }
+
     private func observeInterruptions() {
         observer = NotificationCenter.default.addObserver(
             forName: AVAudioSession.interruptionNotification, object: nil, queue: .main
@@ -203,12 +230,12 @@ public final class SegmentRecorder: AudioCapture {
             let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
             let began = raw.flatMap(AVAudioSession.InterruptionType.init) == .began
             MainActor.assumeIsolated {
-                guard let recorder = self?.recorder else { return }
+                guard let self, let recorder = self.recorder else { return }
                 if began {
                     recorder.pause()
                 } else {
-                    try? AVAudioSession.sharedInstance().setActive(true)
-                    recorder.record()
+                    // Refused (still interrupted): stays paused until the app is active again.
+                    self.resume()
                 }
             }
         }
@@ -216,6 +243,7 @@ public final class SegmentRecorder: AudioCapture {
     #else
     private static func activateSession() throws {}
     private static func deactivateSession() {}
+    private static func reactivateSession() {}
     private func observeInterruptions() {}
     #endif
 }

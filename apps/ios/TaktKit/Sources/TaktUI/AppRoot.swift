@@ -19,6 +19,7 @@ public struct AppRoot: View {
     /// First launch shows 重播 / 开始; afterwards the splash plays and hands over by itself.
     @AppStorage("splash.seen") private var splashSeen = false
     @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.scenePhase) private var scenePhase
     private let info: ProcessInfo
 
     public init(info: ProcessInfo = .processInfo) {
@@ -61,6 +62,11 @@ public struct AppRoot: View {
                 if #available(iOS 26, macOS 26, *) { notes = Self.liveNotes(live) }
                 backend = live
             }
+        }
+        // Back in the foreground: resume a recording an interruption left paused, retry model downloads.
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, let notes else { return }
+            Task { await notes.becameActive() }
         }
         // Launch work (recovery, sync) runs in NotesModel.load(); this picks it up again when the network returns.
         .task(id: notes == nil) {

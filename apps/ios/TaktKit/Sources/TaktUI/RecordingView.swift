@@ -17,20 +17,29 @@ struct RecordingView: View {
             }
             .frame(minHeight: Metrics.hit)
 
-            VStack(spacing: 28) {
-                TimelineView(.periodic(from: startedAt, by: 1)) { t in
-                    let text = NoteLanguage.clock(Int(t.date.timeIntervalSince(startedAt) * 1000))
+            // Recorded time, read from the recorder every half second: it stands still while an interruption has
+            // the recording paused, and then the level bars give way to a resume button.
+            TimelineView(.periodic(from: startedAt, by: 0.5)) { _ in
+                let text = NoteLanguage.clock(notes.recordedMs)
+                let paused = notes.recordingPaused
+                VStack(spacing: 28) {
                     Text(text)
                         .font(.system(size: 60, weight: .bold))
                         .tracking(-1)
                         .monospacedDigit()
-                        .foregroundStyle(Palette.text)
+                        .foregroundStyle(paused ? Palette.muted : Palette.text)
                         .contentTransition(.numericText())
                         .animation(reduce ? nil : Motion.fade, value: text)
+                        .animation(Motion.fade, value: paused)
                         .accessibilityLabel(text)
                         .accessibilityAddTraits(.updatesFrequently)
+                    ZStack {
+                        // Out of the hierarchy while paused: hidden bars would still redraw every frame.
+                        if paused { resumeButton.transition(.opacity) } else { LevelBars().transition(.opacity) }
+                    }
+                    .frame(height: 56)
+                    .animation(Motion.fade, value: paused)
                 }
-                LevelBars()
             }
             .frame(maxHeight: .infinity)
 
@@ -56,6 +65,20 @@ struct RecordingView: View {
             }
         }
         .task { await notes.checkInstalled(NoteLanguage.all.map(\.id)) }
+    }
+
+    private var resumeButton: some View {
+        Button { notes.resumeRecording() } label: {
+            Image(systemName: "play.fill")
+                .font(.system(size: 20))
+                .foregroundStyle(Palette.onFill)
+                .frame(width: 56, height: 56)
+                .background(Palette.fill, in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("继续录音")
+        .accessibilityIdentifier("recording.resume")
     }
 
     private var downloading: Bool { notes.preparing.contains(notes.locale) }

@@ -49,6 +49,10 @@ final class DemoCapture: AudioCapture {
         try Data("0".utf8).write(to: segmentURL(0))
     }
 
+    var recordedMs: Int { started.map { Int(Date().timeIntervalSince($0) * 1000) } ?? 0 }
+    var isPaused: Bool { false }
+    func resume() -> Bool { started != nil }
+
     func stop() async -> (index: Int, durationMs: Int)? {
         guard let started, let url else { return nil }
         self.started = nil

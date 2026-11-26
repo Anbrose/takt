@@ -337,6 +337,25 @@ public final class NotesModel {
         Task { [weak self] in await self?.prepare(locale) }
     }
 
+    /// Recorded time of the recording in progress (it stands still while paused).
+    public var recordedMs: Int { capture.recordedMs }
+
+    /// The recording in progress is paused by an interruption.
+    public var recordingPaused: Bool { recording != nil && capture.isPaused }
+
+    /// The recording view's resume button.
+    public func resumeRecording() {
+        guard recording != nil else { return }
+        capture.resume()
+    }
+
+    /// The app came to the foreground: a recording an interruption paused resumes (iOS doesn't always report the
+    /// interruption's end), and model downloads notes wait for are tried again.
+    public func becameActive() async {
+        resumeRecording()
+        await retryDownloads()
+    }
+
     /// Closes the last segment, then transcribes, diarizes and uploads. The list shows the note at once.
     public func stopRecording() async {
         guard let current = recording else { return }

@@ -98,6 +98,17 @@ final class FakeCapture: AudioCapture {
         defer { recording = false }
         return recording ? stopResult : nil
     }
+
+    var recordedMs = 0
+    var isPaused = false
+    /// The system refuses to resume (the call is still on).
+    var refuseResume = false
+    var resumes = 0
+    func resume() -> Bool {
+        resumes += 1
+        if !refuseResume { isPaused = false }
+        return !isPaused
+    }
 }
 
 @MainActor
@@ -265,6 +276,30 @@ private func twoStepChain(_ b: InMemoryBackend) async throws -> Chain {
         let d = await r.model.open(id)
         #expect(d.note?.transcript.isEmpty == true)
         #expect(await d.audioURL(at: 0) != nil, "the recording can still be played")
+    }
+
+    @Test func becomingActiveResumesAPausedRecording() async throws {
+        let r = Rig()
+        await r.model.becameActive()
+        #expect(r.capture.resumes == 0, "nothing recording")
+
+        try await r.model.startRecording()
+        r.capture.isPaused = true // a call began; iOS never said it ended
+        r.capture.refuseResume = true
+        r.capture.recordedMs = 61_000
+        #expect(r.model.recordingPaused)
+        #expect(r.model.recordedMs == 61_000, "recorded time, not time since start")
+        await r.model.becameActive()
+        #expect(r.model.recordingPaused, "still refused: the view offers to resume")
+
+        r.capture.refuseResume = false
+        r.model.resumeRecording()
+        #expect(!r.model.recordingPaused)
+        r.capture.isPaused = true
+        await r.model.becameActive()
+        #expect(!r.model.recordingPaused)
+        #expect(r.capture.resumes == 3)
+        await r.model.stopRecording()
     }
 
     @Test func recorderErrorKeepsFinishedSegments() async throws {
