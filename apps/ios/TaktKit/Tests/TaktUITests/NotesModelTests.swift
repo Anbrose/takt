@@ -15,6 +15,16 @@ final class StubTranscriber: Transcribing, @unchecked Sendable {
     }
 }
 
+/// Its model is missing until `prepare` installs it.
+actor LateModelTranscriber: Transcribing {
+    private var ready = false
+    func isReady(locale: String) async -> Bool { ready }
+    func prepare(locale: String) async throws { ready = true }
+    func transcribe(_ file: URL, locale: String, offsetMs: Int) async throws -> [TimedText] {
+        [TimedText(startMs: offsetMs + 100, endMs: offsetMs + 900, text: "先去伏见稻荷")]
+    }
+}
+
 struct StubDiarizer: Diarizing {
     func turns(for segments: [SegmentAudio]) async throws -> [SpeakerTurn] {
         [SpeakerTurn(speaker: "1", startMs: 0, endMs: segments.reduce(0) { $0 + $1.durationMs })]
@@ -55,16 +65,18 @@ private struct Rig {
     let defaults = UserDefaults(suiteName: UUID().uuidString)!
     let model: NotesModel
 
-    init(syncBackend: InMemoryBackend? = nil, device: String = "zh_CN", supported: [String] = []) {
+    init(syncBackend: InMemoryBackend? = nil, device: String = "zh_CN", supported: [String] = [],
+         transcriber: any Transcribing = StubTranscriber()) {
         let root = FileManager.default.temporaryDirectory.appending(path: "notes-\(UUID().uuidString)")
         store = NoteStore(root: root)
         let sb = syncBackend ?? backend
         self.syncBackend = sb
         model = NotesModel(
             backend: backend, store: store,
-            processor: NoteProcessor(store: store, transcriber: StubTranscriber(), diarizer: StubDiarizer()),
+            processor: NoteProcessor(store: store, transcriber: transcriber, diarizer: StubDiarizer()),
             sync: NoteSync(store: store, backend: sb, uploader: StubUploader()),
-            capture: capture, defaults: defaults, deviceLocale: device, supportedLocales: { supported })
+            capture: capture, transcriber: transcriber, defaults: defaults, deviceLocale: device,
+            supportedLocales: { supported })
     }
 
     func detail(_ id: UUID = noteId) -> NoteDetailModel {
@@ -318,11 +330,13 @@ private func twoStepChain(_ b: InMemoryBackend) async throws -> Chain {
         try await r.model.startRecording()
         let id = try #require(r.model.recording?.id)
         await r.model.stopRecording()
+        await r.model.autoExtractTask?.value
         #expect(await r.backend.calls.filter { $0 == "extract \(id.uuidString)" }.count == 1)
         #expect(r.model.items.first?.chainCount == 1)
         #expect(r.defaults.stringArray(forKey: "notes.autoPending") ?? [] == [])
         await r.model.load()
         await r.model.syncTask?.value
+        await r.model.autoExtractTask?.value
         #expect(await r.backend.calls.filter { $0.hasPrefix("extract") }.count == 1)
     }
 
@@ -331,8 +345,10 @@ private func twoStepChain(_ b: InMemoryBackend) async throws -> Chain {
         r.model.autoExtract = false
         try await r.model.startRecording()
         await r.model.stopRecording()
+        await r.model.autoExtractTask?.value
         await r.model.load()
         await r.model.syncTask?.value
+        await r.model.autoExtractTask?.value
         #expect(await r.backend.calls.contains { $0.hasPrefix("extract") } == false)
         #expect(r.defaults.stringArray(forKey: "notes.autoPending") ?? [] == [])
         #expect(r.model.items.first?.chainCount == 0)
@@ -343,12 +359,69 @@ private func twoStepChain(_ b: InMemoryBackend) async throws -> Chain {
         await r.backend.failNextExtract(with: "llm_failed", status: 502)
         try await r.model.startRecording()
         await r.model.stopRecording()
+        await r.model.autoExtractTask?.value
         #expect(await r.backend.calls.filter { $0.hasPrefix("extract") }.count == 1)
         #expect(r.model.notice == nil)
         await r.model.load()
         await r.model.syncTask?.value
+        await r.model.autoExtractTask?.value
         #expect(await r.backend.calls.filter { $0.hasPrefix("extract") }.count == 1)
         #expect(r.model.items.first?.chainCount == 0)
+    }
+
+    @Test func autoExtractDoesNotHoldUpTheList() async throws {
+        let r = Rig()
+        let (gate, open) = AsyncStream<Void>.makeStream()
+        await r.backend.delayExtract { for await _ in gate { return } }
+        try await r.model.startRecording()
+        let id = try #require(r.model.recording?.id)
+        await r.model.stopRecording()
+        // stop (and the refresh after it) returned while the extract call is still waiting.
+        #expect(r.model.items.first?.id == id)
+        #expect(r.model.items.first?.processing == false)
+        #expect(r.model.items.first?.chainCount == 0)
+        open.yield()
+        open.finish()
+        await r.model.autoExtractTask?.value
+        #expect(r.model.items.first?.chainCount == 1)
+    }
+
+    @Test func missingModelDownloadsThenTranscribes() async throws {
+        let t = LateModelTranscriber()
+        let r = Rig(transcriber: t)
+        let note = LocalNote(
+            id: noteId, title: "t", locale: "ja_JP",
+            segments: [LocalSegment(index: 0, durationMs: 2000, file: "0.m4a")], recording: false)
+        try await r.store.save(note)
+        try Data("a".utf8).write(to: r.store.segmentFileURL(noteId, 0))
+        await r.model.checkInstalled(["ja_JP"])
+        #expect(r.model.installed.isEmpty)
+        await r.model.prepare("ja_JP")
+        #expect(r.model.installed == ["ja_JP"])
+        #expect(r.model.preparing.isEmpty)
+        let local = try #require(await r.store.note(noteId))
+        #expect(local.diarized)
+        #expect(try await r.backend.note(noteId.uuidString).transcript.map(\.text) == ["先去伏见稻荷"])
+    }
+
+    @Test func localeChosenWhileRecordingAppliesToThatNote() async throws {
+        let r = Rig()
+        try await r.model.startRecording()
+        let id = try #require(r.model.recording?.id)
+        await r.model.chooseLocale("ja_JP")
+        #expect(r.model.locale == "ja_JP")
+        #expect(r.model.items.first?.locale == "ja_JP")
+        await r.model.stopRecording()
+        #expect(try await r.backend.note(id.uuidString).locale == "ja_JP")
+    }
+
+    @Test func resumeWaitsWhileRecording() async throws {
+        let r = Rig()
+        try await r.model.startRecording()
+        let id = try #require(r.model.recording?.id)
+        await r.model.resume()
+        #expect(try #require(await r.store.note(id)).recording)
+        await r.model.stopRecording()
     }
 
     @Test func importDraggedStepBefore() async throws {

@@ -46,6 +46,13 @@ public final class NotesModel {
     private var pendingWrites: Task<Void, Never>?
     /// The background sync started by `load()`.
     public private(set) var syncTask: Task<Void, Never>?
+    /// The latest 自动生成任务 pass, started after the list is rebuilt so loading never waits on the language model.
+    public private(set) var autoExtractTask: Task<Void, Never>?
+    private let transcriber: (any Transcribing)?
+    /// Languages whose on-device model is installed, as far as this model has checked.
+    public private(set) var installed: Set<String> = []
+    /// Languages whose model is downloading now.
+    public private(set) var preparing: Set<String> = []
 
     public private(set) var items: [NoteItem] = []
     public var locale: String {
@@ -65,12 +72,12 @@ public final class NotesModel {
 
     public init(
         backend: any TaktBackend, store: NoteStore, processor: NoteProcessor, sync: NoteSync,
-        capture: AudioCapture, defaults: UserDefaults = .standard,
+        capture: AudioCapture, transcriber: (any Transcribing)? = nil, defaults: UserDefaults = .standard,
         deviceLocale: String = Locale.current.identifier,
         supportedLocales: @escaping @Sendable () async -> [String] = NotesModel.systemSupportedLocales
     ) {
         self.backend = backend; self.store = store; self.processor = processor; self.sync = sync
-        self.capture = capture; self.defaults = defaults
+        self.capture = capture; self.transcriber = transcriber; self.defaults = defaults
         self.deviceLocale = deviceLocale; self.supportedLocales = supportedLocales
         locale = defaults.string(forKey: Self.localeKey) ?? Self.fallbackLocale
         autoExtract = defaults.object(forKey: Self.autoExtractKey) as? Bool ?? true
@@ -129,7 +136,11 @@ public final class NotesModel {
             notice = "加载失败"
         }
         rebuild()
-        await runAutoExtract()
+        let previous = autoExtractTask
+        autoExtractTask = Task { [weak self] in
+            await previous?.value
+            await self?.runAutoExtract()
+        }
     }
 
     // MARK: 自动生成任务
@@ -154,6 +165,49 @@ public final class NotesModel {
             summaries = fresh
             rebuild()
         }
+    }
+
+    // MARK: Language models
+
+    /// Checks which of `locales` have their model installed (for the language sheet's download marks).
+    public func checkInstalled(_ locales: [String]) async {
+        guard let transcriber else { return }
+        for l in locales where await transcriber.isReady(locale: l) { installed.insert(l) }
+    }
+
+    /// Downloads the model for `locale` when it is missing, then transcribes whatever was waiting for it.
+    /// Recording never waits for this.
+    public func prepare(_ locale: String) async {
+        guard let transcriber, !preparing.contains(locale) else { return }
+        if await transcriber.isReady(locale: locale) {
+            installed.insert(locale)
+            return
+        }
+        preparing.insert(locale)
+        defer { preparing.remove(locale) }
+        guard (try? await transcriber.prepare(locale: locale)) != nil else { return }
+        installed.insert(locale)
+        await resume()
+    }
+
+    /// The language chip. During a recording it also applies to that recording (one language per note).
+    public func chooseLocale(_ l: String) async {
+        locale = l
+        if let id = recording?.id {
+            _ = try? await store.update(id) { $0.locale = l }
+            locals = await store.all()
+            rebuild()
+        }
+        await prepare(l)
+    }
+
+    /// At launch and when the network returns: finishes processing and uploads left over, then refreshes.
+    /// Skipped while recording — the processor's recovery would take the live note for one cut off by a kill.
+    public func resume() async {
+        guard recording == nil else { return }
+        await processor.recoverAfterLaunch()
+        await sync.syncAll()
+        await refresh()
     }
 
     private func rebuild() {
@@ -220,6 +274,8 @@ public final class NotesModel {
         recording = (id, Date())
         locals.append(note)
         rebuild()
+        let locale = note.locale
+        Task { [weak self] in await self?.prepare(locale) }
     }
 
     /// Closes the last segment, then transcribes, diarizes and uploads. The list shows the note at once.

@@ -51,6 +51,10 @@ public actor InMemoryBackend: TaktBackend {
     }
     private var failNextExtractError: BackendError?
 
+    /// Test / demo hook: every `extract` waits for this before answering (the language model's latency).
+    public func delayExtract(_ wait: (@Sendable () async -> Void)?) { extractDelay = wait }
+    private var extractDelay: (@Sendable () async -> Void)?
+
     /// Bumps a level's version as if another device had changed it.
     public func touch(_ taskId: String) { nodes[taskId]?.version += 1 }
 
@@ -294,6 +298,7 @@ public actor InMemoryBackend: TaktBackend {
     /// 去 / 订 / 买, with that line as its only step.
     public func extract(note id: String) async throws -> Note {
         try check("extract \(id)")
+        if let extractDelay { await extractDelay() }
         if let e = failNextExtractError {
             failNextExtractError = nil
             throw e
@@ -562,18 +567,21 @@ extension InMemoryBackend {
         return b
     }
 
+    /// The spike's 京都 conversation: (start ms, speaker, text), about 6 s per line.
+    static let kyotoLines: [(Int, String, String)] = [
+        (0, "1", "下周去京都的行程我们定一下吧，我想第一天先去伏见稻荷大社。"),
+        (6000, "2", "好啊，那我来订酒店，最好住在京都站附近，交通方便一点。"),
+        (12000, "3", "伏见稻荷人很多，建议早上七点之前到，拍照比较清净。"),
+        (19000, "1", "那就七点出发。之后去清水寺，中午在二年坂吃午饭。"),
+        (25000, "2", "午饭要提前预约吗？我可以顺便查一下二年坂那家荞麦面店。"),
+        (31000, "3", "要的，周末一般要排队。还有，岚山的小火车票也得提前在网上买。"),
+        (38000, "1", "岚山放第二天吧。第二天上午小火车，下午去竹林和天龙寺。"),
+        (44000, "2", "好，那小火车票我也一起买了，酒店和车票都交给我。"),
+    ]
+
     /// 京都讨论: the spike's 8-line, 3-speaker transcript (50.3 s), recorded in one segment.
     func seedKyotoNote() {
-        let lines: [(Int, String, String)] = [
-            (0, "1", "下周去京都的行程我们定一下吧，我想第一天先去伏见稻荷大社。"),
-            (6000, "2", "好啊，那我来订酒店，最好住在京都站附近，交通方便一点。"),
-            (12000, "3", "伏见稻荷人很多，建议早上七点之前到，拍照比较清净。"),
-            (19000, "1", "那就七点出发。之后去清水寺，中午在二年坂吃午饭。"),
-            (25000, "2", "午饭要提前预约吗？我可以顺便查一下二年坂那家荞麦面店。"),
-            (31000, "3", "要的，周末一般要排队。还有，岚山的小火车票也得提前在网上买。"),
-            (38000, "1", "岚山放第二天吧。第二天上午小火车，下午去竹林和天龙寺。"),
-            (44000, "2", "好，那小火车票我也一起买了，酒店和车票都交给我。"),
-        ]
+        let lines = Self.kyotoLines
         let created = DateComponents(
             calendar: Calendar(identifier: .gregorian), timeZone: TimeZone(identifier: "UTC"),
             year: 2026, month: 11, day: 20, hour: 9
