@@ -100,6 +100,16 @@ private func exists(_ store: NoteStore, _ n: LocalNote, _ i: Int) async -> Bool 
         #expect(await backend.calls.count == before)
     }
 
+    @Test func audioGoesOnceDiarizationIsGivenUp() async throws {
+        let (store, _) = tempStore()
+        let unlabeled = lines.map { AlignedLine(startMs: $0.startMs, endMs: $0.endMs, text: $0.text, speaker: nil) }
+        let n = try await seed(store, lines: unlabeled, diarized: false)
+        try await store.update(n.id) { $0.diarizeAttempts = LocalNote.maxDiarizeAttempts }
+        await NoteSync(store: store, backend: InMemoryBackend(), uploader: FakeUploader()).sync(n.id)
+        #expect(await exists(store, n, 0) == false)
+        #expect(await exists(store, n, 1) == false)
+    }
+
     @Test func offlineKeepsEverythingAndRetries() async throws {
         let (store, _) = tempStore()
         let backend = InMemoryBackend()

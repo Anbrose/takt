@@ -167,7 +167,7 @@ public actor NoteSync {
         }
     }
 
-    /// Uploads one segment unless the server has it, then frees its local audio once the note is diarized.
+    /// Uploads one segment unless the server has it, then frees its local audio once diarization is settled.
     /// Returns the server's note duration when this call completed the upload.
     private func upload(_ id: UUID, _ key: String, _ seg: LocalSegment) async throws -> Int? {
         var uploaded = seg.uploaded
@@ -184,8 +184,8 @@ public actor NoteSync {
             }
             uploaded = true
         }
-        // Diarization reads the local audio, so it stays until the note is diarized.
-        if uploaded, let current = await store.note(id), current.diarized {
+        // Diarization reads the local audio, so it stays until diarization succeeded or was given up.
+        if uploaded, let current = await store.note(id), current.diarizationSettled {
             try await store.deleteAudio(id, seg.index)
         }
         return serverMs

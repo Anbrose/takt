@@ -49,17 +49,29 @@ public actor NoteProcessor {
                 note = saved
             }
         }
-        guard !note.recording, !note.diarized, note.segments.allSatisfy(\.transcribed) else { return }
+        guard !note.recording, !note.diarizationSettled, note.segments.allSatisfy(\.transcribed) else { return }
 
         var audio: [SegmentAudio] = []
         for segment in note.segments.sorted(by: { $0.index < $1.index }) {
             audio.append(SegmentAudio(file: await store.segmentURL(id, segment.index), durationMs: segment.durationMs))
         }
-        // Failure (e.g. offline before the models are downloaded): show unlabeled lines, retry on the next call.
-        let turns: [SpeakerTurn]? = audio.isEmpty ? [] : try? await diarizer.turns(for: audio)
+        // Counted before the run, so a run the app is killed in (memory, on a long recording) counts as well.
+        guard (try? await store.update(id, { $0.diarizeAttempts += 1 })) != nil else { return }
+        // Failure (e.g. offline before the models are downloaded): show unlabeled lines, retry on a later call.
+        var turns: [SpeakerTurn]?
+        var uncounted = false
+        if audio.isEmpty {
+            turns = []
+        } else {
+            do { turns = try await diarizer.turns(for: audio) } catch {
+                uncounted = (error as? DiarizationError) == .modelsUnavailable
+            }
+        }
+        let result = turns, refund = uncounted
         _ = try? await store.update(id) { n in
+            if refund { n.diarizeAttempts -= 1 }
             guard !n.diarized else { return }
-            if let turns {
+            if let turns = result {
                 n.lines = SpeakerAlign.align(n.tokens, turns)
                 n.diarized = true
             } else if n.lines == nil {
@@ -74,10 +86,16 @@ public actor NoteProcessor {
     public func recordingStarted(_ id: UUID) { live = id }
     public func recordingEnded(_ id: UUID) { if live == id { live = nil } }
 
-    /// Call at launch (and when the network returns): a note still marked recording was cut off by the app being
-    /// killed. Its segment in progress is recovered from its `.caf` up to the last buffer written (so at most a
-    /// few seconds are lost), the note is marked stopped, then every note with work left is processed.
+    /// Call at launch (and when the network returns): `recoverInterrupted()`, then `processPending()`.
     public func recoverAfterLaunch() async {
+        await recoverInterrupted()
+        await processPending()
+    }
+
+    /// A note still marked recording was cut off by the app being killed. Its segment in progress is recovered
+    /// from its `.caf` up to the last buffer written (so at most a few seconds are lost) and the note is marked
+    /// stopped. Quick: only reads the folders and encodes what a kill cut off; the list can wait for it.
+    public func recoverInterrupted() async {
         for note in await store.all() where note.id != live {
             let found = await store.recoverSegments(note.id, listed: Set(note.segments.map(\.index)))
             guard note.recording || !found.isEmpty, note.id != live else { continue }
@@ -91,12 +109,18 @@ public actor NoteProcessor {
                     // Found after the note was finished: the transcript is redone with the new audio.
                     n.lines = nil
                     n.diarized = false
+                    n.diarizeAttempts = 0
                     n.synced.transcriptSent = false
                     n.synced.diarizedSent = false
                 }
             }
         }
-        for note in await store.all() where !note.diarized && note.id != live {
+    }
+
+    /// Transcribes and diarizes every note with work left. Slow (minutes for a long recording): run it in the
+    /// background, never in front of the list.
+    public func processPending() async {
+        for note in await store.all() where !note.diarizationSettled && note.id != live {
             await process(note.id)
         }
     }

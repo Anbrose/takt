@@ -12,6 +12,11 @@ public struct SegmentAudio: Equatable, Sendable {
     }
 }
 
+public enum DiarizationError: Error, Equatable {
+    /// The models aren't downloaded and can't be now (offline): not counted as an attempt.
+    case modelsUnavailable
+}
+
 public protocol Diarizing: Sendable {
     /// Speaker turns over the segments played back to back, each occupying exactly its `durationMs`
     /// (times on the whole-recording timeline, the same one the transcript tokens use).
@@ -24,10 +29,11 @@ public struct FluidDiarizer: Diarizing {
 
     public func turns(for segments: [SegmentAudio]) async throws -> [SpeakerTurn] {
         guard !segments.isEmpty else { return [] }
+        // Models first: offline, this fails before any audio is resampled.
+        let manager = OfflineDiarizerManager(config: OfflineDiarizerConfig())
+        do { try await manager.prepareModels() } catch { throw DiarizationError.modelsUnavailable }
         let joined = try Self.concatenate(segments)
         defer { try? FileManager.default.removeItem(at: joined) }
-        let manager = OfflineDiarizerManager(config: OfflineDiarizerConfig())
-        try await manager.prepareModels()
         let result = try await manager.process(joined)
         return Self.renumber(result.segments.map {
             (id: $0.speakerId, startMs: Int((Double($0.startTimeSeconds) * 1000).rounded()),

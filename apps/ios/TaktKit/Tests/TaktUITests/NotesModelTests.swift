@@ -25,6 +25,21 @@ actor LateModelTranscriber: Transcribing {
     }
 }
 
+/// Transcribes only once `open()` is called.
+actor GatedTranscriber: Transcribing {
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var isOpen = false
+    private(set) var started = 0
+    func isReady(locale: String) async -> Bool { true }
+    func prepare(locale: String) async throws {}
+    func transcribe(_ file: URL, locale: String, offsetMs: Int) async throws -> [TimedText] {
+        started += 1
+        if !isOpen { await withCheckedContinuation { waiters.append($0) } }
+        return [TimedText(startMs: offsetMs + 100, endMs: offsetMs + 900, text: "先去伏见稻荷")]
+    }
+    func open() { isOpen = true; waiters.forEach { $0.resume() }; waiters = [] }
+}
+
 struct StubDiarizer: Diarizing {
     func turns(for segments: [SegmentAudio]) async throws -> [SpeakerTurn] {
         [SpeakerTurn(speaker: "1", startMs: 0, endMs: segments.reduce(0) { $0 + $1.durationMs })]
@@ -239,6 +254,29 @@ private func twoStepChain(_ b: InMemoryBackend) async throws -> Chain {
         #expect(item.id == noteId)
         #expect(item.durationMs == 4000)
         #expect(item.processing)
+    }
+
+    @Test func loadListsAndSyncsBeforeProcessing() async throws {
+        let t = GatedTranscriber()
+        let r = Rig(transcriber: t)
+        // Killed mid-recording: segment 0 listed but not transcribed yet.
+        try await r.store.save(LocalNote(
+            id: noteId, title: "t", locale: "zh_CN",
+            segments: [LocalSegment(index: 0, durationMs: 4000, file: "0.m4a")], recording: true))
+        try Data("a".utf8).write(to: r.store.segmentFileURL(noteId, 0))
+
+        await r.model.load() // returns while transcription is still held
+        #expect(r.model.items.map(\.id) == [noteId])
+        #expect(try #require(await r.store.note(noteId)).recording == false)
+        for _ in 0..<1000 where await t.started == 0 { await Task.yield() }
+        #expect(await t.started == 1)
+        #expect(try await r.backend.note(noteId.uuidString).segments.map(\.uploaded) == [true], "uploaded before transcription")
+
+        await t.open()
+        await r.model.syncTask?.value
+        #expect(try #require(await r.store.note(noteId)).diarized)
+        #expect(try await r.backend.note(noteId.uuidString).transcript.map(\.text) == ["先去伏见稻荷"])
+        #expect(r.model.items.first?.processing == false)
     }
 
     @Test func serverNotesMergeNewestFirstAndDelete() async throws {

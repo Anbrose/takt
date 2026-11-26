@@ -10,7 +10,7 @@ public struct NoteItem: Equatable, Identifiable, Sendable {
     public var durationMs: Int
     public var locale: String
     public var createdAt: Date
-    /// Still recording, not yet diarized, or not yet fully on the server.
+    /// Still recording, not yet diarized (or given up on), or its transcript not yet on the server.
     public var processing: Bool
     /// Known only once the server has the note.
     public var chainCount: Int?
@@ -106,26 +106,30 @@ public final class NotesModel {
 
     // MARK: Loading
 
-    /// Recovers notes cut off by a kill, resumes unsent work in the background, and shows the server's list.
+    /// Recovers notes cut off by a kill and shows the list; uploads, then transcription and diarization left
+    /// over (which can take minutes), run in the background.
     public func load() async {
         await recoverOnce()
         await resolveDefaultLocale()
         locals = await store.all()
         rebuild()
-        let sync = sync
+        let sync = sync, processor = processor
         syncTask = Task { [weak self] in
+            await sync.syncAll()
+            await self?.refresh()
+            await processor.processPending()
             await sync.syncAll()
             await self?.refresh()
         }
         await fetchSummaries()
     }
 
-    /// Once per model, and before the first recording: a later run would mistake the live recording for one
-    /// cut off by a kill.
+    /// Once per model, before the first recording: marks notes cut off by a kill as stopped (quick; the
+    /// processing they still need runs in `load()`'s background task).
     private func recoverOnce() async {
         guard !recovered else { return }
         recovered = true
-        await processor.recoverAfterLaunch()
+        await processor.recoverInterrupted()
     }
 
     private func refresh() async {
@@ -238,7 +242,8 @@ public final class NotesModel {
     }
 
     private static func isProcessing(_ n: LocalNote) -> Bool {
-        n.recording || !n.diarized || !n.synced.created || !n.synced.diarizedSent
+        n.recording || !n.diarizationSettled || !n.synced.created || !n.synced.transcriptSent
+            || (n.diarized && !n.synced.diarizedSent)
     }
 
     // MARK: Recording

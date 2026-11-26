@@ -31,6 +31,11 @@ final class FakeTranscriber: Transcribing, @unchecked Sendable {
 
 struct DiarizeFailed: Error {}
 
+/// Its models can't be downloaded (offline).
+struct OfflineDiarizer: Diarizing {
+    func turns(for segments: [SegmentAudio]) async throws -> [SpeakerTurn] { throw DiarizationError.modelsUnavailable }
+}
+
 /// Throws for the first `failures` calls (nil: always), then returns `result`.
 final class FakeDiarizer: Diarizing, @unchecked Sendable {
     private let lock = NSLock()
@@ -172,6 +177,33 @@ private func note(segments: Int, recording: Bool) -> LocalNote {
         #expect(saved.diarized)
         #expect(saved.lines == SpeakerAlign.align(saved.tokens, turns))
         #expect(saved.lines?.map(\.speaker) == ["1"])
+    }
+
+    @Test func stopsRetryingDiarizationAfterTheCap() async throws {
+        let (store, _) = tempStore()
+        let n = note(segments: 1, recording: false)
+        try await store.save(n)
+        let d = FakeDiarizer(turns, failures: nil)
+        let processor = NoteProcessor(store: store, transcriber: FakeTranscriber(), diarizer: d)
+        for _ in 0..<5 { await processor.process(n.id) }
+        await processor.recoverAfterLaunch()
+
+        let saved = try #require(await store.note(n.id))
+        #expect(d.calls.count == LocalNote.maxDiarizeAttempts)
+        #expect(saved.diarizeAttempts == LocalNote.maxDiarizeAttempts)
+        #expect(!saved.diarized && saved.diarizationSettled)
+        #expect(saved.lines?.map(\.speaker) == [nil], "the transcript stays, without speakers")
+    }
+
+    @Test func missingDiarizerModelsDoNotUseUpAttempts() async throws {
+        let (store, _) = tempStore()
+        let n = note(segments: 1, recording: false)
+        try await store.save(n)
+        let processor = NoteProcessor(store: store, transcriber: FakeTranscriber(), diarizer: OfflineDiarizer())
+        for _ in 0..<5 { await processor.process(n.id) }
+        let saved = try #require(await store.note(n.id))
+        #expect(saved.diarizeAttempts == 0)
+        #expect(!saved.diarizationSettled)
     }
 
     @Test func recoversNoteKilledMidRecording() async throws {

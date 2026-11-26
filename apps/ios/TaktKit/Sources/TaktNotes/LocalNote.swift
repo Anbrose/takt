@@ -46,8 +46,11 @@ public struct LocalNote: Codable, Equatable, Sendable {
     public var tokens: [TimedText]
     /// Set once all segments are transcribed after recording stopped; speaker nil until diarization succeeds.
     public var lines: [AlignedLine]?
-    /// True once diarization succeeded and `lines` carry speakers; until then every process() retries it.
+    /// True once diarization succeeded and `lines` carry speakers; until then process() retries it, up to
+    /// `maxDiarizeAttempts` times.
     public var diarized: Bool
+    /// Diarization runs started (counted before each run, so a run the app was killed in counts too).
+    public var diarizeAttempts: Int
     /// True until stop() finished writing the last segment.
     public var recording: Bool
     public var synced: SyncState
@@ -55,15 +58,15 @@ public struct LocalNote: Codable, Equatable, Sendable {
     public init(
         id: UUID = UUID(), title: String = "", locale: String, createdAt: Date = Date(),
         segments: [LocalSegment] = [], tokens: [TimedText] = [], lines: [AlignedLine]? = nil,
-        diarized: Bool = false, recording: Bool = true, synced: SyncState = SyncState()
+        diarized: Bool = false, diarizeAttempts: Int = 0, recording: Bool = true, synced: SyncState = SyncState()
     ) {
         self.id = id; self.title = title; self.locale = locale; self.createdAt = createdAt
         self.segments = segments; self.tokens = tokens; self.lines = lines; self.diarized = diarized
-        self.recording = recording; self.synced = synced
+        self.diarizeAttempts = diarizeAttempts; self.recording = recording; self.synced = synced
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, locale, createdAt, segments, tokens, lines, diarized, recording, synced
+        case id, title, locale, createdAt, segments, tokens, lines, diarized, diarizeAttempts, recording, synced
     }
 
     public init(from decoder: Decoder) throws {
@@ -77,9 +80,17 @@ public struct LocalNote: Codable, Equatable, Sendable {
         lines = try c.decodeIfPresent([AlignedLine].self, forKey: .lines)
         // Missing in notes saved before this field existed: diarization is retried.
         diarized = try c.decodeIfPresent(Bool.self, forKey: .diarized) ?? false
+        diarizeAttempts = try c.decodeIfPresent(Int.self, forKey: .diarizeAttempts) ?? 0
         recording = try c.decode(Bool.self, forKey: .recording)
         synced = try c.decode(SyncState.self, forKey: .synced)
     }
 
     public var durationMs: Int { segments.reduce(0) { $0 + $1.durationMs } }
+
+    /// Automatic diarization stops after this many runs: a recording whose diarization keeps failing (or keeps
+    /// getting the app killed) keeps its transcript without speakers.
+    public static let maxDiarizeAttempts = 3
+
+    /// Nothing more will be done to the lines on this device: diarized, or given up on.
+    public var diarizationSettled: Bool { diarized || diarizeAttempts >= Self.maxDiarizeAttempts }
 }
