@@ -8,6 +8,7 @@ import { levelRoutes } from './routes/levels.ts';
 import { noteRoutes } from './routes/notes.ts';
 import { projectRoutes } from './routes/projects.ts';
 import { runRoutes } from './routes/run.ts';
+import { searchRoutes } from './routes/search.ts';
 import { MemoryAudioStore, type AudioStore } from './storage/audio-store.ts';
 
 /** Single-user until accounts land: every request acts as this owner. */
@@ -48,6 +49,7 @@ export function buildApp({
   projectRoutes(app, db, resolveOwner);
   levelRoutes(app, db, resolveOwner);
   runRoutes(app, db, resolveOwner);
+  searchRoutes(app, db, resolveOwner);
   noteRoutes(app, db, resolveOwner, audioStore, extractor, limits);
   return app;
 }

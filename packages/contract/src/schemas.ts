@@ -347,3 +347,28 @@ export const SegmentParams = z.object({
   noteId: z.uuid(),
   index: z.coerce.number().int().min(0).max(999),
 });
+
+export const SearchQuery = z.object({ q: z.string().trim().min(1).max(100) });
+export const SearchResult = z
+  .object({
+    projects: z.array(z.object({ id: z.uuid(), name: z.string() })),
+    tasks: z.array(
+      z.object({
+        id: z.uuid(),
+        name: z.string(),
+        projectId: z.uuid(),
+        parentTaskId: z.uuid(),
+        path: z.array(z.string()).meta({ description: 'Project name, then ancestors below the hidden root, ending at the parent.' }),
+      }),
+    ),
+    notes: z.array(
+      z.object({
+        noteId: z.uuid(),
+        title: z.string(),
+        lineIndex: z.int().min(0).nullable().meta({ description: 'null = the title matched.' }),
+        startMs: z.int().min(0).nullable(),
+        text: z.string(),
+      }),
+    ),
+  })
+  .meta({ id: 'SearchResult' });

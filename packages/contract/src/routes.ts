@@ -295,6 +295,16 @@ export const routes = {
     status: 200,
     errors: [400, 404, 409],
   },
+  search: {
+    operationId: 'search',
+    method: 'GET',
+    path: '/search',
+    summary: 'Find projects, tasks and notes by case-insensitive substring',
+    query: S.SearchQuery,
+    response: S.SearchResult,
+    status: 200,
+    errors: [400],
+  },
 } as const satisfies Record<string, RouteDef>;
 
 export type Routes = typeof routes;
