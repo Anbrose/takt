@@ -13,15 +13,23 @@ struct TaskRow: View {
     var leg = ""
     /// 左滑: the red 删除 button is showing over the handle.
     var revealed = false
+    /// The dragged row would go into this one if released now: outlined and tinted.
+    var nestOn = false
+    /// Outlined for a moment (a task was just put into it, or it is a search hit).
+    var flashing = false
+    /// Fading and shrinking away before a move takes it off the level.
+    var leaving = false
     let onToggle: () -> Void
     let onOpen: () -> Void
     /// Horizontal swipe on the card: left (true) shows 删除, right (false) hides it.
     var onSwipe: (_ open: Bool) -> Void = { _ in }
     var onDelete: () -> Void = {}
-    /// Drag handle callbacks; `offset` is the finger's vertical travel since touch-down.
-    let onDragChanged: (_ offset: CGFloat) -> Void
+    /// Drag handle callbacks; `offset` is the finger's vertical travel since touch-down, `y` where it is now
+    /// (global).
+    let onDragChanged: (_ offset: CGFloat, _ y: CGFloat) -> Void
     let onDragEnded: () -> Void
     let onMove: (_ delta: Int) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
         HStack(alignment: .top, spacing: 2) {
@@ -63,13 +71,15 @@ struct TaskRow: View {
             )
         }
         .padding(EdgeInsets(top: 4, leading: 2, bottom: 4, trailing: 4))
-        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Metrics.cardRadius))
+        .background(nestOn ? Palette.soft : Palette.surface, in: RoundedRectangle(cornerRadius: Metrics.cardRadius))
         .overlay(alignment: .trailing) { deleteButton }
         .clipShape(RoundedRectangle(cornerRadius: Metrics.cardRadius))
         .overlay(
             RoundedRectangle(cornerRadius: Metrics.cardRadius)
-                .strokeBorder(selected ? Palette.accent : Palette.line, lineWidth: 1.5)
+                .strokeBorder(selected || nestOn || flashing ? Palette.accent : Palette.line, lineWidth: 1.5)
         )
+        .animation(.easeInOut(duration: 0.18), value: nestOn)
+        .animation(Motion.fade, value: flashing)
         // Simultaneous, so vertical scrolling and the handle's own drag keep working;
         // only a clearly horizontal swipe counts.
         .simultaneousGesture(
@@ -82,6 +92,10 @@ struct TaskRow: View {
         )
         .shadow(color: .black.opacity(dragging ? 0.22 : 0), radius: dragging ? 12 : 0, y: dragging ? 10 : 0)
         .opacity(compact && leg == "未定位" ? 0.45 : 1)
+        .opacity(leaving ? 0 : 1)
+        // 减少动态效果: it only fades.
+        .scaleEffect(leaving && !reduce ? 0.9 : 1)
+        .animation(.easeInOut(duration: 0.24), value: leaving)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("row.\(task.name)")
         .accessibilityAction(named: "删除") { onDelete() }
@@ -130,7 +144,7 @@ struct TaskRow: View {
                 if task.childCount > 0 {
                     Button(action: onOpen) {
                         HStack(spacing: 4) {
-                            Text("\(task.childCount) 项")
+                            Text("\(task.childCount) 项").contentTransition(.numericText())
                             Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
                         }
                         .font(.system(size: 14, weight: .semibold))
@@ -150,7 +164,7 @@ struct TaskRow: View {
 /// 三横把手: press and drag to reorder. Also adjustable with VoiceOver and the arrow keys.
 struct DragHandle: View {
     let label: String
-    let onChanged: (CGFloat) -> Void
+    let onChanged: (_ offset: CGFloat, _ y: CGFloat) -> Void
     let onEnded: () -> Void
     let onMove: (Int) -> Void
 
@@ -164,7 +178,7 @@ struct DragHandle: View {
             // card still scrolls the list.
             .gesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                    .onChanged { onChanged($0.translation.height) }
+                    .onChanged { onChanged($0.translation.height, $0.location.y) }
                     .onEnded { _ in onEnded() }
             )
             .focusable()

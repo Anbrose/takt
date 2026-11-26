@@ -73,7 +73,7 @@ private func names(_ m: LevelModel) -> [String] { m.items.map(\.name) }
         let ids = m.items.map(\.id)
         m.beginDrag(ids[0])
         #expect(m.isEditing)
-        m.updateDrag(offset: 150) // passes two centres (70, 140)
+        m.updateDrag(offset: 160) // centre 190: past 72% of rows 1 and 2, short of row 3's middle band
         #expect(m.drag?.to == 2)
         #expect(m.shift(for: ids[1]) == -70)
         #expect(m.shift(for: ids[2]) == -70)
@@ -84,6 +84,146 @@ private func names(_ m: LevelModel) -> [String] { m.items.map(\.name) }
         #expect(m.items.map(\.id) == [ids[1], ids[2], ids[0], ids[3], ids[4], ids[5]])
         #expect(m.isEditing) // draft still unsaved
         #expect(await backend.calls.contains { $0.hasPrefix("reorder") } == false)
+    }
+
+    @Test func dragIntoAsksThenMoves() async throws {
+        let (m, backend) = try await osakaModel()
+        let ids = m.items.map(\.id)
+        m.beginDrag(ids[0])
+        m.updateDrag(offset: 70) // centre 100: middle band of row 1
+        #expect(m.nestTarget == ids[1])
+        #expect(m.drag?.to == 0)
+        #expect(m.shift(for: ids[1]) == 0)
+        m.endDrag()
+        #expect(m.drag == nil && m.nestTarget == nil)
+        #expect(m.pendingNest?.id == ids[0] && m.pendingNest?.into == ids[1])
+        #expect(m.items.map(\.id) == ids) // nothing moved yet
+        #expect(await backend.calls.contains { $0.hasPrefix("moveTask") } == false)
+
+        await m.confirmNest()
+        #expect(m.pendingNest == nil)
+        #expect(m.items.map(\.id) == Array(ids.dropFirst()))
+        #expect(m.items.first?.childCount == 1)
+        #expect(!m.isEditing)
+        #expect(try await backend.level(ids[1]).children.map(\.id) == [ids[0]])
+        // Back to reorder: leaving the middle band clears the highlight.
+        m.beginDrag(m.items[0].id)
+        m.updateDrag(offset: 70)
+        #expect(m.nestTarget == m.items[1].id)
+        m.updateDrag(offset: 0)
+        #expect(m.nestTarget == nil)
+    }
+
+    @Test func cancelNestKeepsTree() async throws {
+        let (m, backend) = try await osakaModel()
+        let ids = m.items.map(\.id)
+        m.beginDrag(ids[2])
+        m.updateDrag(offset: -70) // centre into row 1's middle band
+        #expect(m.nestTarget == ids[1])
+        m.endDrag()
+        m.cancelNest()
+        #expect(m.pendingNest == nil)
+        #expect(m.items.map(\.id) == ids)
+        #expect(!m.isEditing)
+        #expect(try await backend.level(m.taskId).children.map(\.id) == ids)
+        #expect(await backend.calls.contains { $0.hasPrefix("moveTask") } == false)
+    }
+
+    @Test func promotePlacesAfterParent() async throws {
+        let (m, backend) = try await osakaModel()
+        let project = try await backend.projects()[0]
+        #expect(m.parentCrumb?.id == project.rootTaskId)
+        let ids = m.items.map(\.id)
+        // Dragged into the 「移到「日本旅行」」 zone: no confirm, lands right after 大阪.
+        m.beginDrag(ids[3])
+        m.upZoneHot = true
+        m.updateDrag(offset: 70)
+        #expect(m.nestTarget == nil && m.drag?.to == 3)
+        m.endDrag()
+        await m.moving?.value
+        #expect(m.pendingNest == nil)
+        #expect(m.items.map(\.id) == ids.filter { $0 != ids[3] })
+        let root = try await backend.level(project.rootTaskId)
+        #expect(root.children.map(\.name) == ["大阪", "海游馆", "东京", "北海道"])
+
+        // From the last child of the root, it goes to the end. On the first level there is no parent.
+        let hokkaido = LevelModel(taskId: root.children[3].id, backend: backend)
+        await hokkaido.load()
+        await hokkaido.promote(hokkaido.items[0].id)
+        let after = try await backend.level(project.rootTaskId)
+        #expect(after.children.map(\.name) == ["大阪", "海游馆", "东京", "北海道", "大通公园"])
+        let first = LevelModel(taskId: project.rootTaskId, backend: backend)
+        await first.load()
+        #expect(first.parentCrumb == nil)
+    }
+
+    @Test func moveDropsIdFromDraft() async throws {
+        let (m, backend) = try await osakaModel()
+        let ids = m.items.map(\.id)
+        m.move(ids[5], by: -1) // draft: 0 1 2 3 5 4
+        m.beginDrag(ids[0])
+        m.updateDrag(offset: 70)
+        m.endDrag()
+        await m.confirmNest()
+        #expect(m.isEditing) // the rest of the draft is kept
+        #expect(m.items.map(\.id) == [ids[1], ids[2], ids[3], ids[5], ids[4]])
+        await m.save()
+        #expect(m.notice == nil)
+        #expect(try await backend.level(m.taskId).children.map(\.id) == [ids[1], ids[2], ids[3], ids[5], ids[4]])
+    }
+
+    @Test func upZoneSendsNeighboursBack() async throws {
+        let (m, _) = try await osakaModel()
+        let ids = m.items.map(\.id)
+        m.beginDrag(ids[0])
+        m.updateDrag(offset: 160)
+        #expect(m.drag?.to == 2 && m.shift(for: ids[1]) == -70)
+        m.upZoneHot = true
+        #expect(m.drag?.to == 0)
+        #expect(m.shift(for: ids[1]) == 0 && m.shift(for: ids[2]) == 0)
+        m.updateDrag(offset: 200)
+        #expect(m.drag?.to == 0 && m.nestTarget == nil)
+    }
+
+    @Test func moveDropsADraftThatIsBackToTheSavedOrder() async throws {
+        let (m, _) = try await osakaModel()
+        let ids = m.items.map(\.id)
+        m.move(ids[0], by: 1) // draft: 1 0 2 3 4 5
+        m.beginDrag(ids[1])
+        m.updateDrag(offset: 70) // into 大阪城天守阁
+        m.endDrag()
+        #expect(m.pendingNest?.into == ids[0])
+        await m.confirmNest()
+        // What is left (0 2 3 4 5) is the saved order: no 取消 / 保存 bar.
+        #expect(m.draft == nil && !m.isEditing)
+        #expect(m.items.map(\.id) == [ids[0], ids[2], ids[3], ids[4], ids[5]])
+    }
+
+    @Test func nestLeavesThenTheTargetFlashes() async throws {
+        let backend = await InMemoryBackend.sample()
+        let project = try await backend.projects()[0]
+        let osaka = try await backend.level(project.rootTaskId).children[0].id
+        var seen: [(Duration, String?, String?, Int)] = []
+        var model: LevelModel?
+        let m = LevelModel(taskId: osaka, backend: backend, pause: { d in
+            guard let m = model else { return }
+            seen.append((d, m.leaving, m.flash, m.items.count))
+        })
+        model = m
+        await m.load()
+        for t in m.items { m.rowHeights[t.id] = 60 }
+        let ids = m.items.map(\.id)
+        m.beginDrag(ids[0])
+        m.updateDrag(offset: 70)
+        m.endDrag()
+        await m.confirmNest()
+        await m.flashing?.value
+        // 240 ms fading out while still in the list, then the move; the target is outlined for 1400 ms.
+        #expect(seen.count == 2)
+        #expect(seen[0].0 == .milliseconds(240) && seen[0].1 == ids[0] && seen[0].3 == 6)
+        #expect(seen[1].0 == .milliseconds(1400) && seen[1].1 == nil && seen[1].2 == ids[1] && seen[1].3 == 5)
+        #expect(m.flash == nil && m.leaving == nil)
+        #expect(m.items.first?.childCount == 1)
     }
 
     @Test func cancelRestoresTheSavedOrder() async throws {
@@ -187,6 +327,96 @@ private func names(_ m: LevelModel) -> [String] { m.items.map(\.name) }
         #expect(plan.direction == .back && plan.isRoot)
         #expect(plan.current.selection.count == 1)
         #expect(!plan.model(for: osaka.id).isEditing) // leaving a level drops its unsaved drag
+    }
+
+    @Test func promoteRefreshesTheCachedParentLevel() async throws {
+        let backend = await InMemoryBackend.sample()
+        let project = try await backend.projects()[0]
+        let plan = PlanModel(project: project, backend: backend, pause: { _ in })
+        await plan.current.load()
+        let root = plan.current
+        let osaka = root.items[0].id
+        plan.open(osaka)
+        await plan.current.load()
+        let dotonbori = plan.current.items[2]
+        await plan.current.promote(dotonbori.id)
+        #expect(!plan.current.items.contains { $0.id == dotonbori.id })
+        #expect(root.items.map(\.name) == ["大阪", "道顿堀", "东京", "北海道"])
+        #expect(root.items[0].childCount == 5)
+        // The refreshed level carries the server's version: an order saved there is accepted.
+        root.move(root.items[0].id, by: 1)
+        await root.save()
+        #expect(root.notice == nil)
+    }
+
+    @Test func nestRefreshesTheCachedTargetLevel() async throws {
+        let backend = await InMemoryBackend.sample()
+        let project = try await backend.projects()[0]
+        let plan = PlanModel(project: project, backend: backend, pause: { _ in })
+        await plan.current.load()
+        let osaka = plan.current.items[0].id
+        let tokyo = plan.current.items[1].id
+        await plan.model(for: tokyo).load()
+        let ids = plan.current.items.map(\.id)
+        for id in ids { plan.current.rowHeights[id] = 60 }
+        plan.current.beginDrag(osaka)
+        plan.current.updateDrag(offset: 70)
+        plan.current.endDrag()
+        await plan.current.confirmNest()
+        #expect(plan.model(for: tokyo).items.last?.name == "大阪")
+    }
+
+    @Test func nestUpdatesTheCountShownOnTheLevelAbove() async throws {
+        let backend = await InMemoryBackend.sample()
+        let project = try await backend.projects()[0]
+        let plan = PlanModel(project: project, backend: backend, pause: { _ in })
+        await plan.current.load()
+        let root = plan.current
+        plan.open(root.items[0].id)
+        let osaka = plan.current
+        await osaka.load()
+        for t in osaka.items { osaka.rowHeights[t.id] = 60 }
+        osaka.beginDrag(osaka.items[0].id)
+        osaka.updateDrag(offset: 70)
+        osaka.endDrag()
+        await osaka.confirmNest()
+        #expect(root.items[0].childCount == 5)
+    }
+
+    @Test func dropMathsFollowsTheRowsAsTheyGrow() async throws {
+        let (m, _) = try await osakaModel()
+        let ids = m.items.map(\.id)
+        m.beginDrag(ids[2])
+        // The rail narrows the rows and the two above grow by 30 each: row 2's slot is now 60 lower, so the
+        // card's offset from it is the finger's travel minus 60, and the bands are the rows as they now are.
+        m.rowHeights[ids[0]] = 90
+        m.rowHeights[ids[1]] = 90
+        m.updateDrag(offset: -75)
+        #expect(m.drag?.offset == -135)
+        // Centre 200 + 30 - 135 = 95: between 72% of row 0 (64.8) and 28% of row 1 (125.2) → before row 1.
+        // Without the correction it would be 155, the middle of row 1.
+        #expect(m.drag?.to == 1 && m.nestTarget == nil)
+        #expect(m.shift(for: ids[1]) == 70)
+        m.updateDrag(offset: -10) // centre 160: row 1's middle band as it now is
+        #expect(m.nestTarget == ids[1])
+    }
+
+    @Test func revealOpensALevelAtDepthWithTheRowFlashed() async throws {
+        let backend = await InMemoryBackend.sample()
+        let project = try await backend.projects()[0]
+        let osaka = try await backend.level(project.rootTaskId).children[0]
+        let usj = try await backend.level(osaka.id).children[1]
+        var flashed: [Duration] = []
+        let plan = PlanModel(project: project, backend: backend, pause: { flashed.append($0) })
+        let loading = plan.reveal(level: osaka.id, flash: usj.id)
+        #expect(plan.current.taskId == osaka.id, "shows the level before it has loaded")
+        await loading.value
+        #expect(plan.path == [project.rootTaskId, osaka.id])
+        #expect(plan.current.taskId == osaka.id && plan.overline == "日本旅行")
+        await plan.current.flashing?.value
+        #expect(flashed == [.milliseconds(1600)])
+        plan.back()
+        #expect(plan.isRoot)
     }
 
     @Test func projectListCreateRenameDeleteAndOpen() async throws {

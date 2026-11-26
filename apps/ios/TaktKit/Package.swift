@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 import PackageDescription
 
 let package = Package(
@@ -13,6 +13,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.10.0"),
         .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.8.0"),
         .package(url: "https://github.com/apple/swift-openapi-urlsession", from: "1.1.0"),
+        .package(url: "https://github.com/FluidInference/FluidAudio", exact: "0.18.4", traits: ["Diarizer"]),
     ],
     targets: [
         // Rules the device needs for instant feedback (drag preview distance, km formatting).
@@ -26,9 +27,19 @@ let package = Package(
             ],
             plugins: [.plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")]
         ),
-        .target(name: "TaktUI", dependencies: ["TaktCore", "TaktAPI"]),
+        // On-device note taking: segmented recording, transcription, diarization, local store.
+        .target(
+            name: "TaktNotes",
+            dependencies: ["TaktCore", "TaktAPI", .product(name: "FluidAudio", package: "FluidAudio")]
+        ),
+        .target(name: "TaktUI", dependencies: ["TaktCore", "TaktAPI", "TaktNotes"]),
         .testTarget(name: "TaktCoreTests", dependencies: ["TaktCore"]),
         .testTarget(name: "TaktAPITests", dependencies: ["TaktAPI"]),
-        .testTarget(name: "TaktUITests", dependencies: ["TaktUI"]),
+        .testTarget(name: "TaktUITests", dependencies: ["TaktUI", "TaktNotes", "TaktCore"]),
+        .testTarget(
+            name: "TaktNotesTests",
+            dependencies: ["TaktNotes", "TaktCore", "TaktUI"],
+            resources: [.copy("Fixtures")]
+        ),
     ]
 )

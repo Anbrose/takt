@@ -1,12 +1,17 @@
 import SwiftUI
 import TaktAPI
 
-/// Project 列表: name-only cards, newest first. Tap opens, long-press → 重命名 / 删除, ＋ creates.
+/// Project 列表: name-only cards, newest first. Tap opens, long-press → 重命名 / 删除. The ＋ button opens
+/// the menu: 查找 / 笔记 / 录音 / 新建 Project (笔记 and 录音 only where notes are available).
 /// Every change animates (design/guidelines.md 动效): cards open / collapse in place, the empty
-/// state cross-fades with the ＋ button.
+/// state cross-fades, menu items spring out one after another.
 struct ProjectListScreen: View {
     @Bindable var app: AppModel
     @Binding var theme: ThemeChoice
+    var onSearch: () -> Void = {}
+    /// nil hides 笔记 / 录音 (before iOS 26).
+    var onNotes: (() -> Void)?
+    var onRecord: (() -> Void)?
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     private enum Sheet: Equatable {
@@ -18,6 +23,7 @@ struct ProjectListScreen: View {
     /// The last sheet shown, so its labels stay put while it slides away.
     @State private var shown: Sheet = .new
     @State private var deleting: Project?
+    @State private var dialOpen = false
 
     private var listAnimation: Animation { reduce ? Motion.fade : Motion.collapse }
 
@@ -30,14 +36,8 @@ struct ProjectListScreen: View {
             }
         }
         .background(Palette.bg.ignoresSafeArea())
-        .overlay(alignment: .bottomTrailing) {
-            if !app.projects.isEmpty {
-                FloatingAddButton { show(.new) }
-                    .padding(.trailing, Metrics.gutter)
-                    .padding(.bottom, 16)
-                    .transition(reduce ? .opacity : .scale(scale: 0.6).combined(with: .opacity))
-            }
-        }
+        .overlay { scrim }
+        .overlay(alignment: .bottomTrailing) { dial }
         .overlay(alignment: .top) { AppToast(app: app) }
         .overlay { nameSheet }
         .alert(
@@ -51,6 +51,145 @@ struct ProjectListScreen: View {
             }
         }
         .animation(reduce ? Motion.fade : Motion.sheet, value: app.projects.isEmpty)
+    }
+
+    // MARK: 悬浮按钮 menu
+
+    private enum DialItem: Int, CaseIterable {
+        case search, notes, record, new
+
+        var title: String {
+            switch self {
+            case .search: "查找"
+            case .notes: "笔记"
+            case .record: "录音"
+            case .new: "新建 Project"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .search: "magnifyingglass"
+            case .notes: "doc.text"
+            case .record: "mic"
+            case .new: "folder.badge.plus"
+            }
+        }
+
+        var id: String {
+            switch self {
+            case .search: "menu.search"
+            case .notes: "menu.notes"
+            case .record: "menu.record"
+            case .new: "menu.new"
+            }
+        }
+    }
+
+    private var dialItems: [DialItem] {
+        DialItem.allCases.filter { item in
+            switch item {
+            case .notes: onNotes != nil
+            case .record: onRecord != nil
+            default: true
+            }
+        }
+    }
+
+    private var scrim: some View {
+        ZStack {
+            if dialOpen {
+                Color.black.opacity(0.32)
+                    .ignoresSafeArea()
+                    .onTapGesture { setDial(false) }
+                    .accessibilityHidden(true)
+                    .transition(.opacity.animation(.easeInOut(duration: 0.26)))
+            }
+        }
+    }
+
+    private var dial: some View {
+        let items = dialItems
+        return VStack(alignment: .trailing, spacing: 14) {
+            VStack(alignment: .trailing, spacing: 12) {
+                ForEach(Array(items.enumerated()), id: \.element) { i, item in
+                    if dialOpen {
+                        dialButton(item)
+                            // k counts from the bottom: the item next to ＋ comes out first.
+                            .transition(dialTransition(k: items.count - 1 - i))
+                    }
+                }
+            }
+            .padding(.trailing, 2)
+
+            Button { setDial(!dialOpen) } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(Palette.onFill)
+                    .rotationEffect(.degrees(dialOpen ? 45 : 0))
+                    .frame(width: 56, height: 56)
+                    .background(Palette.fill, in: Circle())
+                    .shadow(color: .black.opacity(0.22), radius: 9, y: 6)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(dialOpen ? "关闭" : "菜单")
+            .accessibilityValue(dialOpen ? "1" : "0")
+            .accessibilityIdentifier("fab.menu")
+        }
+        .padding(.trailing, Metrics.gutter)
+        .padding(.bottom, 16)
+    }
+
+    private func dialButton(_ item: DialItem) -> some View {
+        Button { pick(item) } label: {
+            HStack(spacing: 12) {
+                Text(item.title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Palette.text)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(Palette.surface, in: RoundedRectangle(cornerRadius: 10))
+                    .shadow(color: .black.opacity(0.16), radius: 7, y: 4)
+                Image(systemName: item.icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Palette.accentText)
+                    .frame(width: 52, height: 52)
+                    .background(Palette.surface, in: Circle())
+                    .shadow(color: .black.opacity(0.18), radius: 7, y: 4)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(item.title)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier(item.id)
+    }
+
+    /// Prototype: closed = 14 + k·10 pt lower, scale 0.86, transparent; opening is staggered 40 ms per step.
+    private func dialTransition(k: Int) -> AnyTransition {
+        if reduce { return .opacity.animation(Motion.fade) }
+        let delay = Double(k) * 0.04
+        let spring = AnyTransition.modifier(
+            active: DialOffset(y: CGFloat(14 + k * 10), scale: 0.86), identity: DialOffset(y: 0, scale: 1))
+        return .asymmetric(
+            insertion: spring.animation(Motion.dial.delay(delay))
+                .combined(with: .opacity.animation(.easeInOut(duration: 0.2).delay(delay))),
+            removal: spring.animation(Motion.dial).combined(with: .opacity.animation(.easeInOut(duration: 0.2))))
+    }
+
+    private func setDial(_ open: Bool) {
+        Motion.with(Motion.dial, reduce: reduce) { dialOpen = open }
+    }
+
+    private func pick(_ item: DialItem) {
+        setDial(false)
+        switch item {
+        case .search: onSearch()
+        case .notes: onNotes?()
+        case .record: onRecord?()
+        case .new: show(.new)
+        }
     }
 
     private var header: some View {
@@ -175,6 +314,8 @@ struct ProjectNameSheet: View {
     let title: String
     let action: String
     let initial: String
+    /// The small label over the field; nil = none (the title says it).
+    var fieldLabel: String? = "名称"
     let onSubmit: (String) async -> Bool
     @Environment(\.accessibilityReduceMotion) private var reduce
 
@@ -216,10 +357,13 @@ struct ProjectNameSheet: View {
     private var form: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(title).font(.system(size: 18, weight: .bold)).foregroundStyle(Palette.text)
-            LabeledField(label: "名称", text: $name)
-                .focused($focused)
-                .submitLabel(.done)
-                .onSubmit(submit)
+            Group {
+                if let fieldLabel { LabeledField(label: fieldLabel, text: $name) } else { InputField(text: $name) }
+            }
+            .focused($focused)
+            .submitLabel(.done)
+            .onSubmit(submit)
+            .accessibilityLabel(fieldLabel ?? title)
             HStack(spacing: 10) {
                 WideButton(title: "取消", kind: .secondary, height: 48, action: close)
                 WideButton(title: action, kind: .primary, height: 48, busy: submitting, action: submit)
@@ -276,5 +420,13 @@ struct AppToast: View {
         }
         .padding(.top, 8)
         .animation(reduce ? Motion.fade : Motion.sheet, value: app.notice)
+    }
+}
+
+private struct DialOffset: ViewModifier {
+    let y: CGFloat
+    let scale: CGFloat
+    func body(content: Content) -> some View {
+        content.scaleEffect(scale, anchor: .trailing).offset(y: y)
     }
 }

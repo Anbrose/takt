@@ -1,3 +1,6 @@
+/// Where a dragged row lands: moved among its siblings, or dropped onto a sibling to become its child.
+public enum DropTarget: Equatable, Sendable { case reorder(to: Int), into(index: Int) }
+
 /// Mirrors packages/core/src/order.ts.
 public enum Order {
     /// Moves one element; returns a new array.
@@ -29,5 +32,25 @@ public enum Order {
         while to < heights.count - 1, centre > tops[to + 1] + heights[to + 1] / 2 { to += 1 }
         while to > 0, centre < tops[to - 1] + heights[to - 1] / 2 { to -= 1 }
         return to
+    }
+
+    /// Same bands as the canvas: the middle 28%-72% of the next row (in the direction of travel) = into;
+    /// past 72% = reorder past it. The held row's centre decides.
+    public static func dropTarget(heights: [Double], gap: Double, from: Int, offset: Double) -> DropTarget {
+        guard heights.indices.contains(from) else { return .reorder(to: from) }
+        var tops: [Double] = []
+        var acc = 0.0
+        for h in heights {
+            tops.append(acc)
+            acc += h + gap
+        }
+        let n = heights.count
+        let centre = tops[from] + heights[from] / 2 + offset
+        var to = from
+        while to < n - 1, centre > tops[to + 1] + heights[to + 1] * 0.72 { to += 1 }
+        while to > 0, centre < tops[to - 1] + heights[to - 1] * 0.28 { to -= 1 }
+        if to < n - 1, to >= from, centre > tops[to + 1] + heights[to + 1] * 0.28 { return .into(index: to + 1) }
+        if to > 0, to <= from, centre < tops[to - 1] + heights[to - 1] * 0.72 { return .into(index: to - 1) }
+        return .reorder(to: to)
     }
 }

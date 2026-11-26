@@ -4,13 +4,22 @@ import {
   doublePrecision,
   index,
   integer,
+  jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
+import type { z } from 'zod';
+import type * as C from '@takt/contract';
+
+type Chain = z.infer<typeof C.Chain>;
+type ImportedStep = z.infer<typeof C.ImportedStep>;
+type Speaker = z.infer<typeof C.Speaker>;
+type TranscriptLine = z.infer<typeof C.TranscriptLine>;
 
 export const projects = pgTable(
   'projects',
@@ -75,4 +84,53 @@ export const prerequisites = pgTable(
     index('prerequisites_task_idx').on(t.taskId, t.position),
     check('prerequisites_urgency', sql`${t.urgency} in ('early', 'before', 'onsite')`),
   ],
+);
+
+/** A recorded note. The id is chosen by the client so a retried create is idempotent. */
+export const notes = pgTable(
+  'notes',
+  {
+    id: uuid().primaryKey(),
+    ownerId: text('owner_id').notNull(),
+    title: text().notNull(),
+    locale: text().notNull(),
+    durationMs: integer('duration_ms').notNull().default(0),
+    transcript: jsonb().$type<TranscriptLine[]>().notNull().default([]),
+    speakers: jsonb().$type<Speaker[]>().notNull().default([]),
+    transcriptHash: text('transcript_hash'),
+    /** The AI draft; its `version` lives in `extractionVersion`. */
+    extraction: jsonb().$type<{ chains: Chain[] }>().notNull().default({ chains: [] }),
+    extractionVersion: integer('extraction_version').notNull().default(0),
+    /** Hash of the transcript the current draft was extracted from. */
+    extractedHash: text('extracted_hash'),
+    extractCount: integer('extract_count').notNull().default(0),
+    imported: jsonb().$type<ImportedStep[]>().notNull().default([]),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('notes_owner_idx').on(t.ownerId, t.createdAt.desc())],
+);
+
+export const noteSegments = pgTable(
+  'note_segments',
+  {
+    noteId: uuid('note_id')
+      .notNull()
+      .references(() => notes.id, { onDelete: 'cascade' }),
+    index: integer().notNull(),
+    durationMs: integer('duration_ms').notNull(),
+    uploadedAt: timestamp('uploaded_at', { withTimezone: true }),
+  },
+  (t) => [primaryKey({ columns: [t.noteId, t.index] })],
+);
+
+/** Monthly count of LLM extractions per owner (rate limit). */
+export const llmUsage = pgTable(
+  'llm_usage',
+  {
+    ownerId: text('owner_id').notNull(),
+    month: text().notNull(),
+    calls: integer().notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.ownerId, t.month] })],
 );

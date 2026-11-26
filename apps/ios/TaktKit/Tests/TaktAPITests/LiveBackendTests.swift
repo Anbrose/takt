@@ -41,3 +41,44 @@ private func backend(_ json: String, status: HTTPResponse.Status = .ok) -> LiveB
         _ = try await b.reorder("t", ids: [], version: 0)
     }
 }
+
+private let noteJSON = #"{"id":"5f1c7a0e-4e0b-4a3a-9d7e-0c6f2f8f1a11","title":"2026-11-24 09:00","locale":"zh-CN","durationMs":50340,"createdAt":"2026-11-24T09:00:00.000Z","hasTranscript":true,"chainCount":1,"importedCount":1,"transcript":[{"startMs":0,"endMs":5800,"text":"下周去京都","speaker":"1"},{"startMs":6000,"endMs":11800,"text":"好","speaker":null}],"speakers":[{"id":"1","name":"我"}],"segments":[{"index":0,"durationMs":50340,"uploaded":true}],"extraction":{"version":2,"chains":[{"id":"0b6c1f0e-1111-4222-8333-444455556666","name":"京都","steps":[{"id":"0b6c1f0e-1111-4222-8333-777788889999","name":"订酒店","place":null,"quote":{"startMs":6000,"endMs":11800}}]}]},"imported":[{"stepId":"0b6c1f0e-1111-4222-8333-aaaabbbbcccc","chainName":"京都","stepName":"买车票","taskId":"0b6c1f0e-1111-4222-8333-ddddeeeeffff","parentTaskId":"0b6c1f0e-1111-4222-8333-000011112222","importedAt":"2026-11-24T10:15:30.123Z"}]}"#
+
+@Test func decodesANote() async throws {
+    let n = try await backend(noteJSON).note("5f1c7a0e-4e0b-4a3a-9d7e-0c6f2f8f1a11")
+    #expect(n.durationMs == 50340)
+    #expect(n.transcript.map(\.speaker) == ["1", nil])
+    #expect(n.extraction.version == 2)
+    #expect(n.extraction.chains[0].steps[0].place == nil)
+    #expect(n.imported[0].stepId == "0b6c1f0e-1111-4222-8333-aaaabbbbcccc")
+}
+
+@Test func decodesAnImportResult() async throws {
+    let level = #"{"projectId":"p","task":{"id":"t","name":"京都"},"breadcrumb":[{"id":"t","name":"京都"}],"version":4,"children":[]}"#
+    let b = backend(#"{"level":\#(level),"note":\#(noteJSON)}"#)
+    let r = try await b.importNote("n", parent: "t", picks: [ImportPick(chainId: "c", stepIds: ["s"], places: [:])])
+    #expect(r.level.version == 4)
+    #expect(r.note.importedCount == 1)
+}
+
+@Test func decodesAudioUrls() async throws {
+    let b = backend(#"{"segments":[{"index":0,"durationMs":1000,"url":"https://storage.example/a.m4a","expiresAt":"2026-11-24T10:00:00.000Z"}]}"#)
+    let urls = try await b.noteAudio("n")
+    #expect(urls.segments.first?.url == "https://storage.example/a.m4a")
+}
+
+@Test func mapsExtractLimitToItsCode() async throws {
+    let b = backend(#"{"error":"extract_limit","message":"Extraction limit for this note reached"}"#, status: .tooManyRequests)
+    await #expect(throws: BackendError.api(status: 429, code: "extract_limit", message: "Extraction limit for this note reached")) {
+        _ = try await b.extract(note: "n")
+    }
+}
+
+@Test func importPickWrapsPlacesAsADictionary() throws {
+    let place = PickedPlace(place: "伏见稻荷大社", address: "京都", lat: 34.97, lng: 135.77)
+    let pick = ImportPick(chainId: "c", stepIds: ["s"], places: ["s": place])
+    #expect(pick.placesByStep["s"] == place)
+    let json = String(decoding: try JSONEncoder().encode(pick), as: UTF8.self)
+    #expect(json.contains(#""places":{"s":{"#))
+    #expect(ImportPick(chainId: "c", stepIds: ["s"], places: [:]).places == nil)
+}

@@ -8,6 +8,29 @@ func openTrip(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt
     XCTAssertTrue(app.buttons["进入 大阪，6 项"].waitForExistence(timeout: 5), file: file, line: line)
 }
 
+/// Drags `name`'s handle so the dragged card's centre ends at `centreY` (screen points), then lets go.
+/// The drop goes by that centre (`Order.dropTarget`): a row's middle band nests, its edges reorder.
+func dragRow(_ app: XCUIApplication, _ name: String, centreAt centreY: CGFloat) {
+    let row = app.descendants(matching: .any)["row.\(name)"]
+    let handle = app.descendants(matching: .any)["handle.\(name)"]
+    let start = CGPoint(x: handle.frame.midX, y: handle.frame.midY)
+    let end = CGPoint(x: start.x, y: start.y + centreY - row.frame.midY)
+    let origin = app.coordinate(withNormalizedOffset: .zero)
+    origin.withOffset(CGVector(dx: start.x, dy: start.y)).press(
+        forDuration: 0.2, thenDragTo: origin.withOffset(CGVector(dx: end.x, dy: end.y)),
+        withVelocity: .slow, thenHoldForDuration: 0.3)
+}
+
+/// Drags `name` onto the middle of `target` (→ 「放入「target」？」).
+func dragRow(_ app: XCUIApplication, _ name: String, into target: String) {
+    dragRow(app, name, centreAt: app.descendants(matching: .any)["row.\(target)"].frame.midY)
+}
+
+/// Drags `name` just above `target` (the gap before it: a reorder, not a nest).
+func dragRow(_ app: XCUIApplication, _ name: String, above target: String) {
+    dragRow(app, name, centreAt: app.descendants(matching: .any)["row.\(target)"].frame.minY - 5)
+}
+
 /// End-to-end checks of 规划模式 in the simulator against the in-memory demo backend.
 /// Screenshots are attached to the test results (Xcode: Report navigator → Attachments).
 final class PlanFlowUITests: XCTestCase {
@@ -29,7 +52,6 @@ final class PlanFlowUITests: XCTestCase {
     }
 
     private func row(_ name: String) -> XCUIElement { app.descendants(matching: .any)["row.\(name)"] }
-    private func handle(_ name: String) -> XCUIElement { app.descendants(matching: .any)["handle.\(name)"] }
 
     /// Task names sorted by their on-screen position.
     private func visibleOrder(_ names: [String]) -> [String] {
@@ -63,12 +85,12 @@ final class PlanFlowUITests: XCTestCase {
         let names = ["大阪城天守阁", "日本环球影城", "道顿堀"]
         XCTAssertEqual(visibleOrder(names), names)
 
-        handle("大阪城天守阁").press(
-            forDuration: 0.2, thenDragTo: row("道顿堀"), withVelocity: .slow, thenHoldForDuration: 0.2)
+        dragRow(app, "道顿堀", above: "日本环球影城")
 
         let save = app.buttons["保存"]
+        XCTAssertFalse(app.descendants(matching: .any)["confirm.nest"].exists, "an edge reorders, no 放入 question")
         XCTAssertTrue(save.waitForExistence(timeout: 2))
-        XCTAssertNotEqual(visibleOrder(names).first, "大阪城天守阁", "dragged row left the top")
+        XCTAssertEqual(visibleOrder(names), ["大阪城天守阁", "道顿堀", "日本环球影城"], "dragged row went before 日本环球影城")
         snap("after drag (unsaved)")
 
         app.buttons["取消"].tap()
@@ -78,14 +100,13 @@ final class PlanFlowUITests: XCTestCase {
 
     func testDragThenSavePersistsAcrossNavigation() {
         enterOsaka()
-        handle("大阪城天守阁").press(
-            forDuration: 0.2, thenDragTo: row("道顿堀"), withVelocity: .slow, thenHoldForDuration: 0.2)
+        dragRow(app, "道顿堀", above: "日本环球影城")
         app.buttons["保存"].tap()
 
         app.buttons["返回"].tap()
         enterOsaka()
         let names = ["大阪城天守阁", "日本环球影城", "道顿堀"]
-        XCTAssertNotEqual(visibleOrder(names).first, "大阪城天守阁")
+        XCTAssertEqual(visibleOrder(names), ["大阪城天守阁", "道顿堀", "日本环球影城"])
         snap("saved order")
     }
 
@@ -220,8 +241,11 @@ final class ProjectListUITests: XCTestCase {
         let trip = app.buttons["project.日本旅行"]
         XCTAssertTrue(trip.waitForExistence(timeout: 5))
 
-        // 新建 → pushes into the new (empty) project.
-        app.buttons["新建"].tap()
+        // ＋ → 新建 Project → pushes into the new (empty) project.
+        app.descendants(matching: .any)["fab.menu"].tap()
+        let new = app.descendants(matching: .any)["menu.new"]
+        XCTAssertTrue(new.waitForExistence(timeout: 2))
+        new.tap()
         let field = app.textFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 3))
         field.tap()

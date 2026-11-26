@@ -1,0 +1,345 @@
+import { randomUUID } from 'node:crypto';
+import { and, asc, desc, eq, isNotNull, sql } from 'drizzle-orm';
+import type { FastifyInstance } from 'fastify';
+import type { z } from 'zod';
+import { routes, type ImportedStep as ImportedStepSchema } from '@takt/contract';
+import type { Db } from '../db/client.ts';
+import { insertTask, loadLevel } from './levels.ts';
+import { llmUsage, noteSegments, notes } from '../db/schema.ts';
+import { chunkLines, type DraftChain, type ExtractLimits, type Extractor } from '../llm/extractor.ts';
+import { HttpError, notFound, route, type ResolveOwner } from '../http.ts';
+import {
+  defaultTitle,
+  loadNote,
+  loadSegments,
+  toNote,
+  toSummary,
+  transcriptHash,
+} from '../services/notes.ts';
+import { projectOfTask } from '../services/tree.ts';
+import { notePrefix, segmentObject, type AudioStore } from '../storage/audio-store.ts';
+
+type ImportedStep = z.infer<typeof ImportedStepSchema>;
+
+const READ_URL_TTL_SECONDS = 3600;
+
+export function noteRoutes(
+  app: FastifyInstance,
+  db: Db,
+  owner: ResolveOwner,
+  audio: AudioStore,
+  extractor: Extractor,
+  limits: ExtractLimits,
+) {
+  const full = async (row: Awaited<ReturnType<typeof loadNote>>) =>
+    toNote(row, await loadSegments(db, row.id));
+
+  route(app, owner, routes.listNotes, async ({ owner }) => {
+    const rows = await db
+      .select()
+      .from(notes)
+      .where(eq(notes.ownerId, owner))
+      .orderBy(desc(notes.createdAt), desc(notes.id));
+    return { notes: rows.map(toSummary) };
+  });
+
+  route(app, owner, routes.createNote, async ({ owner, body }) => {
+    const createdAt = body.createdAt ? new Date(body.createdAt) : new Date();
+    await db
+      .insert(notes)
+      .values({
+        id: body.id,
+        ownerId: owner,
+        title: body.title ?? defaultTitle(createdAt),
+        locale: body.locale,
+        createdAt,
+      })
+      .onConflictDoNothing({ target: notes.id });
+    const [row] = await db.select().from(notes).where(eq(notes.id, body.id));
+    if (row!.ownerId !== owner) throw new HttpError(409, 'note_id_taken', 'Note id is already in use');
+    return full(row!);
+  });
+
+  route(app, owner, routes.getNote, async ({ owner, params }) =>
+    full(await loadNote(db, owner, params.noteId)),
+  );
+
+  route(app, owner, routes.updateNote, async ({ owner, params, body }) => {
+    const row = await loadNote(db, owner, params.noteId);
+    const [updated] = await db
+      .update(notes)
+      .set({
+        ...(body.title !== undefined && { title: body.title }),
+        ...(body.durationMs !== undefined && { durationMs: body.durationMs }),
+        ...(body.speakers !== undefined && { speakers: body.speakers }),
+        ...(body.transcript !== undefined && {
+          transcript: body.transcript,
+          transcriptHash: transcriptHash(body.transcript),
+        }),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(notes.id, row.id), eq(notes.ownerId, owner)))
+      .returning();
+    return full(updated!);
+  });
+
+  route(app, owner, routes.deleteNote, async ({ owner, params }) => {
+    const row = await loadNote(db, owner, params.noteId);
+    // Audio first: if it fails the row stays, so a retry finds the note and deletes the audio again.
+    await audio.deletePrefix(notePrefix(owner, row.id));
+    // note_segments go with it (ON DELETE CASCADE).
+    await db.delete(notes).where(and(eq(notes.id, row.id), eq(notes.ownerId, owner)));
+    return { id: row.id };
+  });
+
+  route(app, owner, routes.uploadSegment, async ({ owner, params }) => {
+    const row = await loadNote(db, owner, params.noteId);
+    const ticket = await audio.createUpload(segmentObject(owner, row.id, params.index), 'audio/mp4');
+    return { uploadUrl: ticket.uploadUrl, expiresAt: ticket.expiresAt.toISOString() };
+  });
+
+  route(app, owner, routes.completeSegment, async ({ owner, params, body }) => {
+    const row = await loadNote(db, owner, params.noteId);
+    if (!(await audio.stat(segmentObject(owner, row.id, params.index)))) {
+      throw new HttpError(409, 'segment_missing', 'Segment audio has not been uploaded');
+    }
+    const uploadedAt = new Date();
+    const updated = await db.transaction(async (tx) => {
+      await tx
+        .insert(noteSegments)
+        .values({ noteId: row.id, index: params.index, durationMs: body.durationMs, uploadedAt })
+        .onConflictDoUpdate({
+          target: [noteSegments.noteId, noteSegments.index],
+          set: { durationMs: body.durationMs, uploadedAt },
+        });
+      const segments = await loadSegments(tx, row.id);
+      const total = segments.reduce((sum, s) => sum + s.durationMs, 0);
+      const [n] = await tx
+        .update(notes)
+        .set({ durationMs: total, updatedAt: uploadedAt })
+        .where(and(eq(notes.id, row.id), eq(notes.ownerId, owner)))
+        .returning();
+      return { note: n!, segments };
+    });
+    return toNote(updated.note, updated.segments);
+  });
+
+  route(app, owner, routes.noteAudio, async ({ owner, params }) => {
+    const row = await loadNote(db, owner, params.noteId);
+    const uploaded = await db
+      .select()
+      .from(noteSegments)
+      .where(and(eq(noteSegments.noteId, row.id), isNotNull(noteSegments.uploadedAt)))
+      .orderBy(asc(noteSegments.index));
+    const segments = await Promise.all(
+      uploaded.map(async (s) => {
+        const read = await audio.readUrl(segmentObject(owner, row.id, s.index), READ_URL_TTL_SECONDS);
+        return {
+          index: s.index,
+          durationMs: s.durationMs,
+          url: read.url,
+          expiresAt: read.expiresAt.toISOString(),
+        };
+      }),
+    );
+    return { segments };
+  });
+
+  route(app, owner, routes.extractNote, async ({ owner, params }) => {
+    const row = await loadNote(db, owner, params.noteId);
+    if (row.transcript.length === 0) throw new HttpError(400, 'empty_transcript', 'Transcript is empty');
+    if (row.transcriptHash !== null && row.transcriptHash === row.extractedHash) return full(row);
+    if (row.extractCount >= limits.perNote) {
+      throw new HttpError(429, 'extract_limit', 'Extraction limit for this note reached');
+    }
+    const month = new Date().toISOString().slice(0, 7);
+    const [usage] = await db
+      .select()
+      .from(llmUsage)
+      .where(and(eq(llmUsage.ownerId, owner), eq(llmUsage.month, month)));
+    if ((usage?.calls ?? 0) >= limits.monthlyCalls) {
+      throw new HttpError(429, 'budget_exceeded', 'Monthly extraction budget reached');
+    }
+
+    // The budget is checked once, before the run. A multi-chunk run that crosses it
+    // mid-way still finishes: failing half way would waste the calls already paid for.
+    const lastEnd = row.transcript.reduce((m, l) => Math.max(m, l.endMs), 0);
+    const clamp = (ms: number) => Math.round(Math.min(Math.max(ms, 0), lastEnd));
+    const drafts: DraftChain[] = [];
+    try {
+      for (const lines of chunkLines(row.transcript)) {
+        try {
+          drafts.push(...(await extractor.extract({ locale: row.locale, speakers: row.speakers, lines })));
+        } finally {
+          // Count every call actually made, including one that failed.
+          await db
+            .insert(llmUsage)
+            .values({ ownerId: owner, month, calls: 1 })
+            .onConflictDoUpdate({
+              target: [llmUsage.ownerId, llmUsage.month],
+              set: { calls: sql`${llmUsage.calls} + 1` },
+            });
+        }
+      }
+    } catch (err) {
+      app.log.error(err, 'extraction failed');
+      throw new HttpError(502, 'llm_failed', 'Extraction failed');
+    }
+
+    // Model output is untrusted: fit it to the contract's limits instead of failing the response.
+    const text = (v: string) => v.trim().slice(0, 200);
+    const chains = drafts
+      .map((c) => ({
+        id: randomUUID(),
+        name: text(c.name),
+        steps: c.steps
+          .filter((s) => text(s.name) !== '')
+          .slice(0, 100)
+          .map((s) => ({
+            id: randomUUID(),
+            name: text(s.name),
+            place: s.place === null || text(s.place) === '' ? null : text(s.place),
+            quote: {
+              startMs: clamp(s.quote.startMs),
+              endMs: clamp(Math.max(s.quote.endMs, s.quote.startMs)),
+            },
+          })),
+      }))
+      .filter((c) => c.name !== '' && c.steps.length > 0)
+      .slice(0, 50);
+    const [updated] = await db
+      .update(notes)
+      .set({
+        extraction: { chains },
+        extractionVersion: row.extractionVersion + 1,
+        extractedHash: row.transcriptHash,
+        extractCount: row.extractCount + 1,
+        updatedAt: new Date(),
+      })
+      // Only if nobody else extracted or edited the draft while the model ran.
+      .where(
+        and(
+          eq(notes.id, row.id),
+          eq(notes.ownerId, owner),
+          eq(notes.extractionVersion, row.extractionVersion),
+        ),
+      )
+      .returning();
+    if (!updated) {
+      await loadNote(db, owner, row.id); // 404 when the note was deleted meanwhile
+      throw new HttpError(409, 'version_conflict', 'The draft changed during extraction');
+    }
+    return full(updated);
+  });
+
+  route(app, owner, routes.updateExtraction, async ({ owner, params, body }) => {
+    const row = await loadNote(db, owner, params.noteId);
+    if (body.version !== row.extractionVersion) {
+      throw new HttpError(409, 'version_conflict', 'The draft changed since it was loaded');
+    }
+    const imported = new Set(row.imported.map((i) => i.stepId));
+    if (body.chains.some((c) => c.steps.some((s) => imported.has(s.id)))) {
+      throw new HttpError(400, 'already_imported', 'A step in the draft was already imported');
+    }
+    const [updated] = await db
+      .update(notes)
+      .set({
+        extraction: { chains: body.chains },
+        extractionVersion: row.extractionVersion + 1,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(notes.id, row.id),
+          eq(notes.ownerId, owner),
+          eq(notes.extractionVersion, row.extractionVersion),
+        ),
+      )
+      .returning();
+    if (!updated) {
+      await loadNote(db, owner, row.id);
+      throw new HttpError(409, 'version_conflict', 'The draft changed since it was loaded');
+    }
+    return full(updated);
+  });
+
+  route(app, owner, routes.importNote, async ({ owner, params, body }) => {
+    const result = await db.transaction(async (tx) => {
+      // Note first, then (inside insertTask) the parent: the same order everywhere.
+      const [row] = await tx
+        .select()
+        .from(notes)
+        .where(and(eq(notes.id, params.noteId), eq(notes.ownerId, owner)))
+        .for('update');
+      if (!row) throw notFound('Note');
+      await projectOfTask(tx, owner, body.parentTaskId);
+
+      // Validate every pick against the current draft before writing anything.
+      const draft = new Map(row.extraction.chains.map((c) => [c.id, c]));
+      const used = new Set<string>();
+      const plan = body.picks.map((pick) => {
+        const chain = draft.get(pick.chainId);
+        const wanted = new Set(pick.stepIds);
+        const steps = chain?.steps.filter((s) => wanted.has(s.id)) ?? [];
+        if (!chain || steps.length !== wanted.size || pick.stepIds.length !== wanted.size) {
+          throw new HttpError(409, 'stale_draft', 'The draft changed; reload it before importing');
+        }
+        for (const s of steps) {
+          if (used.has(s.id)) throw new HttpError(400, 'duplicate_pick', 'A step was picked twice');
+          used.add(s.id);
+        }
+        return { chain, steps, places: pick.places ?? {} };
+      });
+
+      // Every inserted chain lands before the same sibling, so the chains keep their pick order.
+      const before = body.beforeTaskId;
+      const importedAt = new Date().toISOString();
+      const imported: ImportedStep[] = [];
+      for (const { chain, steps, places } of plan) {
+        const fields = (s: (typeof steps)[number]) => {
+          const p = places[s.id];
+          return p
+            ? { place: p.place, address: p.address, lat: p.lat, lng: p.lng }
+            : { place: s.place ?? '' };
+        };
+        const parent =
+          steps.length >= 2
+            ? await insertTask(tx, body.parentTaskId, { name: chain.name }, before)
+            : null;
+        for (const s of steps) {
+          const task = await insertTask(
+            tx,
+            parent?.id ?? body.parentTaskId,
+            { name: s.name, ...fields(s) },
+            parent ? undefined : before,
+          );
+          imported.push({
+            stepId: s.id,
+            chainName: chain.name,
+            stepName: s.name,
+            taskId: task.id,
+            parentTaskId: parent?.id ?? body.parentTaskId,
+            importedAt,
+          });
+        }
+      }
+
+      const taken = new Set(used);
+      const chains = row.extraction.chains
+        .map((c) => ({ ...c, steps: c.steps.filter((s) => !taken.has(s.id)) }))
+        .filter((c) => c.steps.length > 0);
+      const [updated] = await tx
+        .update(notes)
+        .set({
+          extraction: { chains },
+          imported: [...row.imported, ...imported],
+          extractionVersion: row.extractionVersion + 1,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(notes.id, row.id), eq(notes.ownerId, owner)))
+        .returning();
+      return { level: await loadLevel(tx, owner, body.parentTaskId), note: updated! };
+    });
+    return { level: result.level, note: toNote(result.note, await loadSegments(db, result.note.id)) };
+  });
+}

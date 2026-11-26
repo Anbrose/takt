@@ -10,6 +10,8 @@ public struct PlanScreen: View {
     var onExit: (() -> Void)?
     @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var adding = false
+    /// Bottom edge (global) of the 「移到「父任务」」 zone while it shows.
+    @State private var upZoneBottom: CGFloat?
 
     public init(plan: PlanModel, theme: Binding<ThemeChoice>, onExit: (() -> Void)? = nil) {
         self.plan = plan
@@ -26,18 +28,63 @@ public struct PlanScreen: View {
         VStack(spacing: 0) {
             header
             ZStack {
-                LevelList(model: level, plan: plan, adding: $adding, onOpen: open)
+                LevelList(model: level, plan: plan, adding: $adding, onOpen: open, overUpZone: overUpZone)
                     .id(level.taskId)
                     .transition(navTransition)
             }
             .clipped()
+            .overlay(alignment: .top) { upZone }
         }
         .background(Palette.bg.ignoresSafeArea())
         .overlay(alignment: .bottomTrailing) { AddButton(hidden: level.isEditing || adding) { add() } }
         .overlay(alignment: .bottom) { SaveBar(model: level) }
         .overlay { NewTaskSheet(model: level, isPresented: $adding) }
+        .overlay { nestConfirm }
         .overlay(alignment: .top) { NoticeToast(model: level) }
-        .task(id: level.taskId) { if level.level == nil { await level.load() } }
+        .task(id: level.taskId) { if level.level == nil, level.status != .loading { await level.load() } }
+    }
+
+    // MARK: 调整从属关系
+
+    /// Shown while dragging on a level below the first: drop here to move the task up next to its parent.
+    private var upTarget: Crumb? { level.drag != nil ? level.parentCrumb : nil }
+
+    private func overUpZone(_ y: CGFloat) -> Bool {
+        guard upTarget != nil, let bottom = upZoneBottom else { return false }
+        return y < bottom + 6
+    }
+
+    private var upZone: some View {
+        ZStack {
+            if let up = upTarget {
+                UpZone(name: up.name, hot: level.upZoneHot)
+                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY } action: { bottom in
+                        // Not while it slides away.
+                        if upTarget != nil { upZoneBottom = bottom }
+                    }
+                    .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: -12)))
+            }
+        }
+        .padding(.horizontal, Metrics.gutter)
+        .padding(.top, 4)
+        .allowsHitTesting(false)
+        .animation(reduce ? Motion.fade : Motion.upZone, value: upTarget?.id)
+        // Hidden: forget its frame, so the next drag never goes by an old one.
+        .onChange(of: upTarget == nil) { _, hidden in if hidden { upZoneBottom = nil } }
+    }
+
+    @ViewBuilder private var nestConfirm: some View {
+        let target = level.pendingNest.flatMap { p in level.items.first { $0.id == p.into } }
+        ZStack {
+            if let target {
+                NestConfirm(
+                    name: target.name,
+                    onCancel: { level.cancelNest() },
+                    onConfirm: { Task { await level.confirmNest() } })
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.22), value: target?.id)
     }
 
     // MARK: Header
@@ -121,9 +168,17 @@ struct LevelList: View {
     @Bindable var plan: PlanModel
     @Binding var adding: Bool
     let onOpen: (String) -> Void
+    /// Whether a finger at this global y is over the 「移到「父任务」」 zone.
+    var overUpZone: (CGFloat) -> Bool = { _ in false }
     @Environment(\.accessibilityReduceMotion) private var reduce
+    /// The finger has moved since touch-down in this drag. Until then the up zone doesn't count: the handle
+    /// takes touches at once, and a tap on a handle near the top must not move the task up a level.
+    @State private var travelled = false
     /// Row whose 删除 button is showing (左滑); one at a time.
     @State private var swiped: String?
+
+    /// Points the finger must move before a drag counts as one (for the up zone).
+    static let travel: CGFloat = 6
 
     /// Tasks in the order a release would give (live drag preview → 预览中 numbers).
     private var previewTasks: [TaskSummary] {
@@ -163,6 +218,10 @@ struct LevelList: View {
                 if on { Motion.with(Motion.settle, reduce: reduce) { proxy.scrollTo("top", anchor: .top) } }
             }
             .sensoryFeedback(.selection, trigger: model.drag?.to)
+            .onChange(of: model.flash) { _, id in
+                guard let id else { return }
+                Motion.with(Motion.settle, reduce: reduce) { proxy.scrollTo(id) }
+            }
             .onChange(of: model.lastAdded) { _, id in
                 guard let id else { return }
                 Motion.with(Motion.settle, reduce: reduce) { proxy.scrollTo(id, anchor: .bottom) }
@@ -209,6 +268,9 @@ struct LevelList: View {
                     compact: plan.mapOn,
                     leg: legs[task.id] ?? "",
                     revealed: swiped == task.id,
+                    nestOn: model.nestTarget == task.id,
+                    flashing: model.flash == task.id,
+                    leaving: model.leaving == task.id,
                     onToggle: {
                         if closeSwipe() { return }
                         Motion.with(Motion.fade, reduce: reduce) { model.toggle(task.id) }
@@ -219,9 +281,15 @@ struct LevelList: View {
                         Motion.with(Motion.settle, reduce: reduce) { swiped = open ? task.id : nil }
                     },
                     onDelete: { delete(task.id) },
-                    onDragChanged: { dy in
+                    onDragChanged: { dy, y in
                         if swiped != nil { swiped = nil }
-                        if model.drag == nil { Motion.with(Motion.sheet, reduce: reduce) { model.beginDrag(task.id) } }
+                        if model.drag == nil {
+                            travelled = false
+                            Motion.with(Motion.sheet, reduce: reduce) { model.beginDrag(task.id) }
+                        }
+                        if abs(dy) > LevelList.travel { travelled = true }
+                        let up = travelled && overUpZone(y)
+                        if model.upZoneHot != up { model.upZoneHot = up }
                         model.updateDrag(offset: dy)
                     },
                     onDragEnded: { Motion.with(Motion.settle, reduce: reduce) { model.endDrag() } },
@@ -280,6 +348,35 @@ struct OrderRail: View {
         .clipped()
         .motion(Motion.settle, value: on, reduce: reduce)
         .accessibilityHidden(true)
+    }
+}
+
+// MARK: - 移到上一级
+
+/// Dashed drop zone at the top of the list: ↑ 移到「父任务」. Outlined and tinted while the finger is over it.
+struct UpZone: View {
+    let name: String
+    let hot: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.up").font(.system(size: 16, weight: .semibold))
+            Text("移到「\(name)」").lineLimit(1)
+        }
+        .font(.system(size: 15, weight: .bold))
+        .foregroundStyle(Palette.accentText)
+        .frame(maxWidth: .infinity)
+        .frame(height: 56)
+        .background(hot ? Palette.soft : Palette.surface, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(hot ? Palette.accent : Palette.line, style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
+        )
+        .shadow(color: .black.opacity(0.12), radius: 11, y: 8)
+        .animation(.easeInOut(duration: 0.18), value: hot)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("up.zone")
+        .accessibilityAddTraits(hot ? .isSelected : [])
     }
 }
 

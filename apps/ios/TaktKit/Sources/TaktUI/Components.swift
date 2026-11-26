@@ -170,20 +170,67 @@ struct ThemeToggle: View {
     }
 }
 
-/// Round filled 新建 button, bottom right.
-struct FloatingAddButton: View {
+/// 44×26 switch (prototype `switchVals`): fill track and the knob slides 20 pt when on.
+struct SwitchTrack: View {
+    let on: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduce
+
+    var body: some View {
+        Capsule()
+            .fill(on ? Palette.fill : Palette.line)
+            .frame(width: 44, height: 26)
+            .overlay(alignment: .leading) {
+                Circle()
+                    .fill(Color.white)
+                    .shadow(color: .black.opacity(0.3), radius: 1.5, y: 1)
+                    .frame(width: 22, height: 22)
+                    .padding(.leading, 2)
+                    .offset(x: on ? 18 : 0)
+            }
+            .animation(reduce ? Motion.fade : Motion.toggle, value: on)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Indeterminate ring (prototype `spin`, 900 ms a turn): a quarter arc over a faint track.
+struct Spinner: View {
+    var size: CGFloat = 28
+    var radius: CGFloat = 9
+    var lineWidth: CGFloat = 2.5
+    var track: Color = Palette.line
+    var arc: Color = Palette.accent
+
+    var body: some View {
+        TimelineView(.animation) { t in
+            let turn = t.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 0.9) / 0.9
+            ZStack {
+                Circle().stroke(track, lineWidth: lineWidth)
+                Circle()
+                    .trim(from: 0, to: 0.25)
+                    .stroke(arc, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .rotationEffect(.degrees(-90 + turn * 360))
+            }
+            .frame(width: radius * 2, height: radius * 2)
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
+/// 返回 chevron, 44 pt, pulled 8 pt into the gutter (screen headers).
+struct BackButton: View {
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "plus")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(Palette.onFill)
-                .frame(width: 56, height: 56)
-                .background(Palette.fill, in: Circle())
-                .shadow(color: .black.opacity(0.22), radius: 9, y: 6)
+            Image(systemName: "chevron.left")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Palette.text)
+                .frame(width: Metrics.hit, height: Metrics.hit)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("新建")
+        .accessibilityLabel("返回")
+        .padding(.leading, -8)
     }
 }

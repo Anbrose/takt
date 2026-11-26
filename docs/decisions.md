@@ -65,6 +65,54 @@
 - **推入动画**：规划页从右侧滑入，列表左移 28% 并变暗，曲线 `cubic-bezier(0.32, 0.72, 0, 1)`、420ms；推入结束后列表移出视图层级，返回前先放回去。没有用 `NavigationStack`，因为规划页有自己的标题栏，系统导航栏的样式和动画对不上画布。
 - **未做**：边缘右滑返回手势；记住上次打开的 Project；网页端的 Project 列表；「减少动态效果」下其余界面仍是瞬间切换（准则要求改成淡入淡出，留待逐处审查）。
 
+## 录音笔记（第六阶段，2026-11-24）
+
+- **`notes` 表**：id 由客户端生成（UUID），`POST /notes` 幂等——同一个 id 重试返回 200 和同一条笔记，不会重复；别的 owner 用了同一个 id 返回 409。每个查询都按 `owner_id` 过滤。
+- **录音存在 GCS**：对象路径 `notes/{ownerId}/{noteId}/{segmentIndex}.m4a`。上传用 resumable 会话 URL，读取用 1 小时有效的签名 URL（v4）。**音频不经过 API**，手机和 GCS 直连，API 只发 URL。
+- **Bucket**：区域 `australia-southeast1`，统一访问控制并禁止公开访问。由 `scripts/notes-bucket.sh` 创建（需要 `GCP_PROJECT`，可重复运行），同时给 Cloud Run 默认服务账号 `roles/storage.objectAdmin`（bucket 上）和 `roles/iam.serviceAccountTokenCreator`（对自己，用于签名）。
+- **`NOTES_BUCKET` 环境变量**：设置后用 GCS，没设置时用内存存储（开发和测试不需要 GCP 凭据）。`scripts/deploy-api.sh` **在这个分支上不存在**（部署脚本在别的工作区，还没合并）；等它合入后，部署时要加 `--set-env-vars NOTES_BUCKET=<脚本最后打印的值>`。
+- **任务链提取（LLM）**：默认用 Vertex AI 上的 Gemini（`@google/genai` 的 Vertex 模式，`temperature` 0，JSON schema 结构化输出），模型和区域可配置，默认 `gemini-2.5-flash` / `us-central1`。**还没有和 Claude 对比过**——对比会产生费用，等用户批准后再做；换模型或 SDK 只需改 `apps/api/src/llm/vertex-extractor.ts`。只把逐字稿文本发给模型。手动试跑：`apps/api/scripts/try-extract.ts <transcript.json>`（不在 CI 里跑）。
+- **提取的限制**：未改动的逐字稿再次提取直接返回已有草稿，不调用、不计数；每条笔记最多提取 `NOTE_EXTRACT_LIMIT` 次（默认 10，超出 429 `extract_limit`）；每个 owner 每个 UTC 月最多 `LLM_MONTHLY_CALLS` 次模型调用（默认 300，超出 429 `budget_exceeded`）。长逐字稿按行切成约 3 万字的块，每块调用一次、各计一次；预算只在开始前检查，一次提取中途超出预算也会完成，不会做到一半失败。模型调用失败返回 502 `llm_failed`，只计已经发出的调用。
+- **提取相关环境变量**：`LLM_PROVIDER`（`fake` 默认，返回空草稿，启动时打日志；`vertex`）、`VERTEX_PROJECT`、`VERTEX_LOCATION`、`LLM_MODEL`、`NOTE_EXTRACT_LIMIT`、`LLM_MONTHLY_CALLS`。
+- **手机端转写与说话人**：录音按 300 秒一段存成 AAC（16 kHz 单声道 32 kbps），先存本地 `Application Support/Notes/{id}/`（`note.json` + `{index}.m4a`）。录音中的那一段先写成 16 位 PCM 的 `{index}.caf`（每段约 9.6 MB），这一段结束时再转成 `.m4a` 并删掉 `.caf`：`.m4a` 没关好就整个读不出来，`.caf` 被杀掉后仍能读到最后写入的缓冲，所以 App 被杀只丢最后几秒。下次启动（或网络恢复）时，没列进笔记的 `.caf` / `.m4a` 会被补成一段（真机上 `AVAudioRecorder` 写 `.caf` 被杀后的样子还需要确认；测试用的是写到一半时复制出来的文件）。每段用系统的 `SpeechTranscriber`（iOS 26，离线）转写，语言模型没下载好时段落先留着，装好后再转。停止录音、所有段都转完后，把全部段拼成一个 16 kHz 文件用 FluidAudio 的离线说话人分离跑**一次**（这样各段的说话人编号一致），编号按出现顺序改成 1、2、3…；分离失败就保留没有说话人的逐字稿。FluidAudio 固定 `0.18.4`，用 SwiftPM trait `["Diarizer"]`（包的 tools-version 因此升到 6.2），不带 TTS 和文本规范化的依赖，iOS 真机和模拟器都能链接。
+- **模型与价格（未验证）**：上面的 `gemini-2.5-flash` / `us-central1` 只是 `apps/api/src/config.ts` 里的实现默认值（设计文档和计划都没有指定模型，选择留给实现者），**没有**实测：Gemini 和 Claude 在 Vertex 上的中文提取质量、延迟、价格、悉尼区域可用性都没比较过，也没有任何延迟、费用或准确率数据，等用户批准付费对比后再定（对比后更新这一条）。`NOTE_EXTRACT_LIMIT` 和 `LLM_MONTHLY_CALLS` 的默认值（10、300）来自 `apps/api/src/config.ts`，只是占位，不是按费用算出来的。
+- **GCS 未验证**：`scripts/notes-bucket.sh` 还没有运行过，bucket、授权、签名 URL、resumable 上传都只在内存替身下测过，没连过真实 GCS。
+- **第二版界面**：首页只有 Project 列表，右下角悬浮按钮展开菜单（查找、笔记、录音、新建 Project）。第一次录音弹说明面板，「自动生成任务」开关（默认开）和 `introSeen` 只存手机本地（`notes.autoExtract`、`notes.introSeen`）；开着时文字稿传到服务端后自动提取一次，失败不重试。导入靠长按拖动：整条链或单步拖进底部「加入到项目」，在行上沿/下沿插入（`POST /notes/{id}/import` 的 `beforeTaskId`），行中间成为子任务（先确认），其他位置取消。任务从属关系用 `POST /tasks/{id}/move` 调整（规划页拖到行中间 = 放入并确认；非第一级顶部「移到上一级」不需要确认；立即保存，不进排序草稿）。导入时 `ImportedStep` 带必填 `stepId`（uuid），用来识别 `already_imported`。移动和导入都在一个事务里把涉及各级的 `position` 重写成 `0..n-1` 并给 `children_version` 加一。
+- **查找范围**：Project 名、任务名、笔记标题、**笔记文字稿里的句子**（每条笔记最多 2 句），每组最多 20 条（`GET /search?q=`，不区分大小写的子串匹配）。文字稿也在范围内，因为用户确认的第二版画布就是这样显示的。
+- **实现时的几个决定**：
+  - 笔记标题用**手机本地时间**生成并随 `createNote` 发给服务端（服务端默认标题不会用到）。
+  - 笔记列表的角标显示**链数**（`chainCount`）：`NoteSummary` 没有「剩余步数」，与画布上的数字不同，等接口补上。
+  - 「移到上一级」**不确认**（可以再拖回去）；放入某个任务（变成子任务）**总是确认**。
+  - `ImportPicker`（读屏用户的「加入到项目」逐级选择）是无障碍的后备路径，用原生列表样式，**没有画布画板**；用户可能想补一次画布设计。
+  - 图标用 SF Symbols，代替画布里的 SVG，略有视觉差异。
+  - 说话人分离失败时保留没有说话人的逐字稿，但带 `diarized` 标记，之后每次处理还会重试；本地录音只在上传确认**并且**分离完成后才删除。
+  - 逐字稿的片段直接拼接，不加空格（中文）。
+  - 语言标识用 `Locale.identifier` 形式（`zh_CN`），默认取 `Locale.current`（在支持列表里时），否则 `zh_CN`。
+  - 离线时的笔记详情由本地笔记合成（没有任务链，`isLocalOnly` 禁用提取和导入）。
+- **体积与依赖**：说话人模型约 21 MB，FluidAudio 全量编入约 22 MB（来自设计文档的技术验证，2026-11-23）；用 `Diarizer` trait 去掉 94 MB 的文本处理依赖之后，最终 App 增加的体积**未测量（unknown）**。
+- **测试环境**：iOS UI 测试在 iPhone 17 / iOS 27.2 模拟器上跑，因为本机没有安装 iOS 26 运行时；iOS 26.0 特有的行为没有验证。App target 仍按 iOS 17 部署目标编译通过，说明 iOS 26 专属 API 都有 `@available` 保护。模拟器没有 `SpeechTranscriber`，UI 测试用假识别器。
+- **已知的小问题（留待最终评审，部分影响真机）**：
+  - `NotePlayer.close()` 关闭播放器时会停用音频会话，没有重新检查是否正在录音。
+  - 一个永久失败的段会挡住之后的段和说话人分离，没有跳过策略。
+  - 上传地址在多次同步之间不缓存，续传只在一次同步的 3 次重试内有效；没有退避。
+  - 删除笔记时若 GCS 删除失败，音频对象会成为孤儿。
+  - `VERTEX_LOCATION` 默认值等对比结果；数值型的限制和 `LLM_PROVIDER` 没有校验。
+  - 其余见 `.superpowers/sdd/2026-11-24-notetaker/` 下各任务评审记录。
+
+### 未验证 / 需要在真机上确认
+
+- [ ] 1–2 小时后台录音：锁屏、来电中断后自动继续、耗电和发热。
+- [ ] 真实中文对话的识别准确度（尤其日本地名）和说话人分离效果。
+- [ ] 你的手机上 `SpeechTranscriber` 是否可用、语言模型下载流程。
+- [ ] 蜂窝网络下向 GCS 上传（含断网续传）；需要先运行 `scripts/notes-bucket.sh` 并部署 `NOTES_BUCKET`。
+- [ ] 从某一步跳到文字稿并播放，seek 到的位置是否准确。
+- [ ] 录完之后立刻播放（录音和播放的音频会话切换）。
+- [ ] 播放器开着时开始录音，再关闭播放器，录音不能被中断（`NotePlayer.close()` 的已知问题）。
+- [ ] 长按拖动的手感（长按时长、移动阈值、底部「加入到项目」、悬停 0.5 秒开级）。
+- [ ] VoiceOver 的「加入到项目」自定义操作和 `ImportPicker`（XCUITest 无法执行自定义操作）。
+- [ ] 真实 Vertex 调用：模型选择、区域、延迟、费用、中文任务提取质量（需要用户先批准付费对比）。
+- [ ] iOS 26.0 系统本身（本机只测了 iOS 27.2 模拟器）。
+
 ## 设计流程
 
 - 设计的唯一来源是 Design 画布：<https://claude.ai/artifact/P9mddKiiDZTGZtrFjXPLpb>。`design/takt-handoff/prototype/` 是它的副本，2026-11-21 同步过（手机画板已含 Project 列表）。设计准则见 `design/guidelines.md`。
