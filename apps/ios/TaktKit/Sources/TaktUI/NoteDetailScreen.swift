@@ -17,6 +17,8 @@ struct NoteDetailScreen: View {
     let autoExtracting: Bool
     /// Still on the device / being processed (no transcript on the server yet).
     let processing: Bool
+    /// Opened from a 查找 transcript hit: the player waits paused at this time, its line outlined.
+    let cue: Int?
     let onBack: () -> Void
 
     @State private var drag: ImportDrag
@@ -42,9 +44,10 @@ struct NoteDetailScreen: View {
     }
 
     init(
-        detail: NoteDetailModel, dock: ImportDockModel, item: NoteItem?, autoExtracting: Bool, processing: Bool,
-        isRecording: @escaping () -> Bool = { false }, onBack: @escaping () -> Void
+        detail: NoteDetailModel, dock: ImportDockModel, item: NoteItem?, cue: Int? = nil, autoExtracting: Bool,
+        processing: Bool, isRecording: @escaping () -> Bool = { false }, onBack: @escaping () -> Void
     ) {
+        self.cue = cue
         _player = State(initialValue: NotePlayer(isRecording: isRecording))
         self.detail = detail
         self.item = item
@@ -101,6 +104,11 @@ struct NoteDetailScreen: View {
             drag.onImported = { tipDone = true }
             if detail.note == nil { await detail.load() }
             loaded = true
+            if let cue, let n = note {
+                let detail = detail
+                player.cue(at: cue, duration: n.durationMs) { await detail.audioURL(at: $0) }
+                player.jumpSeq += 1
+            }
         }
         .task(id: note?.imported.map(\.parentTaskId)) { await detail.loadTargets() }
         .task(id: chains.map(\.id)) { openTestPick() }

@@ -8,6 +8,10 @@ import TaktCore
 @Observable
 public final class LevelModel {
     public static let rowGap: Double = 10
+    /// A moved row fades and shrinks away for this long before it leaves the list (prototype 240 ms).
+    public static let leaveTime: Duration = .milliseconds(240)
+    /// The row a task was put into stays outlined this long (prototype 1400 ms).
+    public static let nestFlashTime: Duration = .milliseconds(1400)
 
     public struct Drag: Equatable, Sendable {
         public var id: String
@@ -33,23 +37,45 @@ public final class LevelModel {
     public private(set) var drag: Drag?
     /// Measured row heights, used to decide where a dragged row lands.
     public var rowHeights: [String: Double] = [:]
+    /// Row heights as they were when the drag began (prototype: measured on pointer down). The order rail
+    /// narrows the rows while dragging, which can make them taller; the drop maths keeps the first layout.
+    private var dragHeights: [Double] = []
     /// Id of the task just created, for its entry animation.
     public private(set) var lastAdded: String?
     /// Row the dragged task would go into if released now (its middle band); highlighted.
     public private(set) var nestTarget: String?
     /// The view sets this while the drag is over the 「移到「上一级」」 zone; the rows then neither reorder nor nest.
+    /// Over it, the neighbours slide back to where they were.
     public var upZoneHot = false {
-        didSet { if upZoneHot { nestTarget = nil } }
+        didSet {
+            guard upZoneHot else { return }
+            nestTarget = nil
+            if let d = drag { drag?.to = d.from }
+        }
     }
     /// Released onto a row: waits for 「放入「X」？」.
     public private(set) var pendingNest: (id: String, into: String)?
     /// The move started by releasing in the up zone (test seam).
     public private(set) var moving: Task<Void, Never>?
+    /// Row fading out before a move takes it off this level.
+    public private(set) var leaving: String?
+    /// Row outlined for a moment: where a task was just put, or a search hit.
+    public private(set) var flash: String?
+    /// Clears `flash` when its time is up (test seam).
+    public private(set) var flashing: Task<Void, Never>?
+    /// Called with both levels of a move (where it left, where it went), so cached models can show the change.
+    public var onMoved: ((_ from: Level, _ to: Level) -> Void)?
+    private let pause: @MainActor (Duration) async -> Void
 
-    public init(taskId: String, backend: any TaktBackend, level: Level? = nil) {
+    /// `pause` waits out the leave / flash times; tests pass one that returns at once.
+    public init(
+        taskId: String, backend: any TaktBackend, level: Level? = nil,
+        pause: @escaping @MainActor (Duration) async -> Void = { try? await Task.sleep(for: $0) }
+    ) {
         self.taskId = taskId
         self.backend = backend
         self.level = level
+        self.pause = pause
     }
 
     // MARK: Derived
@@ -115,6 +141,7 @@ public final class LevelModel {
     public func beginDrag(_ id: String) {
         guard drag == nil, let i = items.firstIndex(where: { $0.id == id }) else { return }
         notice = nil
+        dragHeights = items.map { rowHeights[$0.id] ?? 0 }
         drag = Drag(id: id, from: i, to: i, offset: 0)
     }
 
@@ -122,10 +149,10 @@ public final class LevelModel {
         guard var d = drag else { return }
         d.offset = offset
         if upZoneHot {
+            d.to = d.from
             nestTarget = nil
         } else {
-            let heights = items.map { rowHeights[$0.id] ?? 0 }
-            switch Order.dropTarget(heights: heights, gap: Self.rowGap, from: d.from, offset: offset) {
+            switch Order.dropTarget(heights: dragHeights, gap: Self.rowGap, from: d.from, offset: offset) {
             case .reorder(let to):
                 d.to = to
                 nestTarget = nil
@@ -157,7 +184,9 @@ public final class LevelModel {
     public func confirmNest() async {
         guard let p = pendingNest else { return }
         pendingNest = nil
-        await move(p.id, to: p.into, before: nil)
+        if await move(p.id, to: p.into, before: nil) {
+            flash(p.into, for: Self.nestFlashTime)
+        }
     }
 
     public func cancelNest() { pendingNest = nil }
@@ -169,29 +198,64 @@ public final class LevelModel {
         do {
             let siblings = try await backend.level(up.id).children.map(\.id)
             let next = siblings.firstIndex(of: taskId).map { $0 + 1 }.flatMap { siblings.indices.contains($0) ? siblings[$0] : nil }
-            await move(id, to: up.id, before: next)
+            _ = await move(id, to: up.id, before: next)
         } catch {
             notice = "移动失败"
         }
     }
 
-    /// Moves are saved right away; an unsaved order of this level keeps everything but the moved task.
-    private func move(_ id: String, to parent: String, before: String?) async {
+    /// Moves are saved right away; an unsaved order of this level keeps everything but the moved task (and goes
+    /// once what is left is the saved order). The row fades out first, then leaves the list.
+    private func move(_ id: String, to parent: String, before: String?) async -> Bool {
         notice = nil
         status = .saving
-        defer { status = .idle }
+        leaving = id
+        defer {
+            status = .idle
+            leaving = nil
+        }
+        await pause(Self.leaveTime)
         do {
             let r = try await backend.moveTask(id, to: parent, before: before)
             draft?.removeAll { $0 == id }
             selection.remove(id)
             level = r.from
             pruneSelection()
+            if draft == r.from.children.map(\.id) { draft = nil }
+            onMoved?(r.from, r.to)
+            return true
         } catch let e as BackendError where e.code == "not_found" || e.isVersionConflict {
             notice = "已在别处修改"
             await load()
         } catch {
             notice = "移动失败"
         }
+        return false
+    }
+
+    /// Outlines a row for `time`.
+    public func flash(_ id: String, for time: Duration) {
+        flashing?.cancel()
+        flash = id
+        flashing = Task { [weak self, pause] in
+            await pause(time)
+            guard !Task.isCancelled, let self, self.flash == id else { return }
+            self.flash = nil
+        }
+    }
+
+    /// A child's 「N 项」 after tasks moved in or out of its level elsewhere.
+    public func setChildCount(_ id: String, _ count: Int) {
+        guard var l = level, let i = l.children.firstIndex(where: { $0.id == id }) else { return }
+        l.children[i].childCount = count
+        level = l
+    }
+
+    /// Shows a level fetched elsewhere (the other side of a move), unless an order is being dragged here.
+    public func show(_ fresh: Level) {
+        guard fresh.task.id == taskId, drag == nil else { return }
+        level = fresh
+        pruneSelection()
     }
 
     /// Keyboard / VoiceOver: move one row up (-1) or down (+1).

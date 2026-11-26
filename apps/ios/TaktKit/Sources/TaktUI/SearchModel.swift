@@ -51,6 +51,8 @@ public final class SearchModel {
         didSet { if query != oldValue { schedule() } }
     }
     public private(set) var groups: [SearchGroup] = []
+    /// `groups` are the answer to the current query (so an empty answer can say 无结果).
+    public private(set) var answered = false
     /// Short, user-facing message for the last failure. Cleared on the next search.
     public var notice: String?
     /// The pending or running search (test seam).
@@ -67,6 +69,7 @@ public final class SearchModel {
 
     private func schedule() {
         searchTask?.cancel()
+        answered = false
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else {
             searchTask = nil
@@ -85,6 +88,7 @@ public final class SearchModel {
             case .success(let r):
                 notice = nil
                 groups = Self.groups(r, q)
+                answered = true
             case .failure:
                 notice = "查找失败"
             }

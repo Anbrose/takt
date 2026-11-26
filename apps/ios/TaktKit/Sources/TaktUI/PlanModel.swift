@@ -23,10 +23,18 @@ public final class PlanModel {
 
     /// 地图 on/off — shared by all levels, closes when moving between levels.
     public var mapOn = false
+    private let pause: @MainActor (Duration) async -> Void
 
-    public init(project: Project, backend: any TaktBackend) {
+    /// A search hit's row stays outlined this long (prototype 1600 ms).
+    public static let hitFlashTime: Duration = .milliseconds(1600)
+
+    public init(
+        project: Project, backend: any TaktBackend,
+        pause: @escaping @MainActor (Duration) async -> Void = { try? await Task.sleep(for: $0) }
+    ) {
         self.project = project
         self.backend = backend
+        self.pause = pause
         self.path = [project.rootTaskId]
     }
 
@@ -39,9 +47,36 @@ public final class PlanModel {
 
     public func model(for taskId: String) -> LevelModel {
         if let m = models[taskId] { return m }
-        let m = LevelModel(taskId: taskId, backend: backend)
+        let m = LevelModel(taskId: taskId, backend: backend, pause: pause)
+        // A move changes two levels; the other one may be cached here (the parent after 移到上一级, the row
+        // a task was put into).
+        // A level's own 「N 项」 sits on the level above it.
+        m.onMoved = { [weak self] from, to in
+            guard let self else { return }
+            self.models[to.task.id]?.show(to)
+            for l in [from, to] {
+                if let up = l.breadcrumb.dropLast().last { self.models[up.id]?.setChildCount(l.task.id, l.children.count) }
+            }
+        }
         models[taskId] = m
         return m
+    }
+
+    /// Opens `taskId`'s level straight away (from 查找), with `flash` outlined. Back then walks up through
+    /// every level above it, which are known once the level has loaded.
+    /// The level shows at once (loading); the returned task finishes once it has loaded and the row is flashed.
+    @discardableResult
+    public func reveal(level taskId: String, flash: String?) -> Task<Void, Never> {
+        direction = .forward
+        path = taskId == project.rootTaskId ? [taskId] : [project.rootTaskId, taskId]
+        let m = model(for: taskId)
+        return Task { [weak self] in
+            if m.level == nil { await m.load() }
+            guard let self, self.path.last == taskId else { return }
+            let ids = m.breadcrumb.map(\.id)
+            if ids.first == self.project.rootTaskId, ids.last == taskId { self.path = ids }
+            if let flash { m.flash(flash, for: Self.hitFlashTime) }
+        }
     }
 
     /// Enter a child task's level ("N 项 ›"). Unsaved drags on the level being left are dropped.
@@ -101,6 +136,11 @@ public final class AppModel {
 
     public func openProject(_ project: Project, animation: Animation? = nil) {
         withAnimation(animation) { open = PlanModel(project: project, backend: backend) }
+    }
+
+    /// A plan for a project on the list, opened from 查找 (pushed over the search, not over the list).
+    public func plan(for projectId: String) -> PlanModel? {
+        projects.first { $0.id == projectId }.map { PlanModel(project: $0, backend: backend) }
     }
 
     public func closeProject(animation: Animation? = nil) {

@@ -580,8 +580,7 @@ struct DragGhost: View {
     }
 }
 
-/// 「放入「X」？」 — 取消 / 放入.
-@available(iOS 26, macOS 26, *)
+/// 「放入「X」？」 — 取消 / 放入 (drag import and nesting in the plan).
 struct NestConfirm: View {
     let name: String
     let onCancel: () -> Void

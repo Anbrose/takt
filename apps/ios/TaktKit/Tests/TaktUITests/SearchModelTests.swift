@@ -78,6 +78,24 @@ private func sampleWithNote() async throws -> InMemoryBackend {
         #expect(await backend.calls.filter { $0.hasPrefix("search") }.count == 2)
     }
 
+    @Test func answeredOnlyOnceTheResultsAreForTheQuery() async throws {
+        let backend = await InMemoryBackend.sample()
+        let gate = Gate()
+        let m = SearchModel(backend: backend, sleep: { await gate.sleep($0) })
+        #expect(!m.answered)
+        m.query = "火星"
+        #expect(!m.answered, "still waiting: no 无结果 yet")
+        await gate.release()
+        await m.searchTask?.value
+        #expect(m.answered && m.groups.isEmpty)
+        m.query = "火星人"
+        #expect(!m.answered)
+        await m.searchTask?.value
+        #expect(m.answered)
+        m.query = ""
+        #expect(!m.answered)
+    }
+
     @Test func searchHighlightSplit() {
         let s = SearchModel.split("Visit teamLab Planets", on: "TEAMLAB")
         #expect(s.pre == "Visit " && s.hit == "teamLab" && s.post == " Planets")

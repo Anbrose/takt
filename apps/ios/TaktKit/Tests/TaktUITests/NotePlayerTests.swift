@@ -70,6 +70,20 @@ private final class Opener {
         #expect(second.stopped)
     }
 
+    @Test func cueWaitsPausedThenPlaysFromThere() async {
+        let opener = Opener()
+        let session = FakeSession()
+        let p = NotePlayer(makeTrack: opener.make, session: session)
+        p.cue(at: 19000, duration: 50000) { ms in (self.url(ms), 0) }
+        #expect(p.at == 19000 && !p.playing)
+        #expect(session.log.isEmpty && opener.waiting.isEmpty, "nothing opens until 播放")
+        p.toggle()
+        #expect(p.playing && session.log == ["on"])
+        await opener.release(url(19000))
+        #expect(p.track === opener.made.first)
+        p.close()
+    }
+
     @Test func playbackSessionWhilePlayingButNotDuringARecording() {
         let session = FakeSession()
         var recording = false

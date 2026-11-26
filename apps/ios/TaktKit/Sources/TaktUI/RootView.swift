@@ -5,6 +5,7 @@ import TaktAPI
 /// the list drifts left and dims; back reverses it). Loading / error states cross-fade.
 public struct RootView: View {
     @State private var app: AppModel
+    private let backend: any TaktBackend
     /// Note taking; nil where it isn't available (before iOS 26).
     private let notes: NotesModel?
     /// Asks for the microphone before the first recording.
@@ -14,7 +15,7 @@ public struct RootView: View {
     /// The list is taken out of the hierarchy once a screen fully covers it (so VoiceOver and
     /// UI tests only see one screen), and put back under it just before popping.
     @State private var listMounted = true
-    /// Screens pushed over the list from the 悬浮按钮 menu (笔记 › note, 查找).
+    /// Screens pushed over the list from the 悬浮按钮 menu (笔记 › note, 查找 › Project / level / note).
     @State private var routes: [Route] = []
     @State private var introOn = false
     /// A 录音 tap or note open is being handled; repeated taps meanwhile are ignored.
@@ -22,8 +23,12 @@ public struct RootView: View {
 
     struct Route: Identifiable {
         enum Kind {
-            case notes, search
-            case note(NoteDetailModel, ImportDockModel)
+            case notes
+            case search(SearchModel)
+            /// A project opened from 查找.
+            case plan(PlanModel)
+            /// `cue`: opened from a 查找 transcript hit, the player waits paused at this time.
+            case note(NoteDetailModel, ImportDockModel, cue: Int?)
         }
         let id = UUID()
         let kind: Kind
@@ -36,6 +41,7 @@ public struct RootView: View {
         allowRecording: @escaping @MainActor () async -> Bool = { true }
     ) {
         _app = State(initialValue: AppModel(backend: backend))
+        self.backend = backend
         self.notes = notes
         self.allowRecording = allowRecording
     }
@@ -102,7 +108,7 @@ public struct RootView: View {
         if listMounted || !covered {
             ProjectListScreen(
                 app: app, theme: theme,
-                onSearch: { push(.search) },
+                onSearch: { push(.search(SearchModel(backend: backend))) },
                 onNotes: notesOn ? { push(.notes) } : nil,
                 onRecord: notesOn ? { record() } : nil
             )
@@ -139,16 +145,18 @@ public struct RootView: View {
     @ViewBuilder
     private func screen(_ route: Route) -> some View {
         switch route.kind {
-        case .search:
-            SearchScreen(onBack: pop)
+        case .search(let search):
+            SearchScreen(model: search, onBack: pop, onOpen: openHit)
+        case .plan(let plan):
+            PlanScreen(plan: plan, theme: theme, onExit: pop)
         case .notes:
             if #available(iOS 26, macOS 26, *), let notes {
                 NotesListScreen(notes: notes, onBack: pop, onOpen: openNote, onRecord: record)
             }
-        case .note(let detail, let dock):
+        case .note(let detail, let dock, let cue):
             if #available(iOS 26, macOS 26, *), let notes {
                 NoteDetailScreen(
-                    detail: detail, dock: dock, item: notes.items.first { $0.id == detail.id },
+                    detail: detail, dock: dock, item: notes.items.first { $0.id == detail.id }, cue: cue,
                     autoExtracting: notes.autoExtracting.contains(detail.id),
                     processing: notes.items.first { $0.id == detail.id }?.processing ?? false,
                     isRecording: { notes.recording != nil }, onBack: pop)
@@ -175,7 +183,24 @@ public struct RootView: View {
     private func openNote(_ id: UUID) {
         guard let notes else { return }
         if case .note = routes.last?.kind { return }
-        push(.note(notes.detail(id), notes.importDock()))
+        push(.note(notes.detail(id), notes.importDock(), cue: nil))
+    }
+
+    /// 查找: a Project opens at its first level, a task at its level with the row flashed, a transcript line in
+    /// its note with the player paused there.
+    private func openHit(_ target: SearchHit.Target) {
+        switch target {
+        case .project(let id):
+            guard let plan = app.plan(for: id) else { return }
+            push(.plan(plan))
+        case .task(let id, let projectId, let parent):
+            guard let plan = app.plan(for: projectId) else { return }
+            plan.reveal(level: parent, flash: id)
+            push(.plan(plan))
+        case .note(let id, _, let startMs):
+            guard notesOn, let notes, let uuid = UUID(uuidString: id) else { return }
+            push(.note(notes.detail(uuid), notes.importDock(), cue: startMs))
+        }
     }
 
     // MARK: Recording

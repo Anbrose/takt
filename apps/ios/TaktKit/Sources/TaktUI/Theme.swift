@@ -73,6 +73,8 @@ public enum Motion {
     public static let nav = Animation.easeOut(duration: 0.28)
     /// Colour / check / border fades.
     public static let fade = Animation.easeInOut(duration: 0.28)
+    /// 「移到「父任务」」 zone appearing above the list while dragging (prototype 260 ms).
+    public static let upZone = Animation.timingCurve(0.32, 0.72, 0, 1, duration: 0.26)
     /// Project 列表 ↔ 规划页 push / pop (design/guidelines.md: cubic-bezier(0.32, 0.72, 0, 1)).
     public static let push = Animation.timingCurve(0.32, 0.72, 0, 1, duration: 0.42)
     /// A list item opening / collapsing in place.

@@ -73,6 +73,18 @@ final class NotePlayer {
         loadAudio(at: startMs)
     }
 
+    /// Shows the bar paused at `ms` (a 查找 hit); 播放 starts from there.
+    func cue(at ms: Int, duration: Int, locate: @escaping Locate) {
+        generation += 1
+        ticker?.cancel()
+        track?.stop()
+        track = nil
+        self.locate = locate
+        self.duration = duration
+        at = max(0, min(ms, duration))
+        playing = false
+    }
+
     func toggle() {
         guard let at else { return }
         if playing {
