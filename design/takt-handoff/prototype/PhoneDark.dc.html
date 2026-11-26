@@ -13,14 +13,18 @@
 body{margin:0}
 button{font:inherit;color:inherit}
 a{color:#C2185B}a:hover{color:#E6397C}
-.t-light{--bg:#FAF7F8;--surface:#FFFFFF;--text:#1A1A1D;--muted:#5F5660;--line:#EAD8E0;--accent:#E6397C;--accent-text:#C2185B;--fill:#C2185B;--onfill:#FFFFFF;--soft:#FCE6EF;--map:#F7ECF1;--grid:#EBD8E0;--danger:#C62828;--menu:#FFFFFF}
-.t-dark{--bg:#1A1A1D;--surface:#25252A;--text:#F4F1F3;--muted:#B4ADB3;--line:#3A3A41;--accent:#E6397C;--accent-text:#FF8AB5;--fill:#F272A3;--onfill:#1A1A1D;--soft:#3A2230;--map:#202024;--grid:#2E2E34;--danger:#FF6B6B;--menu:#2E2E34}
+.t-light{--bg:#FAF7F8;--surface:#FFFFFF;--text:#1A1A1D;--muted:#5F5660;--line:#EAD8E0;--accent:#E6397C;--accent-text:#C2185B;--fill:#C2185B;--onfill:#FFFFFF;--soft:#FCE6EF;--map:#F7ECF1;--grid:#EBD8E0;--danger:#C62828;--menu:#FFFFFF;--sp2bg:#E3EEFB;--sp2fg:#1D5FB4;--sp3bg:#E6F4EA;--sp3fg:#1E7A3C}
+.t-dark{--bg:#1A1A1D;--surface:#25252A;--text:#F4F1F3;--muted:#B4ADB3;--line:#3A3A41;--accent:#E6397C;--accent-text:#FF8AB5;--fill:#F272A3;--onfill:#1A1A1D;--soft:#3A2230;--map:#202024;--grid:#2E2E34;--danger:#FF6B6B;--menu:#2E2E34;--sp2bg:#1F2C3D;--sp2fg:#8DB8F2;--sp3bg:#1E3326;--sp3fg:#86D19C}
 .app, .app *{transition:background-color .28s ease,border-color .28s ease,color .28s ease,opacity .28s ease}
 @keyframes inRA{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
 @keyframes inRB{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
 @keyframes inLA{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
 @keyframes inLB{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
-.card{-webkit-touch-callout:none;user-select:none}
+.card{-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes lvl{from{transform:scaleY(.15)}to{transform:scaleY(1)}}
+@keyframes flow{0%{transform:translateX(0);opacity:0}20%{opacity:1}80%{opacity:1}100%{transform:translateX(122px);opacity:0}}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(2px)}}
 @media (prefers-reduced-motion: reduce){.app, .app *{transition:none !important;animation:none !important}}
 </style>
 </helmet>
@@ -45,7 +49,27 @@ a{color:#C2185B}a:hover{color:#E6397C}
 <div style="position: absolute; inset: 76px 0 76px; display: flex; align-items: center; justify-content: center; pointer-events: none">
   <button type="button" onClick="{{pl.openNew}}" disabled="{{pl.emptyOff}}" style="pointer-events: auto; min-height: 48px; padding: 0 22px 0 18px; border-radius: 12px; border: none; background: var(--fill); color: var(--onfill); font-size: 15px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; opacity: {{pl.emptyO}}; transform: {{pl.emptyTf}}; visibility: {{pl.emptyVis}}; transition: opacity 260ms ease, transform 260ms ease, {{pl.emptyVisTr}}"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg><span>新建</span></button>
 </div>
-<button type="button" onClick="{{pl.openNew}}" aria-label="新建" disabled="{{pl.fabOff}}" style="position: absolute; right: 16px; bottom: 32px; z-index: 4; width: 56px; height: 56px; border-radius: 50%; border: none; background: var(--fill); color: var(--onfill); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: {{pl.fabO}}; transform: {{pl.fabTf}}; visibility: {{pl.fabVis}}; transition: opacity 220ms ease, transform 220ms ease, {{pl.fabVisTr}}"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg></button>
+<button type="button" onClick="{{dial.toggle}}" aria-label="{{dial.aria}}" aria-expanded="{{dial.expanded}}" aria-haspopup="menu" disabled="{{pl.fabOff}}" style="position: absolute; right: 16px; bottom: 32px; z-index: 7; width: 56px; height: 56px; border-radius: 50%; border: none; background: var(--fill); color: var(--onfill); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: {{pl.fabO}}; transform: {{pl.fabTf}}; visibility: {{pl.fabVis}}; transition: opacity 220ms ease, transform 220ms ease, {{pl.fabVisTr}}"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="transform: {{dial.rot}}; transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1)"><path d="M8 3v10M3 8h10"></path></svg></button>
+
+<button type="button" aria-label="关闭" onClick="{{dial.close}}" disabled="{{dial.off}}" style="position: absolute; inset: 0; z-index: 5; border: none; padding: 0; background: rgba(0, 0, 0, 0.32); opacity: {{dial.scrimO}}; visibility: {{dial.vis}}; transition: opacity 260ms ease, {{dial.visTr}}"></button>
+<div role="menu" aria-label="菜单" style="position: absolute; right: 18px; bottom: 102px; z-index: 6; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; pointer-events: none; visibility: {{dial.vis}}; transition: {{dial.visTr}}">
+  <button type="button" role="menuitem" onClick="{{dial.search}}" disabled="{{dial.off}}" style="pointer-events: auto; min-height: 52px; padding: 0; border: none; background: transparent; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 12px; opacity: {{dial.a0.o}}; transform: {{dial.a0.tf}}; transition: opacity 200ms ease {{dial.a0.d}}, transform 280ms cubic-bezier(0.32, 0.72, 0, 1) {{dial.a0.d}}">
+    <span style="padding: 7px 12px; border-radius: 10px; background: var(--surface); font-size: 15px; font-weight: 600; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16)">查找</span>
+    <span style="width: 52px; height: 52px; border-radius: 50%; background: var(--surface); color: var(--accent-text); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="5.5"></circle><path d="M13 13l4 4"></path></svg></span>
+  </button>
+  <button type="button" role="menuitem" onClick="{{dial.notes}}" disabled="{{dial.off}}" style="pointer-events: auto; min-height: 52px; padding: 0; border: none; background: transparent; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 12px; opacity: {{dial.a1.o}}; transform: {{dial.a1.tf}}; transition: opacity 200ms ease {{dial.a1.d}}, transform 280ms cubic-bezier(0.32, 0.72, 0, 1) {{dial.a1.d}}">
+    <span style="padding: 7px 12px; border-radius: 10px; background: var(--surface); font-size: 15px; font-weight: 600; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16)">笔记</span>
+    <span style="width: 52px; height: 52px; border-radius: 50%; background: var(--surface); color: var(--accent-text); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2.5" width="12" height="15" rx="2.5"></rect><path d="M7 7h6M7 10h6M7 13h3.5"></path></svg></span>
+  </button>
+  <button type="button" role="menuitem" onClick="{{dial.rec}}" disabled="{{dial.off}}" style="pointer-events: auto; min-height: 52px; padding: 0; border: none; background: transparent; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 12px; opacity: {{dial.a2.o}}; transform: {{dial.a2.tf}}; transition: opacity 200ms ease {{dial.a2.d}}, transform 280ms cubic-bezier(0.32, 0.72, 0, 1) {{dial.a2.d}}">
+    <span style="padding: 7px 12px; border-radius: 10px; background: var(--surface); font-size: 15px; font-weight: 600; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16)">录音</span>
+    <span style="width: 52px; height: 52px; border-radius: 50%; background: var(--surface); color: var(--accent-text); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="6" height="10" rx="3"></rect><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5"></path></svg></span>
+  </button>
+  <button type="button" role="menuitem" onClick="{{dial.create}}" disabled="{{dial.off}}" style="pointer-events: auto; min-height: 52px; padding: 0; border: none; background: transparent; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 12px; opacity: {{dial.a3.o}}; transform: {{dial.a3.tf}}; transition: opacity 200ms ease {{dial.a3.d}}, transform 280ms cubic-bezier(0.32, 0.72, 0, 1) {{dial.a3.d}}">
+    <span style="padding: 7px 12px; border-radius: 10px; background: var(--surface); font-size: 15px; font-weight: 600; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16)">新建 Project</span>
+    <span style="width: 52px; height: 52px; border-radius: 50%; background: var(--surface); color: var(--accent-text); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6a1.5 1.5 0 0 1 1.5-1.5h3.5l1.5 2h7a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5H4a1.5 1.5 0 0 1-1.5-1.5z"></path><path d="M10 9v4.5M7.75 11.25h4.5"></path></svg></span>
+  </button>
+</div>
 
 <button type="button" aria-label="关闭菜单" onClick="{{pl.closeMenu}}" disabled="{{pl.menu.off}}" style="position: absolute; inset: 0; z-index: 8; border: none; padding: 0; background: rgba(0, 0, 0, 0.28); opacity: {{pl.menu.o}}; visibility: {{pl.menu.vis}}; transition: opacity 220ms ease, {{pl.menu.visTr}}"></button>
 <div style="position: absolute; left: 16px; right: 16px; top: {{pl.menu.top}}; z-index: 9; display: flex; flex-direction: column; gap: 10px; opacity: {{pl.menu.o}}; visibility: {{pl.menu.vis}}; transform: {{pl.menu.tf}}; transform-origin: top left; transition: opacity 220ms ease, transform 220ms cubic-bezier(0.32, 0.72, 0, 1), {{pl.menu.visTr}}">
@@ -54,7 +78,7 @@ a{color:#C2185B}a:hover{color:#E6397C}
   </div>
   <div role="menu" aria-label="{{pl.menu.name}}" style="width: 230px; border-radius: 14px; overflow: hidden; background: var(--menu); box-shadow: 0 10px 32px rgba(0, 0, 0, 0.24); display: flex; flex-direction: column">
     <button type="button" role="menuitem" onClick="{{pl.openRename}}" disabled="{{pl.menu.off}}" style="min-height: 48px; padding: 0 16px; border: none; border-bottom: 1px solid var(--line); background: transparent; color: var(--text); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: space-between">
-      <span>重命名</span>
+      <span>编辑</span>
       <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 3.5l3 3L7 16H4v-3z"></path></svg>
     </button>
     <button type="button" role="menuitem" onClick="{{pl.openDelete}}" disabled="{{pl.menu.off}}" style="min-height: 48px; padding: 0 16px; border: none; background: transparent; color: var(--danger); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: space-between">
@@ -71,6 +95,29 @@ a{color:#C2185B}a:hover{color:#E6397C}
     <span>名称</span>
     <input type="text" value="{{pl.draft}}" onInput="{{pl.onDraft}}" disabled="{{pl.sheet.off}}" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 16px; font-weight: 400">
   </label>
+  <div style="display: grid; grid-template-rows: {{pl.sheet.moreRows}}; opacity: {{pl.sheet.moreO}}; margin-top: {{pl.sheet.moreMt}}; transition: grid-template-rows 320ms cubic-bezier(0.32, 0.72, 0, 1), opacity 260ms ease, margin-top 320ms cubic-bezier(0.32, 0.72, 0, 1)">
+    <div style="min-height: 0; overflow: hidden; display: flex; gap: 10px">
+      <label style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted)">
+        <span>汇总货币</span>
+        <select value="{{pl.draftCur}}" onChange="{{pl.onCur}}" disabled="{{pl.sheet.off}}" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 16px; font-weight: 400">
+          <option value="CNY">CNY ¥</option>
+          <option value="JPY">JPY ¥</option>
+          <option value="USD">USD $</option>
+          <option value="EUR">EUR €</option>
+        </select>
+      </label>
+      <label style="flex: 1.3; min-width: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted)">
+        <span>时区</span>
+        <select value="{{pl.draftTz}}" onChange="{{pl.onTz}}" disabled="{{pl.sheet.off}}" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 16px; font-weight: 400">
+          <option value="Asia/Tokyo">东京</option>
+          <option value="Asia/Shanghai">上海</option>
+          <option value="Asia/Seoul">首尔</option>
+          <option value="Europe/London">伦敦</option>
+          <option value="America/New_York">纽约</option>
+        </select>
+      </label>
+    </div>
+  </div>
   <div style="display: flex; gap: 10px">
     <button type="button" onClick="{{pl.closeSheet}}" disabled="{{pl.sheet.off}}" style="flex: 1; min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); font-size: 15px; font-weight: 600; cursor: pointer">取消</button>
     <button type="submit" disabled="{{pl.sheet.submitOff}}" style="flex: 1; min-height: 48px; border-radius: 12px; border: none; background: var(--fill); color: var(--onfill); font-size: 15px; font-weight: 700; cursor: pointer; opacity: {{pl.sheet.submitO}}; transition: opacity 200ms ease">{{pl.sheet.action}}</button>
@@ -120,6 +167,17 @@ a{color:#C2185B}a:hover{color:#E6397C}
 <div style="flex: 0 0 auto; display: flex">
   <button type="button" onClick="{{toggleMap}}" aria-pressed="{{mapBtn.pressed}}" style="flex: 1; justify-content: center; min-height: 44px; padding: 0 14px 0 12px; border-radius: 12px; border: 1px solid {{mapBtn.border}}; background: {{mapBtn.bg}}; color: var(--accent-text); font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="4.5" cy="15" r="2"></circle><circle cx="15.5" cy="5" r="2"></circle><path d="M6.5 15H12a2.5 2.5 0 0 0 0-5H8a2.5 2.5 0 0 1 0-5h5.5"></path></svg><span>地图</span></button>
 </div>
+<div style="flex: 0 0 auto; display: flex; align-items: center; gap: 10px; min-height: 44px">
+  <label style="flex: 0 1 auto; min-width: 0; min-height: 40px; box-sizing: border-box; padding: 0 10px; border-radius: 10px; border: 1px solid {{sum.border}}; background: var(--surface); color: {{sum.fg}}; display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; transition: color 240ms ease, border-color 240ms ease">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6"></circle><path d="M8 4.8V8l2.2 1.6"></path></svg>
+    <input type="datetime-local" aria-label="开始时间" value="{{sum.startVal}}" onChange="{{sum.setStart}}" style="min-width: 0; border: none; background: transparent; color: inherit; font: inherit; font-size: 14px; padding: 0">
+  </label>
+  <span style="flex: 1"></span>
+  <span style="display: flex; align-items: baseline; gap: 8px; white-space: nowrap; font-size: 14px">
+    <span style="font-weight: 700; opacity: {{sum.durO}}; transition: opacity 240ms ease">{{sum.dur}}</span>
+    <span style="color: var(--muted); opacity: {{sum.costO}}; transition: opacity 240ms ease">{{sum.cost}}</span>
+  </span>
+</div>
 <div style="flex: 0 0 auto; display: grid; grid-template-rows: {{mapWrap.rows}}; margin-bottom: {{mapWrap.mb}}; opacity: {{mapWrap.o}}; visibility: {{mapWrap.vis}}; transition: grid-template-rows 380ms ease, margin-bottom 380ms ease, opacity 380ms ease, {{mapWrap.visTr}}">
   <div style="min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 12px">
 <div style="position: relative; flex: 0 0 auto; aspect-ratio: 600 / 440; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background-color: var(--map); background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 32px 32px">
@@ -161,26 +219,35 @@ a{color:#C2185B}a:hover{color:#E6397C}
   <div style="flex: 1; min-width: 0">
 <div data-list="rows" style="display: flex; flex-direction: column; gap: 10px; animation: {{navAnim}}">
   <sc-for list="{{rows}}" as="item" hint-placeholder-count="5">
-    <div data-row="{{item.id}}" onPointerDown="{{item.sw.down}}" onPointerMove="{{item.sw.move}}" onPointerUp="{{item.sw.up}}" onPointerCancel="{{item.sw.up}}" style="position: relative; overflow: hidden; touch-action: pan-y; z-index: {{item.z}}; transform: {{item.tf}}; transition: {{item.tr}}; box-shadow: {{item.shadow}}; opacity: {{item.dim}}; animation: {{item.enter}}; display: flex; align-items: flex-start; gap: 2px; padding: 4px 4px 4px 2px; border-radius: 14px; background: var(--surface); border: 1.5px solid {{item.border}}">
+    <div data-row="{{item.id}}" onPointerDown="{{item.sw.down}}" onPointerMove="{{item.sw.move}}" onPointerUp="{{item.sw.up}}" onPointerCancel="{{item.sw.up}}" style="position: relative; overflow: hidden; touch-action: pan-y; z-index: {{item.z}}; transform: {{item.tf}}; transition: {{item.tr}}; box-shadow: {{item.shadow}}; opacity: {{item.dim}}; animation: {{item.enter}}; display: flex; align-items: flex-start; gap: 2px; padding: 4px 4px 4px 2px; border-radius: 14px; background: {{item.bg}}; border: 1.5px solid {{item.border}}">
       <button type="button" onClick="{{item.toggle}}" aria-pressed="{{item.pressed}}" aria-label="{{item.checkAria}}" style="flex: 0 0 44px; height: 44px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center">
         <span style="width: 22px; height: 22px; box-sizing: border-box; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; background: {{item.boxBg}}; color: var(--onfill); border: 1.5px solid {{item.boxBorder}}">{{item.check}}</span>
       </button>
       <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 10px 0">
         <span style="display: flex; align-items: baseline; gap: 6px; min-height: 24px; font-size: 16px; font-weight: 600">
           <span style="color: var(--muted); font-weight: 500">{{item.num}}</span>
-          <span style="flex: 1; min-width: 0">{{item.name}}</span>
+          <button type="button" onClick="{{item.edit}}" aria-label="{{item.editAria}}" style="flex: 1; min-width: 0; padding: 0; border: none; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer">{{item.name}}</button>
           <span style="font-size: 12px; font-weight: 500; color: var(--muted); white-space: nowrap; opacity: {{item.legO}}">{{item.leg}}</span>
         </span>
         <div style="display: grid; grid-template-rows: {{item.detailRows}}; opacity: {{item.detailO}}; transition: grid-template-rows 380ms ease, opacity 300ms ease">
-          <div style="min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 6px">
-            <span style="display: flex; align-items: center; gap: 5px; padding-top: 6px; font-size: 13px; color: var(--muted)"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 13s4.5-4 4.5-7.5a4.5 4.5 0 0 0-9 0C2.5 9 7 13 7 13z"></path><circle cx="7" cy="5.5" r="1.5"></circle></svg><span>{{item.place}}</span></span>
-            <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px">
+          <div style="min-height: 0; overflow: hidden; display: flex; flex-direction: column">
+            <div style="display: grid; grid-template-rows: {{item.metaRows}}; opacity: {{item.metaO}}; transition: grid-template-rows 320ms cubic-bezier(0.32, 0.72, 0, 1), opacity 260ms ease">
+              <span style="min-height: 0; overflow: hidden; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding-top: 6px; font-size: 13px; color: var(--muted)">
+                <sc-for list="{{item.meta}}" as="m" hint-placeholder-count="2">
+                  <span style="display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; color: {{m.fg}}; font-weight: {{m.weight}}">{{m.text}}</span>
+                </sc-for>
+              </span>
+            </div>
+            <div style="display: grid; grid-template-rows: {{item.placeRows}}; opacity: {{item.placeO}}; transition: grid-template-rows 320ms cubic-bezier(0.32, 0.72, 0, 1), opacity 260ms ease">
+            <span style="min-height: 0; overflow: hidden; display: flex; align-items: center; gap: 5px; padding-top: 6px; font-size: 13px; color: var(--muted)"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 13s4.5-4 4.5-7.5a4.5 4.5 0 0 0-9 0C2.5 9 7 13 7 13z"></path><circle cx="7" cy="5.5" r="1.5"></circle></svg><span>{{item.place}}</span></span>
+            </div>
+            <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: {{item.preTop}}">
               <sc-for list="{{item.pre}}" as="p" hint-placeholder-count="1">
                 <span style="font-size: 12px; font-weight: 500; padding: 3px 8px; border-radius: 6px; background: {{p.tagBg}}; color: {{p.tagFg}}; border: 1px solid {{p.tagBorder}}">{{p.action}}</span>
               </sc-for>
             </span>
             <sc-if value="{{item.hasKids}}" hint-placeholder-val="{{false}}">
-              <button type="button" onClick="{{item.open}}" disabled="{{item.kidsOff}}" style="align-self: flex-start; min-height: 44px; margin: -6px 0 -10px; padding: 0; border: none; background: transparent; color: var(--accent-text); font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px">
+              <button type="button" onClick="{{item.open}}" disabled="{{item.kidsOff}}" style="align-self: flex-start; min-height: 44px; margin: 0 0 -10px; padding: 0; border: none; background: transparent; color: var(--accent-text); font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px">
                 <span>{{item.kidsLabel}}</span>
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3l4 4-4 4"></path></svg>
               </button>
@@ -328,14 +395,15 @@ a{color:#C2185B}a:hover{color:#E6397C}
 <button type="button" aria-label="关闭" onClick="{{add.close}}" disabled="{{add.off}}" style="position: absolute; inset: 0; z-index: 6; border: none; padding: 0; background: rgba(0, 0, 0, 0.4); opacity: {{add.scrimO}}; visibility: {{add.vis}}; transition: opacity 320ms ease, {{add.visTr}}"></button>
 <form data-add="1" onSubmit="{{add.submit}}" style="position: absolute; left: 0; right: 0; bottom: 0; border-radius: 20px 20px 0 0; transform: {{add.y}}; z-index: 7; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 20px 16px 20px; background: var(--surface); box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18); visibility: {{add.vis}}; transition: transform 320ms ease, {{add.visTr}}">
     <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
-      <h2 style="margin: 0; font-size: 18px; font-weight: 700">新建任务</h2>
+      <h2 style="margin: 0; font-size: 18px; font-weight: 700">{{add.title}}</h2>
       <span style="font-size: 13px; color: var(--muted)">{{add.level}}</span>
     </div>
     <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted)">
       <span>名称</span>
       <input data-f="name" type="text" disabled="{{add.off}}" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 16px; font-weight: 400">
     </label>
-    <div style="display: flex; flex-direction: column; gap: 6px">
+    <div style="display: grid; grid-template-rows: {{add.f.place.rows}}; opacity: {{add.f.place.o}}; margin-top: {{add.f.place.mt}}; transition: grid-template-rows 320ms cubic-bezier(0.32, 0.72, 0, 1), opacity 260ms ease, margin-top 320ms cubic-bezier(0.32, 0.72, 0, 1)">
+    <div style="min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 6px">
       <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted)">
         <span>地点</span>
         <span style="position: relative; display: flex">
@@ -359,6 +427,41 @@ a{color:#C2185B}a:hover{color:#E6397C}
         </ul>
       </sc-if>
     </div>
+    </div>
+    <div style="display: grid; grid-template-rows: {{add.f.dur.rows}}; opacity: {{add.f.dur.o}}; margin-top: {{add.f.dur.mt}}; transition: grid-template-rows 320ms cubic-bezier(0.32, 0.72, 0, 1), opacity 260ms ease, margin-top 320ms cubic-bezier(0.32, 0.72, 0, 1)">
+      <div style="min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 13px; font-weight: 600; color: var(--muted)">耗时</span>
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap">
+          <sc-for list="{{add.durChips}}" as="c" hint-placeholder-count="4">
+            <button type="button" onClick="{{c.pick}}" aria-pressed="{{c.pressed}}" disabled="{{add.off}}" style="min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid {{c.border}}; background: {{c.bg}}; color: {{c.fg}}; font-size: 14px; font-weight: 600; cursor: pointer; transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease">{{c.label}}</button>
+          </sc-for>
+          <span style="flex: 1"></span>
+          <button type="button" onClick="{{add.durMinus}}" aria-label="减少 15 分钟" disabled="{{add.off}}" style="width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 18px; cursor: pointer">−</button>
+          <span style="min-width: 64px; text-align: center; font-size: 15px; font-weight: 700">{{add.durText}}</span>
+          <button type="button" onClick="{{add.durPlus}}" aria-label="增加 15 分钟" disabled="{{add.off}}" style="width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 18px; cursor: pointer">+</button>
+        </div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-rows: {{add.f.cost.rows}}; opacity: {{add.f.cost.o}}; margin-top: {{add.f.cost.mt}}; transition: grid-template-rows 320ms cubic-bezier(0.32, 0.72, 0, 1), opacity 260ms ease, margin-top 320ms cubic-bezier(0.32, 0.72, 0, 1)">
+      <div style="min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 13px; font-weight: 600; color: var(--muted)">花费</span>
+        <div style="display: flex; gap: 8px">
+          <input data-f="amount" type="text" inputmode="decimal" aria-label="金额" placeholder="0" disabled="{{add.off}}" style="flex: 1; min-width: 0; height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 16px; font-weight: 400">
+          <select data-f="cur" aria-label="货币" disabled="{{add.off}}" style="flex: 0 0 96px; height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 16px; font-weight: 400">
+            <option value="CNY">CNY ¥</option>
+            <option value="JPY">JPY ¥</option>
+            <option value="USD">USD $</option>
+            <option value="EUR">EUR €</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-rows: {{add.f.start.rows}}; opacity: {{add.f.start.o}}; margin-top: {{add.f.start.mt}}; transition: grid-template-rows 320ms cubic-bezier(0.32, 0.72, 0, 1), opacity 260ms ease, margin-top 320ms cubic-bezier(0.32, 0.72, 0, 1)">
+      <div style="min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 13px; font-weight: 600; color: var(--muted)">开始时间</span>
+        <input data-f="start" type="datetime-local" aria-label="开始时间" disabled="{{add.off}}" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 16px; font-weight: 400">
+      </div>
+    </div>
     <div style="display: flex; flex-direction: column">
       <div style="height: {{add.preH}}; overflow: hidden; display: flex; flex-direction: column; transition: height 260ms ease">
         <sc-for list="{{add.pres}}" as="q" hint-placeholder-count="0">
@@ -370,16 +473,323 @@ a{color:#C2185B}a:hover{color:#E6397C}
           </div>
         </sc-for>
       </div>
-      <button type="button" onClick="{{add.addPre}}" disabled="{{add.off}}" style="align-self: flex-start; min-height: 44px; padding: 0; border: none; background: transparent; color: var(--accent-text); font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg>
-        <span>前置条件</span>
-      </button>
+      <div style="display: flex; flex-wrap: wrap; gap: 4px 14px">
+        <sc-for list="{{add.adders}}" as="a" hint-placeholder-count="5">
+          <button type="button" onClick="{{a.show}}" disabled="{{a.off}}" style="min-height: 44px; max-width: {{a.maxW}}; padding: 0; overflow: hidden; white-space: nowrap; border: none; background: transparent; color: var(--accent-text); font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; opacity: {{a.o}}; transition: max-width 300ms cubic-bezier(0.32, 0.72, 0, 1), opacity 220ms ease">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg>
+            <span>{{a.label}}</span>
+          </button>
+        </sc-for>
+      </div>
     </div>
     <div style="display: flex; gap: 10px; margin-top: 2px">
       <button type="button" onClick="{{add.close}}" disabled="{{add.off}}" style="flex: 1; min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); font-size: 15px; font-weight: 600; cursor: pointer">取消</button>
-      <button type="submit" disabled="{{add.off}}" style="flex: 1; min-height: 48px; border-radius: 12px; border: none; background: var(--fill); color: var(--onfill); font-size: 15px; font-weight: 700; cursor: pointer">添加</button>
+      <button type="submit" disabled="{{add.off}}" style="flex: 1; min-height: 48px; border-radius: 12px; border: none; background: var(--fill); color: var(--onfill); font-size: 15px; font-weight: 700; cursor: pointer">{{add.action}}</button>
     </div>
 </form>
+</div>
+<div style="position: absolute; inset: 0; z-index: {{screens.notesZ}}; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); box-shadow: -10px 0 30px rgba(0, 0, 0, 0.12); transform: {{screens.notesTf}}; visibility: {{screens.notesVis}}; transition: transform 420ms cubic-bezier(0.32, 0.72, 0, 1), {{screens.notesVisTr}}, {{screens.notesZTr}}">
+<header style="flex: 0 0 76px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 20px 16px 12px">
+  <button type="button" onClick="{{nt.back}}" aria-label="返回" style="flex: 0 0 44px; height: 44px; margin-left: -8px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.5 4.5L7 10l5.5 5.5"></path></svg>
+  </button>
+  <h1 style="flex: 1; margin: 0; font-size: 24px; font-weight: 700">笔记</h1>
+  <button type="button" role="switch" onClick="{{nt.auto.toggle}}" aria-checked="{{nt.auto.pressed}}" aria-label="自动生成任务" style="flex: 0 0 auto; min-height: 44px; padding: 0 4px 0 10px; border-radius: 22px; border: 1px solid var(--line); background: var(--surface); color: var(--accent-text); cursor: pointer; display: flex; align-items: center; gap: 8px">
+    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2.5l1.6 4.4 4.4 1.6-4.4 1.6L10 14.5l-1.6-4.4L4 8.5l4.4-1.6zM15.5 13l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"></path></svg>
+    <span aria-hidden="true" style="position: relative; width: 44px; height: 26px; border-radius: 13px; background: {{nt.auto.track}}; transition: background-color 220ms ease">
+      <span style="position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); transform: {{nt.auto.knob}}; transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1)"></span>
+    </span>
+  </button>
+</header>
+<div style="position: relative; flex: 1; min-height: 0; overflow-y: auto; box-sizing: border-box; padding: 4px 16px 112px; display: flex; flex-direction: column">
+  <sc-for list="{{nt.notes}}" as="n" hint-placeholder-count="3">
+    <div style="flex: 0 0 auto; display: grid; grid-template-rows: {{n.rows}}; margin-bottom: {{n.mb}}; opacity: {{n.o}}; transition: grid-template-rows 340ms cubic-bezier(0.32, 0.72, 0, 1), margin-bottom 340ms cubic-bezier(0.32, 0.72, 0, 1), opacity 240ms ease">
+      <div style="min-height: 0; overflow: hidden">
+        <div onPointerDown="{{n.sw.down}}" onPointerMove="{{n.sw.move}}" onPointerUp="{{n.sw.up}}" onPointerCancel="{{n.sw.up}}" style="position: relative; overflow: hidden; touch-action: pan-y; border-radius: 14px; border: 1.5px solid var(--line); background: var(--surface)">
+          <button type="button" class="card" onClick="{{n.open}}" aria-label="{{n.aria}}" style="width: 100%; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 16px; border: none; background: transparent; color: var(--text); text-align: left; cursor: pointer">
+            <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+              <span style="font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{n.title}}</span>
+              <span style="font-size: 13px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums">{{n.meta}}</span>
+            </span>
+            <span aria-hidden="true" style="position: relative; flex: 0 0 28px; height: 28px">
+              <span style="position: absolute; inset: 0; border-radius: 14px; background: var(--soft); color: var(--accent-text); font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; opacity: {{n.badgeO}}; transform: scale({{n.badgeS}}); transition: opacity 240ms ease, transform 240ms ease">{{n.badge}}</span>
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" style="position: absolute; inset: 0; opacity: {{n.spinO}}; transition: opacity 240ms ease; animation: spin 900ms linear infinite"><circle cx="14" cy="14" r="9" stroke="var(--line)" stroke-width="2.5"></circle><path d="M14 5a9 9 0 0 1 9 9" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"></path></svg>
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; inset: 0; opacity: {{n.doneO}}; transition: opacity 240ms ease"><path d="M8.5 14.5l3.5 3.5 7.5-8"></path></svg>
+            </span>
+            <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 auto; color: var(--muted)"><path d="M5 3l4 4-4 4"></path></svg>
+          </button>
+          <button type="button" onClick="{{n.del}}" disabled="{{n.delOff}}" aria-label="{{n.delAria}}" style="position: absolute; top: 0; right: 0; bottom: 0; width: 64px; border: none; background: var(--danger); color: #FFFFFF; cursor: pointer; display: flex; align-items: center; justify-content: center; transform: {{n.delTf}}; visibility: {{n.delVis}}; transition: transform 240ms cubic-bezier(0.32, 0.72, 0, 1), {{n.delVisTr}}"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 5.5h13M8 5.5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M5.5 5.5l.8 10.6a1 1 0 0 0 1 .9h5.4a1 1 0 0 0 1-.9l.8-10.6"></path></svg></button>
+        </div>
+      </div>
+    </div>
+  </sc-for>
+  <div aria-hidden="true" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; color: var(--line); opacity: {{nt.emptyO}}; transition: opacity 240ms ease"><svg width="56" height="56" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="6" height="10" rx="3"></rect><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5"></path></svg></div>
+</div>
+<button type="button" onClick="{{nt.record}}" aria-label="录音" disabled="{{nt.fab.off}}" style="position: absolute; right: 16px; bottom: 32px; z-index: 4; width: 56px; height: 56px; border-radius: 50%; border: none; background: var(--fill); color: var(--onfill); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: {{nt.fab.o}}; transform: {{nt.fab.tf}}; visibility: {{nt.fab.vis}}; transition: opacity 220ms ease, transform 220ms ease, {{nt.fab.visTr}}"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="6" height="10" rx="3"></rect><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5"></path></svg></button>
+</div>
+
+<div style="position: absolute; inset: 0; z-index: {{screens.searchZ}}; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); box-shadow: -10px 0 30px rgba(0, 0, 0, 0.12); transform: {{screens.searchTf}}; visibility: {{screens.searchVis}}; transition: transform 420ms cubic-bezier(0.32, 0.72, 0, 1), {{screens.searchVisTr}}, {{screens.searchZTr}}">
+<header style="flex: 0 0 76px; box-sizing: border-box; display: flex; align-items: center; gap: 4px; padding: 20px 16px 12px">
+  <button type="button" onClick="{{sr.back}}" aria-label="返回" style="flex: 0 0 44px; height: 44px; margin-left: -8px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.5 4.5L7 10l5.5 5.5"></path></svg>
+  </button>
+  <label style="position: relative; flex: 1; min-width: 0; display: flex; align-items: center">
+    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true" style="position: absolute; left: 12px; color: var(--muted); pointer-events: none"><circle cx="9" cy="9" r="5.5"></circle><path d="M13 13l4 4"></path></svg>
+    <input data-q="1" type="search" aria-label="查找" value="{{sr.q}}" onInput="{{sr.onQ}}" style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 40px 0 38px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--text); font: inherit; font-size: 16px">
+    <button type="button" onClick="{{sr.clear}}" disabled="{{sr.clearOff}}" aria-label="清除" style="position: absolute; right: 0; width: 40px; height: 44px; border: none; background: transparent; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: {{sr.clearO}}; transition: opacity 180ms ease"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"></path></svg></button>
+  </label>
+</header>
+<div style="position: relative; flex: 1; min-height: 0; overflow-y: auto; box-sizing: border-box; padding: 4px 16px 32px; display: flex; flex-direction: column; gap: 18px">
+  <sc-for list="{{sr.groups}}" as="g" hint-placeholder-count="2">
+    <section style="display: flex; flex-direction: column; gap: 8px; animation: inRA 220ms ease both">
+      <h2 style="margin: 0 0 0 4px; font-size: 13px; font-weight: 700; color: var(--muted)">{{g.label}}</h2>
+      <sc-for list="{{g.items}}" as="r" hint-placeholder-count="2">
+        <button type="button" onClick="{{r.open}}" style="min-height: 56px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 8px 12px 8px 16px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--surface); color: var(--text); text-align: left; cursor: pointer">
+          <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+            <span style="font-size: 15px; font-weight: 600; line-height: 1.4"><span>{{r.pre}}</span><mark style="background: var(--soft); color: var(--accent-text); border-radius: 4px; padding: 0 2px">{{r.hit}}</mark><span>{{r.post}}</span></span>
+            <span style="font-size: 12px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; opacity: {{r.subO}}">{{r.sub}}</span>
+          </span>
+          <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 auto; color: var(--muted)"><path d="M5 3l4 4-4 4"></path></svg>
+        </button>
+      </sc-for>
+    </section>
+  </sc-for>
+  <span aria-live="polite" style="position: absolute; left: 0; right: 0; top: 120px; text-align: center; font-size: 15px; color: var(--muted); pointer-events: none; opacity: {{sr.noneO}}; transition: opacity 200ms ease">{{sr.none}}</span>
+</div>
+</div>
+
+<div style="position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); box-shadow: -10px 0 30px rgba(0, 0, 0, 0.12); transform: {{screens.noteTf}}; visibility: {{screens.noteVis}}; transition: transform 420ms cubic-bezier(0.32, 0.72, 0, 1), {{screens.noteVisTr}}">
+<header style="display: flex; align-items: center; padding: 20px 16px 12px">
+  <button type="button" onClick="{{nd.back}}" aria-label="返回" style="flex: 0 0 44px; height: 44px; margin-left: -8px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.5 4.5L7 10l5.5 5.5"></path></svg>
+  </button>
+  <div style="flex: 1; min-width: 0; margin-left: 8px; display: flex; flex-direction: column; gap: 2px">
+    <span style="font-size: 13px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums">{{nd.meta}}</span>
+    <h1 style="margin: 0; font-size: 24px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{nd.title}}</h1>
+  </div>
+</header>
+<div style="margin: 0 16px 10px">
+<div style="position: relative; display: flex; padding: 4px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line)">
+  <span aria-hidden="true" style="position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / 2); border-radius: 9px; background: var(--fill); transform: translateX({{nd.segX}}); transition: transform 260ms ease"></span>
+  <sc-for list="{{nd.segs}}" as="g" hint-placeholder-count="2">
+    <button type="button" onClick="{{g.pick}}" aria-pressed="{{g.pressed}}" style="position: relative; flex: 1; min-height: 44px; padding: 0 4px; border: none; border-radius: 9px; background: transparent; color: {{g.fg}}; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: color 260ms ease"><span>{{g.label}}</span><span style="font-variant-numeric: tabular-nums; opacity: {{g.countO}}; transition: opacity 240ms ease">{{g.count}}</span></button>
+  </sc-for>
+</div>
+</div>
+<div style="flex: 1; min-height: 0; overflow: hidden">
+<div style="width: 200%; height: 100%; display: flex; transform: {{nd.paneX}}; transition: transform 320ms ease">
+
+<div style="position: relative; flex: 0 0 50%; min-width: 0; height: 100%; box-sizing: border-box; overflow-y: auto; padding: 4px 16px 104px; display: flex; flex-direction: column; gap: 8px; visibility: {{nd.textPane.vis}}; transition: {{nd.textPane.tr}}">
+  <sc-for list="{{nd.lines}}" as="ln" hint-placeholder-count="4">
+    <div role="button" tabindex="0" onClick="{{ln.play}}" aria-label="{{ln.aria}}" style="flex: 0 0 auto; display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; border: 1.5px solid {{ln.border}}; background: {{ln.bg}}; cursor: pointer; transition: border-color 220ms ease, background-color 220ms ease">
+      <button type="button" onClick="{{ln.rename}}" aria-label="{{ln.spkAria}}" style="flex: 0 0 auto; min-width: 32px; height: 28px; padding: 0 9px; box-sizing: border-box; border: none; border-radius: 14px; background: {{ln.spkBg}}; color: {{ln.spkFg}}; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; white-space: nowrap; opacity: {{ln.spkO}}">{{ln.spk}}</button>
+      <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 12px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums">{{ln.time}}</span>
+        <span style="font-size: 15px; line-height: 1.55">{{ln.text}}</span>
+      </span>
+    </div>
+  </sc-for>
+  <div aria-hidden="true" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: {{nd.busyO}}; transition: opacity 260ms ease">
+    <svg width="36" height="36" viewBox="0 0 28 28" fill="none" style="animation: spin 900ms linear infinite"><circle cx="14" cy="14" r="9" stroke="var(--line)" stroke-width="2.5"></circle><path d="M14 5a9 9 0 0 1 9 9" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"></path></svg>
+  </div>
+</div>
+
+<div style="position: relative; flex: 0 0 50%; min-width: 0; height: 100%; box-sizing: border-box; overflow-y: auto; padding: 4px 16px 104px; display: flex; flex-direction: column; visibility: {{nd.chainPane.vis}}; transition: {{nd.chainPane.tr}}">
+  <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: {{nd.ex.o}}; visibility: {{nd.ex.vis}}; transition: opacity 260ms ease, {{nd.ex.visTr}}">
+    <button type="button" onClick="{{nd.ex.run}}" disabled="{{nd.ex.off}}" style="pointer-events: auto; min-height: 52px; padding: 0 24px 0 20px; border-radius: 14px; border: none; background: var(--fill); color: var(--onfill); font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px">
+      <span style="position: relative; width: 20px; height: 20px">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="position: absolute; inset: 0; opacity: {{nd.ex.iconO}}; transition: opacity 200ms ease"><path d="M10 2.5l1.6 4.4 4.4 1.6-4.4 1.6L10 14.5l-1.6-4.4L4 8.5l4.4-1.6zM15.5 13l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"></path></svg>
+        <svg width="20" height="20" viewBox="0 0 28 28" fill="none" aria-hidden="true" style="position: absolute; inset: 0; opacity: {{nd.ex.spinO}}; transition: opacity 200ms ease; animation: spin 900ms linear infinite"><circle cx="14" cy="14" r="10" stroke="currentColor" stroke-opacity="0.35" stroke-width="3"></circle><path d="M14 4a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>
+      </span>
+      <span>提取</span>
+    </button>
+  </div>
+  <div aria-hidden="true" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: {{nd.xO}}; transition: opacity 260ms ease">
+    <svg width="36" height="36" viewBox="0 0 28 28" fill="none" style="animation: spin 900ms linear infinite"><circle cx="14" cy="14" r="9" stroke="var(--line)" stroke-width="2.5"></circle><path d="M14 5a9 9 0 0 1 9 9" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"></path></svg>
+  </div>
+  <div style="flex: 0 0 auto; display: grid; grid-template-rows: {{nd.tip.rows}}; opacity: {{nd.tip.o}}; margin-bottom: {{nd.tip.mb}}; transition: grid-template-rows 320ms cubic-bezier(0.32, 0.72, 0, 1), opacity 240ms ease, margin-bottom 320ms cubic-bezier(0.32, 0.72, 0, 1)">
+    <div style="min-height: 0; overflow: hidden; display: flex; justify-content: center">
+      <span style="display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 14px; border-radius: 18px; background: var(--soft); color: var(--accent-text); font-size: 13px; font-weight: 700">
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="animation: bob 1400ms ease-in-out infinite"><path d="M7.5 10V4.2a1.4 1.4 0 0 1 2.8 0V9M10.3 8.4V7.6a1.4 1.4 0 0 1 2.8 0v1.6M13.1 9V8.6a1.4 1.4 0 0 1 2.7 0v3.6c0 3-2.2 5.3-5.2 5.3h-.8c-1.8 0-3-.8-4-2.2L3.6 12a1.4 1.4 0 0 1 2.2-1.7l1.7 1.9"></path></svg>
+        <span>长按拖到项目</span>
+      </span>
+    </div>
+  </div>
+  <sc-for list="{{nd.chains}}" as="ch" hint-placeholder-count="2">
+    <div style="flex: 0 0 auto; display: grid; grid-template-rows: {{ch.rows}}; margin-bottom: {{ch.mb}}; opacity: {{ch.o}}; animation: {{ch.enter}}; transition: grid-template-rows 340ms cubic-bezier(0.32, 0.72, 0, 1), margin-bottom 340ms cubic-bezier(0.32, 0.72, 0, 1), opacity 240ms ease">
+      <div style="min-height: 0; overflow: hidden">
+        <div class="card" style="border-radius: 14px; border: 1.5px solid var(--line); background: var(--surface); padding: 2px 4px 6px; display: flex; flex-direction: column">
+          <div onPointerDown="{{ch.down}}" onPointerMove="{{ch.move}}" onPointerUp="{{ch.up}}" onPointerCancel="{{ch.up}}" style="display: flex; align-items: center; gap: 2px; padding-left: 12px; min-height: 48px; touch-action: pan-y">
+            <button type="button" onClick="{{ch.rename}}" aria-label="{{ch.renameAria}}" style="flex: 1; min-width: 0; min-height: 44px; padding: 0; border: none; background: transparent; color: var(--text); text-align: left; font-size: 16px; font-weight: 700; cursor: grab; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ch.name}}</button>
+            <button type="button" onClick="{{ch.del}}" aria-label="{{ch.delAria}}" style="flex: 0 0 44px; height: 44px; border: none; background: transparent; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 5.5h13M8 5.5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M5.5 5.5l.8 10.6a1 1 0 0 0 1 .9h5.4a1 1 0 0 0 1-.9l.8-10.6"></path></svg></button>
+          </div>
+          <sc-for list="{{ch.steps}}" as="sp" hint-placeholder-count="3">
+            <div onPointerDown="{{sp.down}}" onPointerMove="{{sp.move}}" onPointerUp="{{sp.up}}" onPointerCancel="{{sp.up}}" style="display: flex; align-items: center; gap: 2px; min-height: 48px; padding-left: 12px; border-radius: 10px; touch-action: pan-y; cursor: grab; opacity: {{sp.o}}; transition: opacity 200ms ease">
+              <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 6px 0">
+                <span style="font-size: 15px; font-weight: 600; display: flex; gap: 6px"><span style="color: var(--muted); font-weight: 500">{{sp.num}}</span><span>{{sp.name}}</span></span>
+                <span style="display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--muted); opacity: {{sp.placeO}}; height: {{sp.placeH}}; overflow: hidden"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 11s3.8-3.4 3.8-6.2A3.8 3.8 0 0 0 2.2 4.8C2.2 7.6 6 11 6 11z"></path><circle cx="6" cy="4.8" r="1.3"></circle></svg>{{sp.place}}</span>
+              </span>
+              <button type="button" onClick="{{sp.jump}}" aria-label="{{sp.jumpAria}}" style="flex: 0 0 auto; min-height: 44px; padding: 0 8px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center">
+                <span style="padding: 3px 8px; border-radius: 8px; background: var(--soft); color: var(--accent-text); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums">{{sp.time}}</span>
+              </button>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-for>
+  <sc-for list="{{nd.imported}}" as="im" hint-placeholder-count="2">
+    <div style="flex: 0 0 auto; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; margin-bottom: 4px; color: var(--muted); font-size: 14px; animation: {{im.enter}}">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.3l3 3 6-6.6"></path></svg>
+      <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{im.name}}</span>
+      <span style="flex: 0 0 auto; font-weight: 600">{{im.target}}</span>
+    </div>
+  </sc-for>
+</div>
+
+</div>
+</div>
+
+<div style="position: absolute; left: 16px; right: 16px; bottom: 24px; z-index: 4; height: 60px; box-sizing: border-box; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16); display: flex; align-items: center; gap: 10px; padding: 0 6px 0 8px; opacity: {{nd.player.o}}; transform: {{nd.player.tf}}; visibility: {{nd.player.vis}}; transition: opacity 260ms ease, transform 320ms cubic-bezier(0.32, 0.72, 0, 1), {{nd.player.visTr}}">
+  <button type="button" onClick="{{nd.player.toggle}}" aria-label="{{nd.player.aria}}" disabled="{{nd.player.off}}" style="position: relative; flex: 0 0 44px; height: 44px; border-radius: 50%; border: none; background: var(--fill); color: var(--onfill); cursor: pointer">
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true" style="position: absolute; left: 13px; top: 13px; opacity: {{nd.player.pauseO}}; transition: opacity 160ms ease"><rect x="3.5" y="3" width="3.6" height="12" rx="1"></rect><rect x="10.9" y="3" width="3.6" height="12" rx="1"></rect></svg>
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true" style="position: absolute; left: 14px; top: 13px; opacity: {{nd.player.playO}}; transition: opacity 160ms ease"><path d="M5 3.2v11.6a.8.8 0 0 0 1.2.7l9-5.8a.8.8 0 0 0 0-1.4l-9-5.8A.8.8 0 0 0 5 3.2z"></path></svg>
+  </button>
+  <div style="flex: 1; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden"><div style="height: 100%; width: {{nd.player.pct}}; background: var(--accent); transition: width 600ms linear"></div></div>
+  <span style="flex: 0 0 auto; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums">{{nd.player.time}}</span>
+  <button type="button" onClick="{{nd.player.close}}" aria-label="关闭播放" disabled="{{nd.player.off}}" style="flex: 0 0 44px; height: 44px; border: none; background: transparent; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"></path></svg></button>
+</div>
+
+<button type="button" aria-label="关闭" onClick="{{nd.name.close}}" disabled="{{nd.name.off}}" style="position: absolute; inset: 0; z-index: 10; border: none; padding: 0; background: rgba(0, 0, 0, 0.4); opacity: {{nd.name.scrimO}}; visibility: {{nd.name.vis}}; transition: opacity 320ms ease, {{nd.name.visTr}}"></button>
+<form onSubmit="{{nd.name.submit}}" style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 11; box-sizing: border-box; border-radius: 20px 20px 0 0; display: flex; flex-direction: column; gap: 14px; padding: 20px 16px 28px; background: var(--surface); box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18); transform: {{nd.name.y}}; visibility: {{nd.name.vis}}; transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1), {{nd.name.visTr}}">
+  <h2 style="margin: 0; font-size: 18px; font-weight: 700">{{nd.name.title}}</h2>
+  <input type="text" aria-label="{{nd.name.title}}" value="{{nd.name.draft}}" onInput="{{nd.name.onDraft}}" disabled="{{nd.name.off}}" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 16px">
+  <div style="display: flex; gap: 10px">
+    <button type="button" onClick="{{nd.name.close}}" disabled="{{nd.name.off}}" style="flex: 1; min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); font-size: 15px; font-weight: 600; cursor: pointer">取消</button>
+    <button type="submit" disabled="{{nd.name.submitOff}}" style="flex: 1; min-height: 48px; border-radius: 12px; border: none; background: var(--fill); color: var(--onfill); font-size: 15px; font-weight: 700; cursor: pointer; opacity: {{nd.name.submitO}}; transition: opacity 200ms ease">保存</button>
+  </div>
+</form>
+
+
+<div data-drop="dock" role="region" aria-label="加入到项目" style="position: absolute; left: 12px; right: 12px; bottom: 20px; z-index: 6; height: {{nd.dock.h}}; box-sizing: border-box; border-radius: 20px; border: 2px dashed {{nd.dock.border}}; background: {{nd.dock.bg}}; box-shadow: 0 -6px 28px rgba(0, 0, 0, 0.16); overflow: hidden; transform: {{nd.dock.y}}; visibility: {{nd.dock.vis}}; transition: height 340ms cubic-bezier(0.32, 0.72, 0, 1), transform 340ms cubic-bezier(0.32, 0.72, 0, 1), border-color 200ms ease, background-color 240ms ease, {{nd.dock.visTr}}">
+  <div aria-hidden="true" style="position: absolute; left: 0; right: 0; bottom: 0; height: 68px; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--accent-text); font-size: 15px; font-weight: 700; pointer-events: none; opacity: {{nd.dock.peekO}}; transition: opacity 200ms ease">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v9M6.5 8.5L10 12l3.5-3.5M3.5 13.5v2a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-2"></path></svg>
+    <span>加入到项目</span>
+  </div>
+  <div aria-live="polite" style="position: absolute; left: 0; right: 0; bottom: 0; height: 68px; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--accent-text); font-size: 15px; font-weight: 700; pointer-events: none; opacity: {{nd.dock.doneO}}; transition: opacity 200ms ease">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 10.5l3.5 3.5 7.5-8"></path></svg>
+    <span>{{nd.dock.doneName}}</span>
+  </div>
+  <div style="position: absolute; inset: 0; box-sizing: border-box; padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 10px; opacity: {{nd.dock.bodyO}}; visibility: {{nd.dock.bodyVis}}; transition: opacity 220ms ease 80ms, {{nd.dock.bodyVisTr}}">
+    <div style="flex: 0 0 auto; display: flex; align-items: center; gap: 6px; min-height: 44px">
+      <span data-drop="back" aria-hidden="true" style="flex: 0 0 auto; width: {{nd.dock.backW}}; height: 40px; border-radius: 12px; background: {{nd.dock.backBg}}; overflow: hidden; display: flex; align-items: center; justify-content: center; opacity: {{nd.dock.backO}}; transition: width 260ms ease, opacity 260ms ease, background-color 200ms ease"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 20px"><path d="M12.5 4.5L7 10l5.5 5.5"></path></svg></span>
+      <h2 style="flex: 1; min-width: 0; margin: 0; font-size: 17px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; animation: {{nd.dock.anim}}">{{nd.dock.title}}</h2>
+    </div>
+    <div style="flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 8px; animation: {{nd.dock.anim}}">
+      <sc-for list="{{nd.dock.projRows}}" as="r" hint-placeholder-count="3">
+        <div data-drop="{{r.key}}" style="position: relative; flex: 0 0 52px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-radius: 14px; border: 1.5px solid {{r.border}}; background: {{r.bg}}; overflow: hidden; font-size: 16px; font-weight: 600; transition: border-color 180ms ease, background-color 180ms ease">
+          <span aria-hidden="true" style="position: absolute; left: 0; bottom: 0; height: 3px; width: {{r.barW}}; background: var(--accent); transition: {{r.barTr}}"></span>
+          <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{r.name}}</span>
+          <span style="font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums">{{r.count}}</span>
+          <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--muted)"><path d="M5 3l4 4-4 4"></path></svg>
+        </div>
+      </sc-for>
+      <sc-for list="{{nd.dock.taskRows}}" as="r" hint-placeholder-count="0">
+        <div data-drop="{{r.key}}" style="position: relative; flex: 0 0 52px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-radius: 14px; border: 1.5px solid {{r.border}}; background: {{r.bg}}; font-size: 16px; font-weight: 600; transition: border-color 180ms ease, background-color 180ms ease">
+          <span aria-hidden="true" style="position: absolute; left: 8px; right: 8px; top: -6px; height: 3px; border-radius: 2px; background: var(--accent); opacity: {{r.topO}}; transition: opacity 140ms ease"></span>
+          <span aria-hidden="true" style="position: absolute; left: 8px; right: 8px; bottom: -6px; height: 3px; border-radius: 2px; background: var(--accent); opacity: {{r.botO}}; transition: opacity 140ms ease"></span>
+          <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{r.name}}</span>
+          <span style="font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums">{{r.count}}</span>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="var(--accent-text)" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="opacity: {{r.plusO}}; transition: opacity 140ms ease"><path d="M9 4v10M4 9h10"></path></svg>
+        </div>
+      </sc-for>
+      <div data-drop="end" aria-hidden="true" style="flex: 0 0 auto; height: {{nd.dock.endH}}; box-sizing: border-box; border-radius: 14px; border: 1.5px dashed {{nd.dock.endBorder}}; background: {{nd.dock.endBg}}; display: flex; align-items: center; justify-content: center; color: var(--muted); opacity: {{nd.dock.endO}}; overflow: hidden; transition: border-color 180ms ease, background-color 180ms ease"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 4v10M4 9h10"></path></svg></div>
+    </div>
+  </div>
+</div>
+
+<div aria-hidden="true" style="position: absolute; z-index: 9; left: {{nd.ghost.left}}; top: {{nd.ghost.top}}; width: 220px; box-sizing: border-box; min-height: 56px; padding: 10px 14px; border-radius: 14px; border: 1.5px solid var(--accent); background: var(--surface); box-shadow: 0 14px 34px rgba(0, 0, 0, 0.26); display: flex; align-items: center; gap: 10px; pointer-events: none; opacity: {{nd.ghost.o}}; transform: {{nd.ghost.tf}}; visibility: {{nd.ghost.vis}}; transition: {{nd.ghost.tr}}">
+  <span style="flex: 1; min-width: 0; font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{nd.ghost.label}}</span>
+  <span style="flex: 0 0 auto; min-width: 24px; height: 24px; padding: 0 6px; box-sizing: border-box; border-radius: 12px; background: var(--fill); color: var(--onfill); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; opacity: {{nd.ghost.countO}}">{{nd.ghost.count}}</span>
+</div>
+
+<div style="position: absolute; inset: 0; z-index: 12; display: flex; align-items: center; justify-content: center; padding: 0 40px; background: rgba(0, 0, 0, 0.4); opacity: {{nd.ask.o}}; visibility: {{nd.ask.vis}}; transition: opacity 220ms ease, {{nd.ask.visTr}}">
+  <div role="alertdialog" aria-label="{{nd.ask.title}}" style="width: 100%; border-radius: 16px; background: var(--surface); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28); display: flex; flex-direction: column; gap: 16px; padding: 22px 16px 16px; transform: {{nd.ask.tf}}; transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1)">
+    <h2 style="margin: 0; font-size: 17px; font-weight: 700; text-align: center">{{nd.ask.title}}</h2>
+    <div style="display: flex; gap: 10px">
+      <button type="button" onClick="{{nd.ask.cancel}}" disabled="{{nd.ask.off}}" style="flex: 1; min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); font-size: 15px; font-weight: 600; cursor: pointer">取消</button>
+      <button type="button" onClick="{{nd.ask.ok}}" disabled="{{nd.ask.off}}" style="flex: 1; min-height: 44px; border-radius: 12px; border: none; background: var(--fill); color: var(--onfill); font-size: 15px; font-weight: 700; cursor: pointer">放入</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<div data-upzone="1" aria-hidden="true" style="position: absolute; left: 16px; right: 16px; top: 80px; z-index: 6; height: 56px; box-sizing: border-box; border-radius: 14px; border: 2px dashed {{nest.upBorder}}; background: {{nest.upBg}}; color: var(--accent-text); display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; font-weight: 700; pointer-events: none; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12); opacity: {{nest.upO}}; transform: {{nest.upTf}}; visibility: {{nest.upVis}}; transition: opacity 220ms ease, transform 260ms cubic-bezier(0.32, 0.72, 0, 1), border-color 180ms ease, background-color 180ms ease, {{nest.upVisTr}}">
+  <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15.5V5M5.5 9.5L10 5l4.5 4.5"></path></svg>
+  <span>{{nest.upLabel}}</span>
+</div>
+
+<div style="position: absolute; inset: 0; z-index: 26; display: flex; align-items: center; justify-content: center; padding: 0 40px; background: rgba(0, 0, 0, 0.4); opacity: {{nest.askO}}; visibility: {{nest.askVis}}; transition: opacity 220ms ease, {{nest.askVisTr}}">
+  <div role="alertdialog" aria-label="{{nest.askTitle}}" style="width: 100%; border-radius: 16px; background: var(--surface); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28); display: flex; flex-direction: column; gap: 16px; padding: 22px 16px 16px; transform: {{nest.askTf}}; transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1)">
+    <h2 style="margin: 0; font-size: 17px; font-weight: 700; text-align: center">{{nest.askTitle}}</h2>
+    <div style="display: flex; gap: 10px">
+      <button type="button" onClick="{{nest.cancel}}" disabled="{{nest.askOff}}" style="flex: 1; min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); font-size: 15px; font-weight: 600; cursor: pointer">取消</button>
+      <button type="button" onClick="{{nest.ok}}" disabled="{{nest.askOff}}" style="flex: 1; min-height: 44px; border-radius: 12px; border: none; background: var(--fill); color: var(--onfill); font-size: 15px; font-weight: 700; cursor: pointer">放入</button>
+    </div>
+  </div>
+</div>
+
+<div style="position: absolute; inset: 0; z-index: 20; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; padding: 20px 16px 56px; background: var(--bg); transform: {{rec.tf}}; visibility: {{rec.vis}}; transition: transform 420ms cubic-bezier(0.32, 0.72, 0, 1), {{rec.visTr}}">
+  <div style="align-self: stretch; display: flex; justify-content: flex-end; min-height: 44px">
+    <button type="button" onClick="{{rec.openLang}}" disabled="{{rec.off}}" aria-label="{{rec.langAria}}" style="min-width: 64px; height: 44px; padding: 0 12px 0 16px; border-radius: 22px; border: 1px solid var(--line); background: var(--surface); font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px">
+      <span>{{rec.lang}}</span>
+      <span style="position: relative; width: 16px; height: 16px">
+        <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="position: absolute; inset: 0; color: var(--muted); opacity: {{rec.chevO}}; transition: opacity 200ms ease"><path d="M3.5 5.5L7 9l3.5-3.5"></path></svg>
+        <svg width="16" height="16" viewBox="0 0 28 28" fill="none" aria-hidden="true" style="position: absolute; inset: 0; opacity: {{rec.dlO}}; transition: opacity 200ms ease; animation: spin 900ms linear infinite"><circle cx="14" cy="14" r="10" stroke="var(--line)" stroke-width="3.5"></circle><path d="M14 4a10 10 0 0 1 10 10" stroke="var(--accent)" stroke-width="3.5" stroke-linecap="round"></path></svg>
+      </span>
+    </button>
+  </div>
+  <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px">
+    <span role="timer" aria-label="{{rec.timeAria}}" style="font-size: 60px; font-weight: 700; letter-spacing: -1px; font-variant-numeric: tabular-nums">{{rec.time}}</span>
+    <div aria-hidden="true" style="display: flex; gap: 5px; align-items: center; height: 56px">
+      <sc-for list="{{rec.bars}}" as="b" hint-placeholder-count="12">
+        <span style="width: 4px; height: {{b.h}}; border-radius: 2px; background: var(--accent); animation: lvl {{b.d}} ease-in-out {{b.delay}} infinite alternate"></span>
+      </sc-for>
+    </div>
+  </div>
+  <button type="button" onClick="{{rec.stop}}" disabled="{{rec.off}}" aria-label="停止" style="width: 80px; height: 80px; box-sizing: border-box; border-radius: 50%; border: 4px solid var(--line); background: var(--surface); cursor: pointer; display: flex; align-items: center; justify-content: center"><span style="width: 30px; height: 30px; border-radius: 8px; background: var(--danger)"></span></button>
+</div>
+
+<button type="button" aria-label="关闭" onClick="{{rec.closeLang}}" disabled="{{rec.langOff}}" style="position: absolute; inset: 0; z-index: 21; border: none; padding: 0; background: rgba(0, 0, 0, 0.4); opacity: {{rec.langScrimO}}; visibility: {{rec.langVis}}; transition: opacity 320ms ease, {{rec.langVisTr}}"></button>
+<div role="dialog" aria-label="识别语言" style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 22; box-sizing: border-box; border-radius: 20px 20px 0 0; padding: 20px 16px 32px; background: var(--surface); box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18); display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; transform: {{rec.langY}}; visibility: {{rec.langVis}}; transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1), {{rec.langVisTr}}">
+  <sc-for list="{{rec.langs}}" as="lg" hint-placeholder-count="9">
+    <button type="button" onClick="{{lg.pick}}" aria-pressed="{{lg.pressed}}" disabled="{{rec.langOff}}" style="position: relative; min-height: 56px; border-radius: 12px; border: 1.5px solid {{lg.border}}; background: {{lg.bg}}; color: var(--text); font-size: 15px; font-weight: 600; cursor: pointer; transition: border-color 200ms ease, background-color 200ms ease">
+      <span>{{lg.name}}</span>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="var(--muted)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="position: absolute; top: 7px; right: 7px; opacity: {{lg.dlO}}"><path d="M6 2v5.5M3.8 5.3L6 7.5l2.2-2.2M2.5 10h7"></path></svg>
+    </button>
+  </sc-for>
+</div>
+
+<button type="button" aria-label="关闭" onClick="{{intro.close}}" disabled="{{intro.off}}" style="position: absolute; inset: 0; z-index: 23; border: none; padding: 0; background: rgba(0, 0, 0, 0.4); opacity: {{intro.scrimO}}; visibility: {{intro.vis}}; transition: opacity 320ms ease, {{intro.visTr}}"></button>
+<div role="dialog" aria-label="录完自动整理成任务" style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 24; box-sizing: border-box; border-radius: 20px 20px 0 0; display: flex; flex-direction: column; gap: 18px; padding: 28px 16px 32px; background: var(--surface); box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18); transform: {{intro.y}}; visibility: {{intro.vis}}; transition: transform 340ms cubic-bezier(0.32, 0.72, 0, 1), {{intro.visTr}}">
+  <div aria-hidden="true" style="position: relative; align-self: center; width: 232px; height: 64px; display: flex; align-items: center; justify-content: space-between; opacity: {{intro.flowO}}; transition: opacity 260ms ease">
+    <span style="position: absolute; left: 56px; right: 56px; top: 31px; border-top: 2px dashed var(--line)"></span>
+    <span style="position: absolute; left: 50px; top: 27px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); animation: flow 1800ms ease-in-out infinite"></span>
+    <span style="position: absolute; left: 50px; top: 27px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); animation: flow 1800ms ease-in-out 900ms infinite"></span>
+    <span style="position: relative; width: 56px; height: 56px; border-radius: 18px; background: var(--soft); color: var(--accent-text); display: flex; align-items: center; justify-content: center"><svg width="26" height="26" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="6" height="10" rx="3"></rect><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5"></path></svg></span>
+    <span style="position: relative; width: 56px; height: 56px; border-radius: 18px; background: var(--fill); color: var(--onfill); display: flex; align-items: center; justify-content: center"><svg width="26" height="26" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 5.5l1.5 1.5 2.5-3M3.5 11l1.5 1.5 2.5-3M10 5.5h6.5M10 11h6.5M3.5 16h13"></path></svg></span>
+  </div>
+  <h2 style="margin: 0; text-align: center; font-size: 20px; font-weight: 700">录完自动整理成任务</h2>
+  <button type="button" role="switch" onClick="{{intro.sw.toggle}}" aria-checked="{{intro.sw.pressed}}" disabled="{{intro.off}}" style="min-height: 56px; box-sizing: border-box; display: flex; align-items: center; gap: 12px; padding: 0 12px 0 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 16px; font-weight: 600; text-align: left; cursor: pointer">
+    <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+      <span>自动生成任务</span>
+      <span style="font-size: 12px; font-weight: 500; color: var(--muted)">之后可在「笔记」里关闭</span>
+    </span>
+    <span aria-hidden="true" style="position: relative; flex: 0 0 44px; height: 26px; border-radius: 13px; background: {{intro.sw.track}}; transition: background-color 220ms ease">
+      <span style="position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); transform: {{intro.sw.knob}}; transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1)"></span>
+    </span>
+  </button>
+  <button type="button" onClick="{{intro.start}}" disabled="{{intro.off}}" style="min-height: 52px; border-radius: 14px; border: none; background: var(--fill); color: var(--onfill); font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 50%; background: currentColor"></span><span>开始录音</span></button>
 </div>
 </div>
 </x-dc>
@@ -427,6 +837,132 @@ class Component extends DCLogic {
       { name: '筑地场外市场', addr: '日本东京都中央区築地4丁目16-2', lat: 35.6655, lng: 139.7707, gq: '築地場外市場 東京都中央区築地4丁目16-2' },
       { name: '二条市场', addr: '日本北海道札幌市中央区南3条東1丁目', lat: 43.0573, lng: 141.3577, gq: '二条市場 北海道札幌市中央区南3条東1丁目' }
     ];
+  }
+
+  fmtMin(m) {
+    if (m < 60) return m + ' 分';
+    var h = Math.floor(m / 60), r = m % 60;
+    return r ? h + ' 小时 ' + r + ' 分' : h + ' 小时';
+  }
+
+  fmtMoney(amount, cur, home) {
+    var zero = cur === 'JPY' || cur === 'KRW';
+    var n = zero ? Math.round(amount) : Math.round(amount * 100) / 100;
+    var parts = (zero ? String(n) : n.toFixed(2).replace(/\.00$/, '')).split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    var s = parts.join('.');
+    var sym = { CNY: '¥', JPY: '¥', USD: '$', EUR: '€' }[cur];
+    return cur === home && sym ? sym + s : cur + ' ' + s;
+  }
+
+  /** CNY per unit (sample daily rates). */
+  rate(cur) { return { CNY: 1, JPY: 0.047, USD: 7.2, EUR: 7.8 }[cur] || null; }
+
+  /** Sample durations, costs and fixed starts (instants) for the 日本旅行 tree. */
+  sampleMeta() {
+    return {
+      osaka: { cost: ['36000', 'JPY'] },
+      castle: { dur: 120, cost: ['600', 'JPY'] },
+      usj: { dur: 480, cost: ['8600', 'JPY'], fixed: Date.parse('2026-12-05T11:00:00+09:00') },
+      dotonbori: { dur: 90 },
+      kaiyukan: { dur: 150, cost: ['2700', 'JPY'] },
+      umeda: { dur: 60, cost: ['2000', 'JPY'] },
+      tsutenkaku: { cost: ['1000', 'JPY'] },
+      tokyo: { cost: ['42000', 'JPY'], fixed: Date.parse('2026-12-07T09:00:00+09:00') },
+      ghibli: { dur: 150, cost: ['1000', 'JPY'] },
+      shibuyasky: { dur: 90, cost: ['2500', 'JPY'] },
+      teamlab: { dur: 120, cost: ['3800', 'JPY'] },
+      sensoji: { dur: 90 },
+      tokyotower: { dur: 60, cost: ['1200', 'JPY'] },
+      hokkaido: { cost: ['1500', 'CNY'], fixed: Date.parse('2026-12-10T09:00:00+09:00') },
+      odori: { dur: 60 },
+      otaru: { dur: 240 },
+      noboribetsu: { dur: 180, cost: ['2000', 'JPY'] },
+      toya: { dur: 120 },
+      hakodate: { dur: 120, cost: ['1800', 'JPY'] }
+    };
+  }
+
+  tzOffset(ms, tz) {
+    var p = {};
+    new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+      .formatToParts(new Date(ms)).forEach(function (x) { p[x.type] = x.value; });
+    return (Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute) - Math.floor(ms / 60000) * 60000) / 60000;
+  }
+
+  localVal(ms, tz) {
+    if (ms == null) return '';
+    var d = new Date(ms + this.tzOffset(ms, tz) * 60000);
+    function z(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getUTCFullYear() + '-' + z(d.getUTCMonth() + 1) + '-' + z(d.getUTCDate()) + 'T' + z(d.getUTCHours()) + ':' + z(d.getUTCMinutes());
+  }
+
+  fromLocal(v, tz) {
+    if (!v) return null;
+    var guess = Date.parse(v + ':00Z');
+    return guess - this.tzOffset(guess, tz) * 60000;
+  }
+
+  clock(ms, tz, refMs) {
+    var v = this.localVal(ms, tz), r = this.localVal(refMs, tz);
+    var hm = v.slice(11);
+    if (refMs == null || v.slice(0, 10) === r.slice(0, 10)) return hm;
+    return (+v.slice(5, 7)) + '/' + (+v.slice(8, 10)) + ' ' + hm;
+  }
+
+  /** The time chain over one ordered list (design spec 时间推算规则, straight-line travel at 30 km/h). */
+  chain(list, S, fixedOf) {
+    var self = this;
+    function geo(t) { return typeof t.lat === 'number' ? t : null; }
+    function entry(t) {
+      var kids = t.children || [];
+      for (var i = 0; i < kids.length; i++) { var p = entry(kids[i]); if (p) return p; }
+      return geo(t);
+    }
+    function exit(t) {
+      var kids = t.children || [];
+      for (var i = kids.length - 1; i >= 0; i--) { var p = exit(kids[i]); if (p) return p; }
+      return geo(t);
+    }
+    function durOf(t) {
+      if (t.children && t.children.length) {
+        var r = self.chain(t.children, null, function () { return null; });
+        return { min: r.total, known: r.known };
+      }
+      return typeof t.dur === 'number' ? { min: t.dur, known: true } : { min: 0, known: false };
+    }
+    var cur = S, last = null, approx = false, total = 0, known = false, out = {};
+    list.forEach(function (c) {
+      var e = entry(c), tr = 0;
+      if (e && last && (e.lat !== last.lat || e.lng !== last.lng)) {
+        tr = Math.round(self.km(last, e) / 30 * 60);
+        if (cur != null) cur += tr * 60000;
+      }
+      var fx = fixedOf(c), start = cur, late = null;
+      if (fx != null) { if (cur != null && cur > fx) late = Math.round((cur - fx) / 60000); start = fx; }
+      var d = durOf(c);
+      var end = start != null ? start + d.min * 60000 : null;
+      out[c.id] = { start: start, end: end, dur: d.known ? d.min : null, late: late, approx: approx, travel: tr };
+      if (!d.known) approx = true; else known = true;
+      cur = end != null ? end : cur;
+      total += tr + d.min;
+      last = exit(c) || last;
+    });
+    return { out: out, total: total, known: known };
+  }
+
+  /** Own cost + all descendants, in `home`; costs in currencies without a rate are skipped. */
+  costOf(t, home) {
+    var self = this, sum = 0, any = false, mixed = false;
+    function walk(n) {
+      if (n.cost) {
+        var a = parseFloat(n.cost[0]), r = self.rate(n.cost[1]), h = self.rate(home);
+        if (r && h) { sum += a * r / h; any = true; if (n.cost[1] !== home) mixed = true; }
+      }
+      (n.children || []).forEach(walk);
+    }
+    walk(t);
+    return { sum: sum, any: any, mixed: mixed };
   }
 
   km(a, b) {
@@ -510,9 +1046,9 @@ class Component extends DCLogic {
 
   plSeed() {
     return [
-      { id: 'p3', name: '搬家' },
-      { id: 'p2', name: '毕业论文' },
-      { id: 'p1', name: '日本旅行' }
+      { id: 'p3', name: '搬家', currency: 'CNY', tz: 'Asia/Shanghai' },
+      { id: 'p2', name: '毕业论文', currency: 'CNY', tz: 'Asia/Shanghai' },
+      { id: 'p1', name: '日本旅行', currency: 'CNY', tz: 'Asia/Tokyo' }
     ];
   }
 
@@ -531,8 +1067,8 @@ class Component extends DCLogic {
     var empty = live.length === 0;
     function vis(on, ms) { return on ? 'visibility 0s' : 'visibility 0s linear ' + ms + 'ms'; }
     function open(p) {
-      var next = { screen: 'plan', project: p.id, level: 'root', tab: 'tasks', mode: 'plan', draft: null, drag: null, focus: null, swiped: null, addOpen: false, runIdx: 0 };
-      if ((st.project || 'p1') !== p.id) { next.sel = {}; next.order = {}; next.added = {}; next.removed = {}; next.done = {}; }
+      var next = { screen: 'plan', planFrom: null, project: p.id, level: 'root', tab: 'tasks', mode: 'plan', draft: null, drag: null, focus: null, swiped: null, addOpen: false, runIdx: 0 };
+      if ((st.project || 'p1') !== p.id) { next.sel = {}; next.order = {}; next.added = {}; next.removed = {}; next.done = {}; next.moves = []; }
       self._drag = null;
       self.setState(next);
     }
@@ -565,8 +1101,7 @@ class Component extends DCLogic {
       openNew: function () { self.setState({ plSheet: 'new', plDraft: '', plTarget: null }); },
       emptyO: empty ? '1' : '0', emptyTf: empty ? 'scale(1)' : 'scale(0.94)',
       emptyVis: empty ? 'visible' : 'hidden', emptyVisTr: vis(empty, 260), emptyOff: !empty,
-      fabO: empty ? '0' : '1', fabTf: empty ? 'scale(0.6)' : 'scale(1)',
-      fabVis: empty ? 'hidden' : 'visible', fabVisTr: vis(!empty, 220), fabOff: empty,
+      fabO: '1', fabTf: 'scale(1)', fabVis: 'visible', fabVisTr: vis(true, 220), fabOff: false,
       menu: {
         name: menuOn ? all[menuIdx].name : '',
         top: (80 + Math.max(menuIdx, 0) * 66) + 'px',
@@ -576,11 +1111,12 @@ class Component extends DCLogic {
       closeMenu: function () { self.setState({ plMenu: null }); },
       openRename: function () {
         var p = all[menuIdx];
-        self.setState({ plMenu: null, plSheet: 'rename', plTarget: p.id, plDraft: p.name });
+        self.setState({ plMenu: null, plSheet: 'rename', plTarget: p.id, plDraft: p.name, plDraftCur: p.currency || 'CNY', plDraftTz: p.tz || 'Asia/Shanghai' });
       },
       openDelete: function () { self.setState({ plMenu: null, plConfirm: st.plMenu }); },
       sheet: {
-        title: st.plSheet === 'rename' ? '重命名' : '新建 Project',
+        title: st.plSheet === 'rename' ? '编辑' : '新建 Project',
+        moreRows: st.plSheet === 'rename' ? '1fr' : '0fr', moreO: st.plSheet === 'rename' ? '1' : '0', moreMt: st.plSheet === 'rename' ? '0px' : '-14px',
         action: st.plSheet === 'rename' ? '保存' : '创建',
         y: sheetOn ? 'translateY(0%)' : 'translateY(110%)',
         scrimO: sheetOn ? '1' : '0',
@@ -589,15 +1125,18 @@ class Component extends DCLogic {
       },
       draft: draft,
       onDraft: function (e) { self.setState({ plDraft: e.currentTarget.value }); },
+      draftCur: st.plDraftCur || 'CNY', draftTz: st.plDraftTz || 'Asia/Shanghai',
+      onCur: function (e) { self.setState({ plDraftCur: e.currentTarget.value }); },
+      onTz: function (e) { self.setState({ plDraftTz: e.currentTarget.value }); },
       closeSheet: function () { self.setState({ plSheet: null }); },
       submitSheet: function (e) {
         e.preventDefault();
         if (!trimmed) return;
         if (st.plSheet === 'rename') {
-          self.setState({ plSheet: null, plProjects: all.map(function (p) { return p.id === st.plTarget ? { id: p.id, name: trimmed } : p; }) });
+          self.setState({ plSheet: null, plProjects: all.map(function (p) { return p.id === st.plTarget ? { id: p.id, name: trimmed, currency: st.plDraftCur || p.currency, tz: st.plDraftTz || p.tz } : p; }) });
           return;
         }
-        var p = { id: 'n' + Date.now(), name: trimmed };
+        var p = { id: 'n' + Date.now(), name: trimmed, currency: 'CNY', tz: 'Asia/Shanghai' };
         self.setState({ plSheet: null, plProjects: [p].concat(all), plEntering: p.id });
         setTimeout(function () { self.setState({ plEntering: null }); }, 40);
         setTimeout(function () { open(p); }, 520);
@@ -619,22 +1158,798 @@ class Component extends DCLogic {
     };
   }
 
-  renderVals() {
+  // ---------- 录音笔记 ----------
+  langList() {
+    return [
+      { id: 'zh_CN', short: '中', name: '普通话' }, { id: 'zh_TW', short: '繁', name: '國語' }, { id: 'yue_CN', short: '粵', name: '粵語' },
+      { id: 'ja_JP', short: '日', name: '日本語' }, { id: 'ko_KR', short: '한', name: '한국어' }, { id: 'en_US', short: 'EN', name: 'English' },
+      { id: 'fr_FR', short: 'FR', name: 'Français' }, { id: 'de_DE', short: 'DE', name: 'Deutsch' }, { id: 'es_ES', short: 'ES', name: 'Español' }
+    ];
+  }
+
+  langShort(id) { var l = this.langList().filter(function (x) { return x.id === id; })[0]; return l ? l.short : id; }
+
+  mmss(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return h ? h + ':' + p(m) + ':' + p(s) : m + ':' + p(s);
+  }
+
+  ntSeed() {
+    var kyoto = [
+      [0, '1', '下周去京都的行程我们定一下吧，我想第一天先去伏见稻荷大社。'],
+      [6, '2', '好啊，那我来订酒店，最好住在京都站附近，交通方便一点。'],
+      [12, '3', '伏见稻荷人很多，建议早上七点之前到，拍照比较清净。'],
+      [19, '1', '那就七点出发。之后去清水寺，中午在二年坂吃午饭。'],
+      [25, '2', '午饭要提前预约吗？我可以顺便查一下二年坂那家荞麦面店。'],
+      [31, '3', '要的，周末一般要排队。还有，岚山的小火车票也得提前在网上买。'],
+      [38, '1', '岚山放第二天吧。第二天上午小火车，下午去竹林和天龙寺。'],
+      [44, '2', '好，那小火车票我也一起买了，酒店和车票都交给我。']
+    ].map(function (l) { return { t: l[0], s: l[1], text: l[2] }; });
+    return [
+      { id: 'n1', title: '11-23 14:05', dur: 768, lang: 'zh_CN', state: 'ready', speakers: { '1': '我', '2': '小林', '3': '3' }, lines: kyoto, chains: null, imported: [] },
+      { id: 'n2', title: '11-21 09:30', dur: 1082, lang: 'ja_JP', state: 'ready', speakers: { '1': '1', '2': '2' },
+        lines: [
+          { t: 0, s: '1', text: '東京に着いたら、まずSuicaを買いましょう。' },
+          { t: 7, s: '2', text: 'そのあと浅草寺に行って、雷門で写真を撮りたいです。' },
+          { t: 15, s: '1', text: 'スカイツリーのチケットは前日までに予約しておきます。' }
+        ],
+        chains: [{ id: 'c21', name: '東京一日目', steps: [
+          { id: 's211', name: 'Suicaを買う', place: '', t: 0 },
+          { id: 's212', name: '浅草寺・雷門', place: '浅草寺', t: 7 },
+          { id: 's213', name: 'スカイツリーを予約', place: '東京スカイツリー', t: 15 }
+        ] }],
+        imported: [] },
+      { id: 'n3', title: '11-20 20:15', dur: 3761, lang: 'zh_CN', state: 'ready', speakers: { '1': '我' },
+        lines: [{ t: 0, s: '1', text: '论文这周要把第三章的实验数据整理完，周五前发给导师。' }],
+        chains: [],
+        imported: [{ name: '整理第三章实验数据', target: '毕业论文' }, { name: '周五前发给导师', target: '毕业论文' }] }
+    ];
+  }
+
+  ntExtract() {
+    return [
+      { id: 'c11', name: '京都第一天', steps: [
+        { id: 's111', name: '伏见稻荷大社', place: '伏见稻荷大社', t: 0 },
+        { id: 's112', name: '清水寺', place: '清水寺', t: 19 },
+        { id: 's113', name: '二年坂吃午饭', place: '二年坂', t: 19 }
+      ] },
+      { id: 'c12', name: '京都第二天', steps: [
+        { id: 's121', name: '岚山小火车', place: '嵯峨野观光小火车', t: 38 },
+        { id: 's122', name: '竹林', place: '嵯峨野竹林', t: 38 },
+        { id: 's123', name: '天龙寺', place: '天龙寺', t: 38 }
+      ] },
+      { id: 'c13', name: '订京都站附近的酒店', steps: [{ id: 's131', name: '订京都站附近的酒店', place: '京都站', t: 6 }] },
+      { id: 'c14', name: '预约二年坂荞麦面店', steps: [{ id: 's141', name: '预约二年坂荞麦面店', place: '二年坂', t: 25 }] }
+    ];
+  }
+
+  campExtract() {
+    var k = Date.now();
+    return [{ id: 'cx' + k, name: '周六露营', steps: [
+      { id: 'sx1' + k, name: '去超市买食材', place: '超市', t: 0 },
+      { id: 'sx2' + k, name: '取帐篷', place: '', t: 0 },
+      { id: 'sx3' + k, name: '订营地', place: '', t: 8 }
+    ] }];
+  }
+
+  ntNotes(st) { return st.ntNotes || this.ntSeed(); }
+
+  ntSet(id, fn) {
+    var cur = this.ntNotes(this.state || {});
+    this.setState({ ntNotes: cur.map(function (n) { if (n.id !== id) return n; var c = {}; Object.keys(n).forEach(function (k) { c[k] = n[k]; }); fn(c); return c; }) });
+  }
+
+  cp(o) { var c = {}; Object.keys(o || {}).forEach(function (k) { c[k] = o[k]; }); return c; }
+  vt(on, ms) { return on ? 'visibility 0s' : 'visibility 0s linear ' + ms + 'ms'; }
+
+  // ---------- 任务树：新增 / 删除 / 移动（任意层级） ----------
+  findNode(n, id) {
+    if (n.id === id) return n;
+    var k = n.children || [];
+    for (var i = 0; i < k.length; i++) { var r = this.findNode(k[i], id); if (r) return r; }
+    return null;
+  }
+
+  parentOf(n, id) {
+    var k = n.children || [];
+    for (var i = 0; i < k.length; i++) { if (k[i].id === id) return n; var r = this.parentOf(k[i], id); if (r) return r; }
+    return null;
+  }
+
+  buildTree(st) {
     var self = this;
-    var st = this.state || {};
     var root = this.tree();
     var plCur = (st.plProjects || this.plSeed()).filter(function (p) { return p.id === (st.project || 'p1'); })[0];
     if (plCur && plCur.id !== 'p1') root = { id: 'root', name: plCur.name, children: [] };
     else if (plCur) root.name = plCur.name;
+    var added = st.added || {}, removed = st.removed || {};
+    (function build(n) {
+      var extra = (added[n.id] || []).map(function (t) { var c = self.cp(t); delete c.children; return c; });
+      if (n.children || extra.length) n.children = (n.children || []).concat(extra).filter(function (c) { return !removed[c.id]; });
+      (n.children || []).forEach(build);
+    })(root);
+    (st.moves || []).forEach(function (mv) {
+      var par = self.parentOf(root, mv.id);
+      if (!par) return;
+      var node = par.children.filter(function (c) { return c.id === mv.id; })[0];
+      var tgt = mv.up ? self.parentOf(root, par.id) : self.findNode(root, mv.to);
+      if (!tgt || self.findNode(node, tgt.id)) return;
+      par.children = par.children.filter(function (c) { return c.id !== mv.id; });
+      tgt.children = (tgt.children || []).slice();
+      if (mv.up) {
+        var at = tgt.children.map(function (c) { return c.id; }).indexOf(par.id);
+        tgt.children.splice(at + 1, 0, node);
+      } else tgt.children.push(node);
+    });
+    return { root: root, plCur: plCur };
+  }
+
+  orderedKids(st, node) {
+    var ord = (st.order || {})[node.id];
+    var kids = node.children || [];
+    if (!ord) return kids;
+    var map = {};
+    kids.forEach(function (c) { map[c.id] = c; });
+    var out = ord.map(function (id) { return map[id]; }).filter(Boolean);
+    kids.forEach(function (c) { if (ord.indexOf(c.id) < 0) out.push(c); });
+    return out;
+  }
+
+  // ---------- 屏幕切换 ----------
+  screenVals(st) {
+    var scr = st.screen || this.props.start || 'list';
+    var nf = st.noteFrom || 'notes', pf = st.planFrom || 'list';
+    function slot(s) {
+      return {
+        tf: s === 'on' ? 'translateX(0%)' : s === 'under' ? 'translateX(-28%)' : 'translateX(100%)',
+        vis: s === 'on' ? 'visible' : 'hidden',
+        visTr: s === 'on' ? 'visibility 0s' : 'visibility 0s linear 420ms',
+        z: s === 'on' ? '2' : '1',
+        zTr: s === 'on' ? 'z-index 0s linear 420ms' : 'z-index 0s'
+      };
+    }
+    var notesS = scr === 'notes' ? 'on' : scr === 'note' && nf === 'notes' ? 'under' : 'off';
+    var searchS = scr === 'search' ? 'on' : (scr === 'note' && nf === 'search') || (scr === 'plan' && pf === 'search') ? 'under' : 'off';
+    var L = slot(scr === 'list' ? 'on' : 'under'), P = slot(scr === 'plan' ? 'on' : 'off'), N = slot(notesS), S = slot(searchS), D = slot(scr === 'note' ? 'on' : 'off');
+    return {
+      listTf: L.tf, listVis: L.vis, listVisTr: L.visTr, dimO: scr === 'list' ? '0' : '0.18',
+      planTf: P.tf, planVis: P.vis, planVisTr: P.visTr,
+      notesTf: N.tf, notesVis: N.vis, notesVisTr: N.visTr, notesZ: N.z, notesZTr: N.zTr,
+      searchTf: S.tf, searchVis: S.vis, searchVisTr: S.visTr, searchZ: S.z, searchZTr: S.zTr,
+      noteTf: D.tf, noteVis: D.vis, noteVisTr: D.visTr
+    };
+  }
+
+  // ---------- 悬浮按钮菜单 ----------
+  fabVals(st) {
+    var self = this;
+    var on = !!st.fabOpen && (st.screen || this.props.start || 'list') === 'list';
+    function act(k) {
+      return { o: on ? '1' : '0', tf: on ? 'translateY(0px) scale(1)' : 'translateY(' + (14 + k * 10) + 'px) scale(0.86)', d: (on ? k * 40 : 0) + 'ms' };
+    }
+    function close() { self.setState({ fabOpen: false }); }
+    return {
+      off: !on, scrimO: on ? '1' : '0', vis: on ? 'visible' : 'hidden', visTr: this.vt(on, 260),
+      rot: on ? 'rotate(45deg)' : 'rotate(0deg)', aria: on ? '关闭' : '菜单', expanded: on ? 'true' : 'false',
+      toggle: function () { self.setState({ fabOpen: !on, plMenu: null }); },
+      close: close,
+      a0: act(3), a1: act(2), a2: act(1), a3: act(0),
+      search: function (e) {
+        var app = e.currentTarget.closest('.app');
+        self.setState({ fabOpen: false, screen: 'search', q: '' });
+        setTimeout(function () { try { app.querySelector('[data-q]').focus(); } catch (err) {} }, 440);
+      },
+      notes: function () { self.setState({ fabOpen: false, screen: 'notes', ntSwiped: null }); },
+      rec: function () { self.setState({ fabOpen: false }); self.startRec(); },
+      create: function () { self.setState({ fabOpen: false, plSheet: 'new', plDraft: '', plTarget: null }); }
+    };
+  }
+
+  // ---------- 录音：第一次的说明 ----------
+  startRec() {
+    var st = this.state || {};
+    if (!st.introSeen) { this.setState({ introOn: true, introAuto: st.autoX !== false }); return; }
+    this.beginRec();
+  }
+
+  beginRec() {
+    var self = this;
+    clearInterval(self._recTimer);
+    self.setState({ recOn: true, recStart: Date.now(), recTick: 0, recLangOpen: false });
+    self._recTimer = setInterval(function () { self.setState({ recTick: (self.state.recTick || 0) + 1 }); }, 1000);
+  }
+
+  switchVals(on) {
+    return { pressed: on ? 'true' : 'false', track: on ? 'var(--fill)' : 'var(--line)', knob: on ? 'translateX(20px)' : 'translateX(0px)' };
+  }
+
+  introVals(st) {
+    var self = this;
+    var on = !!st.introOn;
+    var a = st.introAuto !== false;
+    var sw = this.switchVals(a);
+    sw.toggle = function () { self.setState({ introAuto: !a }); };
+    return {
+      off: !on, y: on ? 'translateY(0%)' : 'translateY(110%)', scrimO: on ? '1' : '0',
+      vis: on ? 'visible' : 'hidden', visTr: this.vt(on, 320), sw: sw,
+      flowO: a ? '1' : '0.25',
+      close: function () { self.setState({ introOn: false }); },
+      start: function () {
+        self.setState({ introOn: false, introSeen: true, autoX: a });
+        setTimeout(function () { self.beginRec(); }, 240);
+      }
+    };
+  }
+
+  // ---------- 笔记列表 ----------
+  notesVals(st) {
+    var self = this;
+    var notes = this.ntNotes(st);
+    var leaving = st.ntLeaving || null, entering = st.ntEntering || null;
+    var auto = st.autoX !== false;
+    var sw = this.switchVals(auto);
+    sw.toggle = function () { self.setState({ autoX: !auto }); };
+    function swJust() { return Date.now() - (self._ntSwAt || 0) < 450; }
+    var fabOn = (st.screen === 'notes') && !st.recOn;
+    return {
+      back: function () { self.setState({ screen: 'list', ntSwiped: null }); },
+      auto: sw,
+      fab: { off: !fabOn, o: fabOn ? '1' : '0', tf: fabOn ? 'scale(1)' : 'scale(0.6)', vis: fabOn ? 'visible' : 'hidden', visTr: this.vt(fabOn, 220) },
+      record: function () { self.startRec(); },
+      emptyO: notes.length ? '0' : '1',
+      notes: notes.map(function (n) {
+        var gone = n.id === leaving || n.id === entering;
+        var left = (n.chains || []).reduce(function (a, c) { return a + c.steps.length; }, 0);
+        var busy = n.state === 'processing' || n.state === 'extracting';
+        var done = !busy && n.chains && left === 0 && n.imported.length > 0;
+        var sw2 = st.ntSwiped === n.id;
+        return {
+          id: n.id, title: n.title, aria: n.title,
+          meta: self.mmss(n.dur) + ' · ' + self.langShort(n.lang),
+          rows: gone ? '0fr' : '1fr', mb: gone ? '0px' : '10px', o: gone ? '0' : '1',
+          badge: left || '', badgeO: !busy && left ? '1' : '0', badgeS: !busy && left ? '1' : '0.6',
+          spinO: busy ? '1' : '0', doneO: done ? '1' : '0',
+          open: function () {
+            if (swJust()) return;
+            if (st.ntSwiped) { self.setState({ ntSwiped: null }); return; }
+            self.setState({ screen: 'note', noteFrom: 'notes', noteId: n.id, noteTab: n.chains && n.chains.length ? 'chains' : 'text', playAt: null, playing: false, ndName: null });
+          },
+          sw: {
+            down: function (e) { self._ntSw = { id: n.id, x: e.clientX, y: e.clientY, fired: false }; },
+            move: function (e) {
+              var s = self._ntSw;
+              if (!s || s.id !== n.id || s.fired) return;
+              var dx = e.clientX - s.x, dy = e.clientY - s.y;
+              if (Math.abs(dx) < 28 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+              s.fired = true; self._ntSwAt = Date.now();
+              self.setState({ ntSwiped: dx < 0 ? n.id : null });
+            },
+            up: function () { self._ntSw = null; }
+          },
+          del: function () {
+            self.setState({ ntSwiped: null, ntLeaving: n.id });
+            setTimeout(function () { self.setState({ ntLeaving: null, ntNotes: self.ntNotes(self.state).filter(function (x) { return x.id !== n.id; }) }); }, 360);
+          },
+          delAria: '删除：' + n.title, delOff: !sw2,
+          delTf: sw2 ? 'translateX(0%)' : 'translateX(101%)', delVis: sw2 ? 'visible' : 'hidden',
+          delVisTr: self.vt(sw2, 240)
+        };
+      })
+    };
+  }
+
+  // ---------- 录音中 ----------
+  recVals(st) {
+    var self = this;
+    var on = !!st.recOn;
+    var lang = st.recLang || 'zh_CN';
+    var have = st.recHave || { zh_CN: true, en_US: true };
+    var dl = st.recDl || null;
+    var langOn = on && !!st.recLangOpen;
+    var sec = on ? Math.floor((Date.now() - (st.recStart || Date.now())) / 1000) : 0;
+    var heights = [18, 34, 52, 28, 44, 56, 38, 22, 48, 30, 42, 20];
+    var name = this.langList().filter(function (l) { return l.id === lang; })[0];
+    return {
+      off: !on,
+      tf: on ? 'translateY(0%)' : 'translateY(100%)', vis: on ? 'visible' : 'hidden', visTr: this.vt(on, 420),
+      time: this.mmss(sec), timeAria: this.mmss(sec),
+      lang: this.langShort(lang), langAria: '识别语言：' + (name ? name.name : lang),
+      chevO: dl ? '0' : '1', dlO: dl ? '1' : '0',
+      bars: heights.map(function (h, i) { return { h: h + 'px', d: (420 + (i * 137) % 380) + 'ms', delay: (-(i * 173) % 600) + 'ms' }; }),
+      openLang: function () { self.setState({ recLangOpen: true }); },
+      closeLang: function () { self.setState({ recLangOpen: false }); },
+      langOff: !langOn, langScrimO: langOn ? '1' : '0', langY: langOn ? 'translateY(0%)' : 'translateY(110%)',
+      langVis: langOn ? 'visible' : 'hidden', langVisTr: this.vt(langOn, 320),
+      langs: this.langList().map(function (l) {
+        var cur = l.id === lang;
+        return { name: l.name, pressed: cur ? 'true' : 'false', border: cur ? 'var(--accent)' : 'var(--line)', bg: cur ? 'var(--soft)' : 'var(--bg)',
+          dlO: have[l.id] ? '0' : '1',
+          pick: function () {
+            var next = { recLang: l.id, recLangOpen: false };
+            if (!have[l.id]) {
+              next.recDl = l.id;
+              setTimeout(function () {
+                var h = self.cp(self.state.recHave || { zh_CN: true, en_US: true });
+                h[l.id] = true;
+                self.setState({ recHave: h, recDl: self.state.recDl === l.id ? null : self.state.recDl });
+              }, 2600);
+            }
+            self.setState(next);
+          } };
+      }),
+      stop: function () {
+        clearInterval(self._recTimer);
+        var dur = Math.max(1, Math.floor((Date.now() - (self.state.recStart || Date.now())) / 1000));
+        var d = new Date();
+        var p = function (x) { return (x < 10 ? '0' : '') + x; };
+        var id = 'r' + Date.now();
+        var note = { id: id, title: p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()), dur: dur,
+          lang: self.state.recLang || 'zh_CN', state: 'processing', speakers: {}, lines: [], chains: null, imported: [] };
+        self.setState({ recOn: false, recLangOpen: false, screen: self.state.screen === 'note' ? 'note' : 'notes', ntNotes: [note].concat(self.ntNotes(self.state)), ntEntering: id });
+        setTimeout(function () { self.setState({ ntEntering: null }); }, 40);
+        setTimeout(function () {
+          var auto = self.state.autoX !== false;
+          self.ntSet(id, function (c) {
+            c.state = auto ? 'extracting' : 'ready';
+            c.speakers = { '1': '1', '2': '2' };
+            c.lines = [
+              { t: 0, s: '1', text: '周六先去超市买露营要用的食材，再去取帐篷。' },
+              { t: Math.min(8, dur), s: '2', text: '帐篷我来取，你记得订营地。' }
+            ];
+          });
+          if (!auto) return;
+          setTimeout(function () {
+            self.ntSet(id, function (c) { c.state = 'ready'; c.chains = self.campExtract(); });
+            self.setState({ ndEnterSeq: (self.state.ndEnterSeq || 0) + 1 });
+          }, 1800);
+        }, 2600);
+      }
+    };
+  }
+
+  // ---------- 笔记详情 + 拖到项目 ----------
+  noteVals(st) {
+    var self = this;
+    var n = this.ntNotes(st).filter(function (x) { return x.id === st.noteId; })[0] ||
+      { id: '', title: '', dur: 0, lang: 'zh_CN', state: 'ready', speakers: {}, lines: [], chains: null, imported: [] };
+    var tab = st.noteTab || 'text';
+    var chainsTab = tab === 'chains';
+    var busy = n.state === 'processing';
+    var xing = n.state === 'extracting';
+    var extracting = st.ndExtracting === n.id;
+    var chains = n.chains || [];
+    var leaving = st.ndLeaving || null;
+    var playAt = st.playAt;
+    var playing = !!st.playing && playAt != null;
+    var spkOrder = Object.keys(n.speakers);
+    var spkCls = [['var(--soft)', 'var(--accent-text)'], ['var(--sp2bg)', 'var(--sp2fg)'], ['var(--sp3bg)', 'var(--sp3fg)']];
+    function pane(on) { return { vis: on ? 'visible' : 'hidden', tr: on ? 'visibility 0s' : 'visibility 0s linear 320ms' }; }
+    function lpJust() { return Date.now() - (self._lpAt || 0) < 450; }
+    function play(i) {
+      clearInterval(self._playTimer);
+      self.setState({ playAt: i, playing: true });
+      self._playTimer = setInterval(function () {
+        var s = self.state;
+        if (!s.playing || s.playAt == null) return;
+        var cur = self.ntNotes(s).filter(function (x) { return x.id === s.noteId; })[0];
+        if (!cur || s.playAt >= cur.lines.length - 1) { clearInterval(self._playTimer); self.setState({ playing: false }); return; }
+        self.setState({ playAt: s.playAt + 1 });
+      }, 3000);
+    }
+    var left = chains.reduce(function (a, c) { return a + c.steps.length; }, 0);
+    var nameSheet = st.ndName || null;
+    var nameOn = !!nameSheet;
+    var draft = st.ndNameDraft || '';
+
+    // 拖动状态
+    var dg = st.ndDrag || null;
+    var live = !!(dg && !dg.hide);
+    var over = st.ndOver || null;
+    var dockOpen = !!st.ndDockOpen && live;
+    var done = st.ndDone || null;
+    var ask = st.ndAsk || null;
+    var projects = st.plProjects || this.plSeed();
+    var curProj = st.project || 'p1';
+    var projId = st.ndProj || null;
+    var proj = projId ? projects.filter(function (p) { return p.id === projId; })[0] : null;
+    function levelOf(pid) {
+      if (pid === curProj) return self.buildTree(st).root;
+      if (pid === 'p1') return self.tree();
+      var p = projects.filter(function (x) { return x.id === pid; })[0];
+      return { id: 'root', name: p ? p.name : '', children: [] };
+    }
+    var lvl = proj ? levelOf(proj.id) : null;
+    var lvlKids = lvl ? (proj.id === curProj ? self.orderedKids(st, lvl) : lvl.children) : [];
+
+    function appXY(el, e) {
+      var app = el.closest('.app');
+      var r = app.getBoundingClientRect();
+      var k = 390 / r.width;
+      return { x: (e.clientX - r.left) * k, y: (e.clientY - r.top) * k };
+    }
+    function commit(d, pid, mode, ref) {
+      var s0 = self.state;
+      var note = self.ntNotes(s0).filter(function (x) { return x.id === s0.noteId; })[0];
+      var c = note && (note.chains || []).filter(function (ch) { return ch.id === d.chainId; })[0];
+      if (!c) return;
+      var steps = d.kind === 'chain' ? c.steps : c.steps.filter(function (x) { return x.id === d.stepId; });
+      var p = projects.filter(function (x) { return x.id === pid; })[0];
+      var target = p ? p.name : '';
+      if (pid === (s0.project || 'p1')) {
+        var bt = self.buildTree(s0);
+        var parentId = mode === 'in' ? ref : 'root';
+        var refNode = ref ? self.findNode(bt.root, ref) : null;
+        if (mode === 'in' && refNode) target = refNode.name;
+        var stamp = Date.now();
+        var mk = function (x) { return { id: 'imp' + x.id + stamp, name: x.name, short: x.name, place: x.place || '', pre: [] }; };
+        var added = self.cp(s0.added), order = self.cp(s0.order);
+        var newId;
+        if (steps.length === 1) { var t1 = mk(steps[0]); newId = t1.id; added[parentId] = (added[parentId] || []).concat([t1]); }
+        else { newId = 'impc' + c.id + stamp; added[parentId] = (added[parentId] || []).concat([{ id: newId, name: c.name, short: c.name, place: '', pre: [] }]); added[newId] = steps.map(mk); }
+        if (mode === 'before' || mode === 'after') {
+          var cur = self.orderedKids(s0, bt.root).map(function (x) { return x.id; });
+          var at = cur.indexOf(ref);
+          if (at < 0) at = cur.length; else if (mode === 'after') at++;
+          cur.splice(at, 0, newId);
+          order.root = cur;
+        } else if (order[parentId]) order[parentId] = order[parentId].concat([newId]);
+        self.setState({ added: added, order: order });
+      }
+      var gone = {};
+      steps.forEach(function (x) { gone[x.id] = true; });
+      self.ntSet(s0.noteId, function (x) {
+        x.imported = x.imported.concat(steps.map(function (y) { return { name: y.name, target: target, fresh: true }; }));
+        x.chains = x.chains.map(function (y) { return { id: y.id, name: y.name, steps: y.steps.filter(function (z) { return !gone[z.id]; }) }; })
+          .filter(function (y) { return y.steps.length; });
+      });
+      var hd = self.cp(d); hd.hide = true;
+      self.setState({ ndDrag: hd, ndOver: null, ndDockOpen: false, ndDone: { name: target }, dragTipDone: true });
+      setTimeout(function () { self.setState({ ndDone: null, ndDrag: null, ndProj: null }); }, 1200);
+    }
+    function cancel(d) {
+      var b = self.cp(d); b.x = d.ox; b.y = d.oy; b.back = true;
+      self.setState({ ndDrag: b, ndOver: null, ndDockOpen: false });
+      setTimeout(function () { self.setState({ ndDrag: null, ndProj: null }); }, 300);
+    }
+    function drop(key) {
+      var s0 = self.state, d = s0.ndDrag;
+      if (!d) return;
+      if (!key || key === 'dock' || key === 'back') { cancel(d); return; }
+      var pid = null, mode = 'end', ref = null;
+      if (key.indexOf('proj:') === 0) pid = key.slice(5);
+      else if (key === 'end') pid = s0.ndProj;
+      else if (key.indexOf('task:') === 0) { var parts = key.split(':'); pid = s0.ndProj; ref = parts[1]; mode = parts[2]; }
+      if (!pid) { cancel(d); return; }
+      var hid = self.cp(d); hid.hide = true;
+      if (mode === 'in') {
+        self.setState({ ndDrag: hid, ndOver: null, ndDockOpen: false, ndAsk: { d: d, pid: pid, ref: ref } });
+        return;
+      }
+      self.setState({ ndDrag: hid });
+      commit(hid, pid, mode, ref);
+    }
+    function lp(kind, c, s) {
+      return {
+        down: function (e) {
+          if (e.button) return;
+          var el = e.currentTarget;
+          var p = appXY(el, e);
+          clearTimeout(self._lpT);
+          self._lp = { el: el, id: e.pointerId, sx: e.clientX, sy: e.clientY, p: p, live: false };
+          self._lpT = setTimeout(function () {
+            var L = self._lp;
+            if (!L) return;
+            L.live = true;
+            try { L.el.setPointerCapture(L.id); } catch (err) {}
+            var steps = kind === 'chain' ? c.steps : [s];
+            self.setState({ ndDrag: { kind: kind, chainId: c.id, stepId: s ? s.id : null, label: kind === 'chain' ? c.name : s.name, count: steps.length, x: L.p.x, y: L.p.y, ox: L.p.x, oy: L.p.y, back: false, hide: false },
+              ndOver: null, ndDockOpen: false, ndProj: null, ndDone: null, ndSeq: 0 });
+          }, 420);
+        },
+        move: function (e) {
+          var L = self._lp;
+          if (!L) return;
+          if (!L.live) {
+            if (Math.abs(e.clientX - L.sx) > 8 || Math.abs(e.clientY - L.sy) > 8) { clearTimeout(self._lpT); self._lp = null; }
+            return;
+          }
+          e.preventDefault();
+          var p = appXY(L.el, e);
+          var hitEl = document.elementFromPoint(e.clientX, e.clientY);
+          var z = hitEl && hitEl.closest ? hitEl.closest('[data-drop]') : null;
+          var key = z ? z.getAttribute('data-drop') : null;
+          if (key && key.indexOf('task:') === 0) {
+            var r = z.getBoundingClientRect();
+            var rel = (e.clientY - r.top) / r.height;
+            key += rel < 0.28 ? ':before' : rel > 0.72 ? ':after' : ':in';
+          }
+          var s0 = self.state;
+          var nd = self.cp(s0.ndDrag); nd.x = p.x; nd.y = p.y;
+          var next = { ndDrag: nd };
+          if (key && !s0.ndDockOpen) next.ndDockOpen = true;
+          if (key !== s0.ndOver) {
+            next.ndOver = key;
+            clearTimeout(self._dwT);
+            if (key && key.indexOf('proj:') === 0) {
+              var pid = key.slice(5);
+              self._dwT = setTimeout(function () {
+                if (self.state.ndOver === key) self.setState({ ndProj: pid, ndOver: null, ndSeq: (self.state.ndSeq || 0) + 1, ndDir: 'R' });
+              }, 520);
+            } else if (key === 'back') {
+              self._dwT = setTimeout(function () {
+                if (self.state.ndOver === 'back') self.setState({ ndProj: null, ndOver: null, ndSeq: (self.state.ndSeq || 0) + 1, ndDir: 'L' });
+              }, 420);
+            }
+          }
+          self.setState(next);
+        },
+        up: function () {
+          clearTimeout(self._lpT); clearTimeout(self._dwT);
+          var L = self._lp;
+          self._lp = null;
+          if (!L || !L.live) return;
+          self._lpAt = Date.now();
+          drop(self.state.ndOver);
+        }
+      };
+    }
+
+    var dragChain = live && dg.kind === 'chain' ? dg.chainId : null;
+    var dragStep = live && dg.kind === 'step' ? dg.stepId : null;
+    var dockShown = live || !!done;
+    var overIn = !!(over && /:in$/.test(over));
+    var askNode = ask ? (function () { var lv = levelOf(ask.pid); return self.findNode(lv, ask.ref); })() : null;
+
+    return {
+      title: n.title, meta: this.mmss(n.dur) + ' · ' + this.langShort(n.lang),
+      back: function () { clearInterval(self._playTimer); self.setState({ screen: st.noteFrom || 'notes', playAt: null, playing: false }); },
+      segX: chainsTab ? '100%' : '0%',
+      segs: [['text', '文字稿', ''], ['chains', '任务链', left || '']].map(function (g) {
+        var on = tab === g[0];
+        return { label: g[1], count: g[2], countO: g[2] ? '1' : '0', pressed: on ? 'true' : 'false', fg: on ? 'var(--onfill)' : 'var(--text)',
+          pick: function () { self.setState({ noteTab: g[0] }); } };
+      }),
+      paneX: chainsTab ? 'translateX(-50%)' : 'translateX(0%)',
+      textPane: pane(!chainsTab), chainPane: pane(chainsTab),
+      busyO: busy ? '1' : '0',
+      xO: (xing || extracting) && n.chains === null && !busy ? '1' : '0',
+      lines: n.lines.map(function (l, i) {
+        var on = playAt === i;
+        var si = spkOrder.indexOf(l.s);
+        var cls = spkCls[(si < 0 ? 0 : si) % spkCls.length];
+        var spk = n.speakers[l.s] || l.s;
+        return {
+          time: self.mmss(l.t), text: l.text, spk: spk, spkO: spkOrder.length > 1 ? '1' : '0.0001',
+          spkBg: cls[0], spkFg: cls[1], spkAria: '说话人：' + spk,
+          aria: spk + ' ' + self.mmss(l.t),
+          border: on ? 'var(--accent)' : 'transparent', bg: on ? 'var(--surface)' : 'transparent',
+          play: function () { play(i); },
+          rename: function (e) { if (e && e.stopPropagation) e.stopPropagation(); self.setState({ ndName: { kind: 'speaker', id: l.s }, ndNameDraft: spk }); }
+        };
+      }),
+      ex: (function () {
+        var on = chainsTab && !busy && !xing && n.chains === null;
+        return { o: on ? '1' : '0', vis: on ? 'visible' : 'hidden', visTr: self.vt(on, 260), off: !on || extracting,
+          iconO: extracting ? '0' : '1', spinO: extracting ? '1' : '0',
+          run: function () {
+            self.setState({ ndExtracting: n.id });
+            setTimeout(function () {
+              self.ntSet(n.id, function (c) { c.chains = self.ntExtract(); });
+              self.setState({ ndExtracting: null, ndEnterSeq: (self.state.ndEnterSeq || 0) + 1 });
+            }, 1600);
+          } };
+      })(),
+      tip: (function () {
+        var on = chains.length > 0 && !st.dragTipDone && !live;
+        return { rows: on ? '1fr' : '0fr', o: on ? '1' : '0', mb: on ? '12px' : '0px' };
+      })(),
+      chains: chains.map(function (c, ci) {
+        var gone = leaving === c.id;
+        var h = lp('chain', c, null);
+        return {
+          name: c.name, renameAria: '重命名：' + c.name, delAria: '删除：' + c.name,
+          count: c.steps.length,
+          rows: gone ? '0fr' : '1fr', mb: gone ? '0px' : '12px', o: gone ? '0' : dragChain === c.id ? '0.35' : '1',
+          enter: st.ndEnterSeq ? 'inRA 320ms ease ' + (ci * 60) + 'ms both' : 'none',
+          down: h.down, move: h.move, up: h.up,
+          rename: function () { if (lpJust()) return; self.setState({ ndName: { kind: 'chain', id: c.id }, ndNameDraft: c.name }); },
+          del: function () {
+            if (lpJust()) return;
+            self.setState({ ndLeaving: c.id });
+            setTimeout(function () { self.ntSet(n.id, function (x) { x.chains = x.chains.filter(function (y) { return y.id !== c.id; }); }); self.setState({ ndLeaving: null }); }, 360);
+          },
+          steps: c.steps.map(function (s, si) {
+            var li = 0; n.lines.forEach(function (l, i) { if (l.t <= s.t) li = i; });
+            var hs = lp('step', c, s);
+            return {
+              num: (si + 1) + '.', name: s.name, place: s.place, placeO: s.place ? '1' : '0', placeH: s.place ? '17px' : '0px',
+              o: dragStep === s.id ? '0.35' : '1',
+              down: hs.down, move: hs.move, up: hs.up,
+              time: self.mmss(s.t), jumpAria: '播放：' + self.mmss(s.t),
+              jump: function () { if (lpJust()) return; self.setState({ noteTab: 'text' }); play(li); }
+            };
+          })
+        };
+      }),
+      imported: n.imported.map(function (im) { return { name: im.name, target: '→ ' + im.target, enter: im.fresh ? 'inRA 320ms ease both' : 'none' }; }),
+      player: (function () {
+        var on = playAt != null && !busy && !dockShown;
+        var l = on ? n.lines[playAt] : null;
+        var t = l ? l.t : 0;
+        return { off: !on, o: on ? '1' : '0', tf: on ? 'translateY(0px)' : 'translateY(24px)', vis: on ? 'visible' : 'hidden', visTr: self.vt(on, 320),
+          pauseO: playing ? '1' : '0', playO: playing ? '0' : '1', aria: playing ? '暂停' : '播放',
+          pct: (n.dur ? Math.min(100, (t / n.dur) * 100 * 12) : 0) + '%', time: self.mmss(t) + ' / ' + self.mmss(n.dur),
+          toggle: function () { if (playing) { self.setState({ playing: false }); } else { play(playAt || 0); } },
+          close: function () { clearInterval(self._playTimer); self.setState({ playAt: null, playing: false }); } };
+      })(),
+      ghost: {
+        o: live ? '1' : '0', vis: dg ? 'visible' : 'hidden',
+        left: (dg ? dg.x - 110 : 0) + 'px', top: (dg ? dg.y - 30 : 0) + 'px',
+        tr: dg && dg.back ? 'left 280ms cubic-bezier(0.32, 0.72, 0, 1), top 280ms cubic-bezier(0.32, 0.72, 0, 1), opacity 240ms ease 60ms, transform 200ms ease' : 'opacity 180ms ease, transform 200ms ease',
+        tf: overIn ? 'scale(0.88)' : live ? 'scale(1.03)' : 'scale(0.96)',
+        label: dg ? dg.label : '', count: dg ? dg.count : '', countO: dg && dg.count > 1 ? '1' : '0'
+      },
+      dock: (function () {
+        var hd = !proj ? '加入到项目' : proj.name;
+        var onDock = over === 'dock';
+        return {
+          vis: dockShown ? 'visible' : 'hidden', visTr: self.vt(dockShown, 340),
+          y: dockShown ? 'translateY(0%)' : 'translateY(130%)',
+          h: dockOpen ? '440px' : '72px',
+          border: dockOpen || onDock || done ? 'var(--accent)' : 'var(--line)',
+          bg: done ? 'var(--soft)' : 'var(--surface)',
+          peekO: !dockOpen && !done ? '1' : '0', doneO: done ? '1' : '0', doneName: done ? done.name : '',
+          bodyO: dockOpen ? '1' : '0', bodyVis: dockOpen ? 'visible' : 'hidden', bodyVisTr: self.vt(dockOpen, 240),
+          title: hd,
+          backW: proj ? '40px' : '0px', backO: proj ? '1' : '0', backBg: over === 'back' ? 'var(--soft)' : 'transparent',
+          anim: st.ndSeq ? 'in' + (st.ndDir || 'R') + (st.ndSeq % 2 ? 'A' : 'B') + ' 260ms ease' : 'none',
+          projRows: proj ? [] : projects.map(function (p) {
+            var key = 'proj:' + p.id, on = over === key;
+            var kids = levelOf(p.id).children || [];
+            return { key: key, name: p.name, count: kids.length ? kids.length + ' 项' : '', border: on ? 'var(--accent)' : 'var(--line)', bg: on ? 'var(--soft)' : 'var(--bg)',
+              barW: on ? '100%' : '0%', barTr: on ? 'width 520ms linear' : 'width 0s' };
+          }),
+          taskRows: lvlKids.map(function (c) {
+            var key = 'task:' + c.id;
+            var o = over && over.indexOf(key + ':') === 0 ? over.slice(key.length + 1) : null;
+            var kids = (c.children || []).length;
+            return { key: key, name: c.name, count: kids ? kids + ' 项' : '',
+              border: o === 'in' ? 'var(--accent)' : 'var(--line)', bg: o === 'in' ? 'var(--soft)' : 'var(--bg)',
+              topO: o === 'before' ? '1' : '0', botO: o === 'after' ? '1' : '0',
+              plusO: o === 'in' ? '1' : '0' };
+          }),
+          endOn: !!proj, endBorder: over === 'end' ? 'var(--accent)' : 'var(--line)', endBg: over === 'end' ? 'var(--soft)' : 'transparent',
+          endH: proj ? '52px' : '0px', endO: proj ? '1' : '0'
+        };
+      })(),
+      ask: {
+        off: !ask, o: ask ? '1' : '0', tf: ask ? 'scale(1)' : 'scale(0.96)', vis: ask ? 'visible' : 'hidden', visTr: self.vt(!!ask, 220),
+        title: askNode ? '放入「' + askNode.name + '」？' : '',
+        cancel: function () { self.setState({ ndAsk: null, ndDrag: null, ndProj: null }); },
+        ok: function () { var a = self.state.ndAsk; self.setState({ ndAsk: null }); if (a) commit(a.d, a.pid, 'in', a.ref); }
+      },
+      name: {
+        title: nameSheet && nameSheet.kind === 'speaker' ? '说话人' : '任务链',
+        draft: draft, off: !nameOn, scrimO: nameOn ? '1' : '0', y: nameOn ? 'translateY(0%)' : 'translateY(110%)',
+        vis: nameOn ? 'visible' : 'hidden', visTr: self.vt(nameOn, 320),
+        submitOff: !nameOn || !draft.trim(), submitO: draft.trim() ? '1' : '0.45',
+        onDraft: function (e) { self.setState({ ndNameDraft: e.currentTarget.value }); },
+        close: function () { self.setState({ ndName: null }); },
+        submit: function (e) {
+          e.preventDefault();
+          var v = draft.trim();
+          if (!v || !nameSheet) return;
+          self.ntSet(n.id, function (c) {
+            if (nameSheet.kind === 'speaker') { var sp = self.cp(c.speakers); sp[nameSheet.id] = v; c.speakers = sp; }
+            else c.chains = c.chains.map(function (y) { if (y.id !== nameSheet.id) return y; return { id: y.id, name: v, steps: y.steps }; });
+          });
+          self.setState({ ndName: null });
+        }
+      }
+    };
+  }
+
+  // ---------- 查找 ----------
+  searchVals(st) {
+    var self = this;
+    var raw = st.q || '';
+    var q = raw.trim();
+    var ql = q.toLowerCase();
+    function hit(text) {
+      var i = text.toLowerCase().indexOf(ql);
+      if (i < 0) return null;
+      return { pre: text.slice(0, i), hit: text.slice(i, i + q.length), post: text.slice(i + q.length) };
+    }
+    function clip(h) {
+      return { pre: h.pre.length > 8 ? '…' + h.pre.slice(-8) : h.pre, hit: h.hit, post: h.post.length > 22 ? h.post.slice(0, 22) + '…' : h.post };
+    }
+    var groups = [];
+    if (q) {
+      var projects = st.plProjects || this.plSeed();
+      var curProj = st.project || 'p1';
+      var pr = [];
+      projects.forEach(function (p) {
+        var h = hit(p.name);
+        if (!h) return;
+        h.sub = ''; h.subO = '0';
+        h.open = function () {
+          var next = { screen: 'plan', planFrom: 'search', project: p.id, level: 'root', tab: 'tasks', mode: 'plan', draft: null, drag: null, focus: null, swiped: null, addOpen: false, runIdx: 0 };
+          if (curProj !== p.id) { next.sel = {}; next.order = {}; next.added = {}; next.removed = {}; next.done = {}; next.moves = []; }
+          self._drag = null;
+          self.setState(next);
+        };
+        pr.push(h);
+      });
+      var bt = this.buildTree(st);
+      var tr = [];
+      (function walk(node, path) {
+        (node.children || []).forEach(function (c) {
+          var h = hit(c.name);
+          if (h) {
+            h.sub = path.join(' › '); h.subO = '1';
+            h.open = function () {
+              self._drag = null;
+              self.setState({ screen: 'plan', planFrom: 'search', level: node.id, tab: 'tasks', mode: 'plan', draft: null, drag: null, swiped: null, addOpen: false, flash: c.id });
+              setTimeout(function () { if (self.state.flash === c.id) self.setState({ flash: null }); }, 1600);
+            };
+            tr.push(h);
+          }
+          walk(c, path.concat([c.name]));
+        });
+      })(bt.root, [bt.root.name]);
+      var nr = [];
+      this.ntNotes(st).forEach(function (n) {
+        var th = hit(n.title);
+        if (th) { th.sub = self.mmss(n.dur); th.subO = '1'; th.open = function () { self.setState({ screen: 'note', noteFrom: 'search', noteId: n.id, noteTab: 'text', playAt: null, playing: false }); }; nr.push(th); }
+        var k = 0;
+        n.lines.forEach(function (l, i) {
+          if (k >= 2) return;
+          var h = hit(l.text);
+          if (!h) return;
+          k++;
+          h = clip(h);
+          h.sub = n.title + ' · ' + self.mmss(l.t); h.subO = '1';
+          h.open = function () { clearInterval(self._playTimer); self.setState({ screen: 'note', noteFrom: 'search', noteId: n.id, noteTab: 'text', playAt: i, playing: false }); };
+          nr.push(h);
+        });
+      });
+      groups = [['Project', pr], ['任务', tr], ['笔记', nr]].filter(function (g) { return g[1].length; })
+        .map(function (g) { return { label: g[0], items: g[1].slice(0, 8) }; });
+    }
+    return {
+      q: raw, groups: groups, noneO: q && !groups.length ? '1' : '0', none: q && !groups.length ? '无结果' : '',
+      clearO: raw ? '1' : '0', clearOff: !raw,
+      onQ: function (e) { self.setState({ q: e.currentTarget.value }); },
+      clear: function (e) { var app = e.currentTarget.closest('.app'); self.setState({ q: '' }); try { app.querySelector('[data-q]').focus(); } catch (err) {} },
+      back: function () { self.setState({ screen: 'list' }); }
+    };
+  }
+
+  renderVals() {
+    var self = this;
+    var st = this.state || {};
+    var bt = this.buildTree(st);
+    var root = bt.root, plCur = bt.plCur;
     var onPlan = (st.screen || this.props.start || 'list') === 'plan';
     var added = st.added || {};
-    root.children = root.children.concat((added.root || []).map(function (t) {
-      var c = {}; Object.keys(t).forEach(function (k) { c[k] = t[k]; }); c.children = []; return c;
-    }));
-    root.children.forEach(function (c) { c.children = c.children.concat(added[c.id] || []); });
     var removed = st.removed || {};
-    root.children = root.children.filter(function (c) { return !removed[c.id]; });
-    root.children.forEach(function (c) { c.children = c.children.filter(function (k) { return !removed[k.id]; }); });
+    var tmeta = plCur && plCur.id === 'p1' ? this.sampleMeta() : {};
+    var edits = st.edits || {};
+    var fixedAt = st.fixed || {};
+    (function apply(n) {
+      var m = tmeta[n.id] || {}, e = edits[n.id] || {};
+      if (n.dur === undefined) n.dur = m.dur;
+      if (n.cost === undefined) n.cost = m.cost;
+      if (m.fixed !== undefined && fixedAt[n.id] === undefined) n.fixed = m.fixed;
+      Object.keys(e).forEach(function (k) { n[k] = e[k]; });
+      if (fixedAt[n.id] !== undefined) n.fixed = fixedAt[n.id];
+      (n.children || []).forEach(apply);
+    })(root);
+    var projTz = (plCur && plCur.tz) || 'Asia/Shanghai';
+    var home = (plCur && plCur.currency) || 'CNY';
+    var rootStart = st.rootStart !== undefined ? st.rootStart : (plCur && plCur.id === 'p1' ? Date.parse('2026-12-05T09:00:00+09:00') : null);
     function hasGeo(t) { return typeof t.lat === 'number'; }
     var theme = st.theme || this.props.theme || 'dark';
     var dark = theme === 'dark';
@@ -647,9 +1962,11 @@ class Component extends DCLogic {
     var mapOn = tab === 'map';
 
     function ordered(node) {
-      var ids = orders[node.id] || node.children.map(function (c) { return c.id; });
+      var kids0 = node.children || [];
+      var ids = kids0.map(function (c) { return c.id; });
+      if (orders[node.id]) ids = orders[node.id].concat(ids.filter(function (id) { return orders[node.id].indexOf(id) < 0; }));
       var map = {};
-      node.children.forEach(function (c) { map[c.id] = c; });
+      kids0.forEach(function (c) { map[c.id] = c; });
       return ids.map(function (id) { return map[id]; }).filter(Boolean);
     }
     function patch(obj, key, val) {
@@ -659,8 +1976,9 @@ class Component extends DCLogic {
       return copy;
     }
 
-    var level = levelId === 'root' ? root : root.children.filter(function (c) { return c.id === levelId; })[0];
-    var isRoot = levelId === 'root';
+    var level = self.findNode(root, levelId) || root;
+    if (!level.children) level.children = [];
+    var isRoot = level === root;
     var draft = st.draft && st.draft.level === levelId ? st.draft : null;
     var drag = st.drag || null;
     var editing = !!(drag || draft);
@@ -689,7 +2007,7 @@ class Component extends DCLogic {
       };
     }
     var levels = [navVals(root, '0px', root.children.length + ' 项')].concat(ordered(root).map(function (c) {
-      return navVals(c, '18px', c.children.length + ' 项');
+      return navVals(c, '18px', (c.children || []).length + ' 项');
     }));
 
     function snap(src) {
@@ -722,11 +2040,11 @@ class Component extends DCLogic {
       return function (t, i) {
         var d = drag && drag.list === listName ? drag : null;
         var info = self._drag;
-        var tf = 'none', tr = 'border-color 280ms ease, background-color 280ms ease, opacity 280ms ease', z = '0', shadow = 'none';
+        var tf = 'none', tr = 'border-color 280ms ease, background-color 280ms ease, opacity 280ms ease, transform 240ms ease', z = '0', shadow = 'none';
         if (d && info) {
           var amt = info.hs[d.from] + gap;
           if (i === d.from) {
-            tf = 'translateY(' + d.y.toFixed(1) + 'px)'; tr = 'none'; z = '2'; shadow = '0 10px 24px rgba(0, 0, 0, 0.22)';
+            tf = 'translateY(' + d.y.toFixed(1) + 'px)' + (d.nest != null || d.up ? ' scale(0.94)' : ''); tr = 'transform 120ms ease'; z = '2'; shadow = '0 10px 24px rgba(0, 0, 0, 0.22)';
           } else {
             tr = 'transform 180ms ease';
             if (i > d.from && i <= d.to) tf = 'translateY(' + (-amt) + 'px)';
@@ -734,7 +2052,7 @@ class Component extends DCLogic {
           }
         }
         return {
-          id: t.id, tf: tf, tr: tr, z: z, shadow: shadow,
+          id: t.id, tf: tf, tr: tr, z: z, shadow: shadow, nestOn: !!(d && d.nest === i),
           dragAria: '拖动调整顺序：' + t.name + '（也可用上下方向键）',
           down: function (e) {
             if (e.button) return;
@@ -756,16 +2074,28 @@ class Component extends DCLogic {
             var cum = [], acc = 0;
             hs.forEach(function (h) { cum.push(acc); acc += h + gap; });
             var c = cum[d.from] + hs[d.from] / 2 + y;
-            var to = d.from, n = hs.length;
-            while (to < n - 1 && c > cum[to + 1] + hs[to + 1] / 2) to++;
-            while (to > 0 && c < cum[to - 1] + hs[to - 1] / 2) to--;
-            self.setState({ drag: { list: listName, from: d.from, to: to, y: y } });
+            var to = d.from, n = hs.length, nest = null, up = false;
+            var band = listName === 'rows';
+            var hi = band ? 0.72 : 0.5, lo = band ? 0.28 : 0.5;
+            while (to < n - 1 && c > cum[to + 1] + hs[to + 1] * hi) to++;
+            while (to > 0 && c < cum[to - 1] + hs[to - 1] * lo) to--;
+            if (band) {
+              if (to < n - 1 && to >= d.from && c > cum[to + 1] + hs[to + 1] * lo) nest = to + 1;
+              else if (to > 0 && to <= d.from && c < cum[to - 1] + hs[to - 1] * hi) nest = to - 1;
+              if (!isRoot) {
+                var uz = info2.el.closest('.app').querySelector('[data-upzone]');
+                if (uz && e.clientY < uz.getBoundingClientRect().bottom + 6) { up = true; nest = null; to = d.from; }
+              }
+            }
+            self.setState({ drag: { list: listName, from: d.from, to: to, y: y, nest: nest, up: up } });
           },
           up: function () {
             var info2 = self._drag;
             if (!info2 || !d) return;
             try { self._flip = snap(info2.el); } catch (err) {}
             self._drag = null;
+            if (d.nest != null) { self.setState({ drag: null, nestAsk: { id: t.id, to: listIds[d.nest] } }); return; }
+            if (d.up) { self.setState({ drag: null }); promote(t.id); return; }
             self.setState({ drag: null, draft: { level: levelId, ids: toFull(moved(listIds, d.from, d.to)) } });
           },
           key: function (e) {
@@ -809,6 +2139,19 @@ class Component extends DCLogic {
       };
     }
 
+    // 时间推算 for this level: start = the root's start, or the parent's slot in the root chain.
+    var rootChain = self.chain(root.children, rootStart, function (c) { return c.fixed != null ? c.fixed : null; });
+    var levelStart = isRoot ? rootStart : (level.fixed != null ? level.fixed : (rootChain.out[level.id] ? rootChain.out[level.id].start : null));
+    var lvChain = self.chain(items, levelStart, function (c) { return c.fixed != null ? c.fixed : null; });
+    function metaOf(t) {
+      var c = lvChain.out[t.id] || {}, out = [];
+      if (c.start != null) out.push({ text: (c.approx ? '约 ' : '') + self.clock(c.start, projTz, levelStart), fg: 'var(--text)', weight: '600' });
+      if (c.late) out.push({ text: '晚 ' + c.late + ' 分', fg: 'var(--accent-text)', weight: '700' });
+      if (c.dur != null) out.push({ text: self.fmtMin(c.dur), fg: 'var(--muted)', weight: '400' });
+      var k = self.costOf(t, home);
+      if (k.any) out.push({ text: (k.mixed ? '约 ' : '') + self.fmtMoney(k.sum, home, home), fg: 'var(--muted)', weight: '400' });
+      return out;
+    }
     var rows = items.map(function (t, i) {
       var on = selIds.indexOf(t.id) >= 0;
       var kids = t.children ? t.children.length : 0;
@@ -816,16 +2159,20 @@ class Component extends DCLogic {
       var si = geo.indexOf(t);
       var lost = scoped.indexOf(t) >= 0 && si < 0;
       return {
-        leg: lost ? '未定位' : si < 0 ? '' : si === 0 ? '起点' : '+' + self.fmt(self.km(geo[si - 1], t)) + ' km',
+        leg: si < 0 ? '' : si === 0 ? '起点' : '+' + self.fmt(self.km(geo[si - 1], t)) + ' km',
         enter: st.lastAdded === t.id ? 'inRA 320ms ease' : 'none',
-        legO: mapOn ? '1' : '0', dim: mapOn && si < 0 ? '0.45' : '1',
+        legO: mapOn ? '1' : '0', dim: st.nestLeaving === t.id ? '0' : '1',
         detailRows: mapOn ? '0fr' : '1fr', detailO: mapOn ? '0' : '1', kidsOff: mapOn,
-        id: dk.id, tf: dk.tf, tr: dk.tr, z: dk.z, shadow: dk.shadow, dragAria: dk.dragAria,
+        id: dk.id, tf: st.nestLeaving === t.id ? 'scale(0.9)' : dk.tf, tr: dk.tr, z: dk.z, shadow: dk.shadow, dragAria: dk.dragAria,
         down: dk.down, move: dk.move, up: dk.up, key: dk.key,
         num: (i + 1) + '.', name: t.name, place: t.place,
+        meta: metaOf(t), metaRows: metaOf(t).length ? '1fr' : '0fr', metaO: metaOf(t).length ? '1' : '0',
+        placeRows: t.place ? '1fr' : '0fr', placeO: t.place ? '1' : '0',
+        preTop: t.pre && t.pre.length ? '6px' : '0px',
+        edit: function (e) { if (swJust()) return; openEdit(e, t); }, editAria: '编辑：' + t.name,
         pressed: on ? 'true' : 'false', check: on ? '✓' : '',
         checkAria: (on ? '取消勾选：' : '勾选：') + t.name,
-        border: on ? 'var(--accent)' : 'var(--line)',
+        border: dk.nestOn || st.flash === t.id || on ? 'var(--accent)' : 'var(--line)', bg: dk.nestOn ? 'var(--soft)' : 'var(--surface)',
         boxBg: on ? 'var(--fill)' : 'transparent',
         boxBorder: on ? 'var(--fill)' : 'var(--muted)',
         noPre: t.pre.length === 0,
@@ -838,7 +2185,7 @@ class Component extends DCLogic {
           if (swiped) { self.setState({ swiped: null }); return; }
           setSel(on ? selIds.filter(function (id) { return id !== t.id; }) : selIds.concat([t.id]));
         },
-        hasKids: !!t.children, kidsLabel: kids + ' 项',
+        hasKids: kids > 0, kidsLabel: kids + ' 项',
         open: function () { if (swJust()) return; if (swiped) { self.setState({ swiped: null }); return; } go(t.id); },
         sw: {
           down: function (e) {
@@ -1108,10 +2455,65 @@ class Component extends DCLogic {
         });
       })(pi);
     }
+    var lvCost = items.reduce(function (acc, t) { var k = self.costOf(t, home); return { sum: acc.sum + k.sum, any: acc.any || k.any, mixed: acc.mixed || k.mixed }; }, { sum: 0, any: false, mixed: false });
+    var sumVals = {
+      startVal: self.localVal(levelStart, projTz),
+      fg: (isRoot ? rootStart != null : level.fixed != null) ? 'var(--accent-text)' : 'var(--muted)',
+      border: (isRoot ? rootStart != null : level.fixed != null) ? 'var(--accent)' : 'var(--line)',
+      setStart: function (e) {
+        var ms = self.fromLocal(e.currentTarget.value, projTz);
+        if (isRoot) self.setState({ rootStart: ms });
+        else self.setState({ fixed: patch(fixedAt, level.id, ms) });
+      },
+      dur: lvChain.known ? self.fmtMin(lvChain.total) : '', durO: lvChain.known ? '1' : '0',
+      cost: lvCost.any ? (lvCost.mixed ? '约 ' : '') + self.fmtMoney(lvCost.sum, home, home) : '', costO: lvCost.any ? '1' : '0'
+    };
+
+    // 新建 / 编辑 share one form; optional fields stay folded until asked for.
+    var editT = st.editId ? (childMap[st.editId] || null) : null;
+    var shown = st.addShow || {};
+    function fold(on) { return { rows: on ? '1fr' : '0fr', o: on ? '1' : '0', mt: on ? '0px' : '-14px' }; }
+    var addDur = st.addDur != null ? st.addDur : null;
+    function setShow(k) { var n = {}; Object.keys(shown).forEach(function (x) { n[x] = shown[x]; }); n[k] = true; self.setState({ addShow: n }); }
+    function openEdit(e, t) {
+      var app = e.currentTarget.closest('.app');
+      var show = { place: !!t.place, dur: t.dur != null, cost: !!t.cost, start: t.fixed != null };
+      self.setState({ addOpen: true, editId: t.id, addShow: show, addDur: t.dur != null ? t.dur : null, placeQ: '', placePick: null });
+      setTimeout(function () {
+        try {
+          var f = app.querySelector('[data-add]');
+          f.querySelector('[data-f="name"]').value = t.name;
+          f.querySelector('[data-f="place"]').value = t.place || '';
+          f.querySelector('[data-f="amount"]').value = t.cost ? t.cost[0] : '';
+          f.querySelector('[data-f="cur"]').value = t.cost ? t.cost[1] : home;
+          f.querySelector('[data-f="start"]').value = self.localVal(t.fixed, projTz);
+        } catch (err) {}
+      }, 30);
+    }
+    var durChips = [15, 30, 60, 120].map(function (m) {
+      var on = addDur === m;
+      return {
+        label: self.fmtMin(m).replace(' ', ''), pressed: on ? 'true' : 'false',
+        bg: on ? 'var(--fill)' : 'var(--bg)', fg: on ? 'var(--onfill)' : 'var(--text)', border: on ? 'var(--fill)' : 'var(--line)',
+        pick: function () { self.setState({ addDur: m }); }
+      };
+    });
+    var adders = [['place', '地点'], ['dur', '耗时'], ['cost', '花费'], ['start', '开始时间']].map(function (a) {
+      var on = !!shown[a[0]];
+      return { label: a[1], o: on ? '0' : '1', maxW: on ? '0px' : '120px', off: on || !addOpen, show: function () { setShow(a[0]); } };
+    });
+    adders.push({ label: '前置条件', o: '1', maxW: '120px', off: !addOpen, show: function (e) { addVals.addPre(e); } });
+
     var addVals = {
+      title: editT ? '编辑任务' : '新建任务', action: editT ? '保存' : '添加',
+      f: { place: fold(!!shown.place), dur: fold(!!shown.dur), cost: fold(!!shown.cost), start: fold(!!shown.start) },
+      durChips: durChips, adders: adders,
+      durText: addDur != null ? self.fmtMin(addDur) : '—',
+      durMinus: function () { self.setState({ addDur: Math.max(0, (addDur || 0) - 15) }); },
+      durPlus: function () { self.setState({ addDur: (addDur || 0) + 15 }); },
       y: addOpen ? 'translateY(0%)' : 'translateY(110%)',
       desk: addOpen ? 'translate(-50%, 0%)' : 'translate(-50%, 130%)',
-      scrimO: addOpen ? '1' : '0', off: !addOpen, level: level.name,
+      scrimO: addOpen ? '1' : '0', off: !addOpen, level: editT ? '' : level.name,
       pres: preRows, preH: (preCount * 56) + 'px',
       sug: sug, hasSug: sug.length > 0,
       pinO: placePick ? '1' : '0', placeBorder: placePick ? 'var(--accent)' : 'var(--line)',
@@ -1124,10 +2526,18 @@ class Component extends DCLogic {
       vis: addOpen ? 'visible' : 'hidden', visTr: addOpen ? 'visibility 0s' : 'visibility 0s linear 320ms',
       open: function (e) {
         var app = e.currentTarget.closest('.app');
-        self.setState({ addOpen: true });
-        setTimeout(function () { try { app.querySelector('[data-add] input').focus(); } catch (err) {} }, 340);
+        self.setState({ addOpen: true, editId: null, addShow: {}, addDur: null });
+        setTimeout(function () {
+          try {
+            var f = app.querySelector('[data-add]');
+            Array.prototype.forEach.call(f.querySelectorAll('input'), function (el) { el.value = ''; });
+            f.querySelector('[data-f="cur"]').value = home;
+            f.querySelector('[data-f="name"]').focus();
+          } catch (err) {}
+        }, 340);
       },
       close: function () { self.setState({ addOpen: false, placeQ: '', placePick: null }); },
+      // editId / addShow stay until the next open so the closing sheet keeps its look.
       submit: function (e) {
         e.preventDefault();
         var form = e.currentTarget;
@@ -1135,7 +2545,19 @@ class Component extends DCLogic {
         var name = val('name');
         if (!name) { try { form.querySelector('[data-f="name"]').focus(); } catch (err) {} return; }
         var pk = placePick && placePick.name === val('place') ? placePick : null;
-        var task = { id: 'n' + Date.now(), name: name, short: name, place: pk ? pk.addr : (val('place') || '未填地点'), lat: pk ? pk.lat : null, lng: pk ? pk.lng : null, gq: pk ? pk.gq : null, pre: Array.prototype.map.call(form.querySelectorAll('[data-f="pre"]'), function (el) { return el.value.trim(); })
+        var amt = val('amount'), cur = val('cur') || home;
+        var extra = {
+          dur: shown.dur && addDur != null ? addDur : null,
+          cost: shown.cost && /^\d+(\.\d{1,2})?$/.test(amt) ? [amt, cur] : null,
+          fixed: shown.start ? self.fromLocal(val('start'), projTz) : null
+        };
+        if (editT) {
+          var ed = { name: name, short: name, dur: extra.dur, cost: extra.cost };
+          if (shown.place) { ed.place = pk ? pk.addr : val('place'); if (pk) { ed.lat = pk.lat; ed.lng = pk.lng; } }
+          self.setState({ addOpen: false, edits: patch(edits, editT.id, ed), fixed: patch(fixedAt, editT.id, extra.fixed), placeQ: '', placePick: null });
+          return;
+        }
+        var task = { id: 'n' + Date.now(), name: name, short: name, dur: extra.dur, cost: extra.cost, fixed: extra.fixed, place: pk ? pk.addr : val('place'), lat: pk ? pk.lat : null, lng: pk ? pk.lng : null, gq: pk ? pk.gq : null, pre: Array.prototype.map.call(form.querySelectorAll('[data-f="pre"]'), function (el) { return el.value.trim(); })
             .filter(function (x) { return x; }).map(function (x) { return { action: x, rank: 2 }; }) };
         var next = { added: patch(added, levelId, (added[levelId] || []).concat([task])), addOpen: false, lastAdded: task.id, preCount: 0, placeQ: '', placePick: null };
         if (orders[levelId]) next.order = patch(orders, levelId, orders[levelId].concat([task.id]));
@@ -1149,18 +2571,53 @@ class Component extends DCLogic {
       }
     };
 
+    // 拖进任务 = 子任务（先确认）；拖到顶部 = 移到上一级
+    var parentNode = isRoot ? null : (self.parentOf(root, level.id) || root);
+    var nestAsk = st.nestAsk || null;
+    var askTo = nestAsk ? self.findNode(root, nestAsk.to) : null;
+    function applyMove(mv, extra) {
+      self.setState({ nestLeaving: mv.id, nestAsk: null });
+      setTimeout(function () {
+        try { var lst = document.querySelector('[data-list="rows"]'); if (lst) self._flip = snap(lst); } catch (err) {}
+        var s1 = self.state;
+        var nx = { moves: (s1.moves || []).concat([mv]), nestLeaving: null, flash: mv.up ? null : mv.to };
+        if (s1.draft && s1.draft.level === levelId) nx.draft = { level: levelId, ids: s1.draft.ids.filter(function (x) { return x !== mv.id; }) };
+        Object.keys(extra || {}).forEach(function (k) { nx[k] = extra[k]; });
+        self.setState(nx);
+        setTimeout(function () { if (mv.to && self.state.flash === mv.to) self.setState({ flash: null }); }, 1400);
+      }, 240);
+    }
+    function promote(id) {
+      var extra = {};
+      if (parentNode && orders[parentNode.id]) {
+        var o = orders[parentNode.id].filter(function (x) { return x !== id; });
+        var at = o.indexOf(level.id);
+        o.splice(at < 0 ? o.length : at + 1, 0, id);
+        extra.order = patch(orders, parentNode.id, o);
+      }
+      applyMove({ id: id, up: true }, extra);
+    }
+    var upOn = !!(drag && drag.list === 'rows' && !isRoot);
+    var upHot = !!(upOn && drag.up);
+    var nestVals = {
+      upO: upOn ? '1' : '0', upTf: upOn ? 'translateY(0px)' : 'translateY(-12px)',
+      upVis: upOn ? 'visible' : 'hidden', upVisTr: upOn ? 'visibility 0s' : 'visibility 0s linear 260ms',
+      upBorder: upHot ? 'var(--accent)' : 'var(--line)', upBg: upHot ? 'var(--soft)' : 'var(--surface)',
+      upLabel: parentNode ? '移到「' + parentNode.name + '」' : '',
+      askO: askTo ? '1' : '0', askTf: askTo ? 'scale(1)' : 'scale(0.96)', askVis: askTo ? 'visible' : 'hidden',
+      askVisTr: askTo ? 'visibility 0s' : 'visibility 0s linear 220ms', askOff: !askTo,
+      askTitle: askTo ? '放入「' + askTo.name + '」？' : '',
+      cancel: function () { self.setState({ nestAsk: null }); },
+      ok: function () { var a = self.state.nestAsk; if (a) applyMove({ id: a.id, to: a.to }); }
+    };
+
     return {
       pl: this.listVals(st),
-      screens: {
-        listTf: onPlan ? 'translateX(-28%)' : 'translateX(0%)',
-        listVis: onPlan ? 'hidden' : 'visible',
-        listVisTr: onPlan ? 'visibility 0s linear 420ms' : 'visibility 0s',
-        dimO: onPlan ? '0.18' : '0',
-        planTf: onPlan ? 'translateX(0%)' : 'translateX(100%)',
-        planVis: onPlan ? 'visible' : 'hidden',
-        planVisTr: onPlan ? 'visibility 0s' : 'visibility 0s linear 420ms'
-      },
+      dial: this.fabVals(st), nt: this.notesVals(st), nd: this.noteVals(st), rec: this.recVals(st),
+      intro: this.introVals(st), sr: this.searchVals(st), nest: nestVals,
+      screens: this.screenVals(st),
       add: addVals,
+      sum: sumVals,
       navAnim: anim(st.navSeq, st.navDir), runAnim: anim(st.runSeq, st.runDir),
       mode: { items: modeSegs, w: 'calc((100% - 8px) / 2)', x: plan ? '0%' : '100%' },
       modeX: plan ? 'translateX(0%)' : 'translateX(-50%)',
@@ -1182,7 +2639,7 @@ class Component extends DCLogic {
       planMode: plan, showRun: !plan,
       
       title: plan ? level.name : root.name,
-      overline: plan && !isRoot ? root.name : 'Project',
+      overline: plan && !isRoot ? (parentNode || root).name : 'Project',
       showBack: plan && !isRoot,
       subCrumb: isRoot ? '' : '/ ' + level.name,
       themeCls: dark ? 't-dark' : 't-light',
@@ -1190,7 +2647,12 @@ class Component extends DCLogic {
       toggleTheme: function () { self.setState({ theme: dark ? 'light' : 'dark' }); },
       levels: levels, levelName: level.name, isRoot: isRoot, notRoot: !isRoot,
       crumb: isRoot ? 'Flow · ' + items.length + ' 个任务' : root.name + ' / ' + level.name,
-      back: function () { if (isRoot) { self.setState({ screen: 'list' }); } else { go('root'); } },
+      back: function () {
+        if (isRoot) { self.setState({ screen: st.planFrom || 'list', planFrom: null }); return; }
+        var pn = parentNode || root;
+        self._drag = null;
+        self.setState({ level: pn === root ? 'root' : pn.id, tab: 'tasks', draft: null, drag: null, focus: null, swiped: null, navSeq: (st.navSeq || 0) + 1, navDir: 'L' });
+      },
       rows: rows,
       fab: (function () {
         var on = plan && tab !== 'prep' && !editing && !addOpen;
