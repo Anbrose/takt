@@ -156,8 +156,9 @@ final class NotesUITests: XCTestCase {
         recordFromMenu(autoOff: true)
         let row = stop()
         XCTAssertEqual(el("notes.auto").value as? String, "0", "the list's switch follows the intro")
-        sleep(2) // processed and on the server
-        XCTAssertEqual(row.value as? String ?? "", "", "no chains without 自动生成任务")
+        // Processed and on the server: the row's value goes from 处理中 to "" (no chains without 自动生成任务).
+        let settled = NSPredicate { _, _ in (row.value as? String ?? "") == "" }
+        wait(for: [expectation(for: settled, evaluatedWith: nil)], timeout: 10)
         row.tap()
         XCTAssertTrue(app.buttons["提取"].waitForExistence(timeout: 5))
         snap("note without draft")

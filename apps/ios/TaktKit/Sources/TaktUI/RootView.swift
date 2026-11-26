@@ -17,6 +17,9 @@ public struct RootView: View {
     /// Screens pushed over the list from the 悬浮按钮 menu (笔记 › note, 查找).
     @State private var routes: [Route] = []
     @State private var introOn = false
+    /// A 录音 tap or note open is being handled; repeated taps meanwhile are ignored.
+    @State private var recordBusy = false
+    @State private var opening = false
 
     struct Route: Identifiable {
         enum Kind {
@@ -166,9 +169,12 @@ public struct RootView: View {
     }
 
     private func openNote(_ id: UUID) {
-        guard let notes else { return }
+        guard let notes, !opening else { return }
+        opening = true
         Task {
             let detail = await notes.open(id)
+            opening = false
+            if case .note = routes.last?.kind { return }
             push(.note(detail))
         }
     }
@@ -177,8 +183,10 @@ public struct RootView: View {
 
     /// 录音 (menu or 笔记): the intro the first time, otherwise straight into recording.
     private func record() {
-        guard let notes else { return }
+        guard let notes, !recordBusy, notes.recording == nil else { return }
+        recordBusy = true
         Task {
+            defer { recordBusy = false }
             guard await allowRecording() else { return failed() }
             do {
                 if try await !notes.requestRecording() {

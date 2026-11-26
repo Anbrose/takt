@@ -72,8 +72,9 @@ struct RecordingView: View {
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(Palette.muted)
                         .opacity(downloading ? 0 : 1)
-                    Spinner(size: 16, radius: 6, lineWidth: 2)
-                        .opacity(downloading ? 1 : 0)
+                    if downloading {
+                        Spinner(size: 16, radius: 6, lineWidth: 2).transition(.opacity)
+                    }
                 }
                 .frame(width: 16, height: 16)
                 .animation(.easeInOut(duration: 0.2), value: downloading)

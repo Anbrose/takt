@@ -43,10 +43,12 @@ final class FakeCapture: AudioCapture {
     var onError: ((Error) -> Void)?
     var recording = false
     var stopResult: (index: Int, durationMs: Int)? = (0, 2000)
+    var starts = 0
 
     func start(segmentURL: @escaping (Int) -> URL, segmentSeconds: Int, onSegment: @escaping (Int, Int) -> Void,
                onError: @escaping (Error) -> Void) throws {
         url = segmentURL; self.onSegment = onSegment; self.onError = onError; recording = true
+        starts += 1
         try Data("a".utf8).write(to: segmentURL(0))
     }
 
@@ -413,6 +415,32 @@ private func twoStepChain(_ b: InMemoryBackend) async throws -> Chain {
         #expect(r.model.items.first?.locale == "ja_JP")
         await r.model.stopRecording()
         #expect(try await r.backend.note(id.uuidString).locale == "ja_JP")
+    }
+
+    @Test func doubleTapStartsOneRecording() async throws {
+        let r = Rig()
+        async let a: Void = r.model.startRecording()
+        async let b: Void = r.model.startRecording()
+        _ = try await (a, b)
+        let id = try #require(r.model.recording?.id)
+        #expect(r.capture.starts == 1)
+        #expect(await r.store.all().map(\.id) == [id])
+        await r.model.stopRecording()
+        #expect(try #require(await r.store.note(id)).recording == false)
+    }
+
+    @Test func titleIsLocalStartTime() async throws {
+        let at = Date(timeIntervalSince1970: 1_795_000_000) // 2026-11-18 11:06:40 UTC
+        #expect(NotesModel.defaultTitle(at, timeZone: TimeZone(identifier: "Australia/Sydney")!) == "11-18 22:06")
+        #expect(NotesModel.defaultTitle(at, timeZone: TimeZone(identifier: "UTC")!) == "11-18 11:06")
+        let r = Rig()
+        try await r.model.startRecording()
+        let id = try #require(r.model.recording?.id)
+        let local = try #require(await r.store.note(id))
+        #expect(local.title == NotesModel.defaultTitle(local.createdAt))
+        #expect(r.model.items.first?.title == local.title)
+        await r.model.stopRecording()
+        #expect(try await r.backend.note(id.uuidString).title == local.title)
     }
 
     @Test func resumeWaitsWhileRecording() async throws {

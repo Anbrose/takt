@@ -36,6 +36,8 @@ public final class NotesModel {
     private let deviceLocale: String
     private let supportedLocales: @Sendable () async -> [String]
     private var recovered = false
+    /// A start is in flight (between the 录音 tap and `recording` being set).
+    private var starting = false
     private var applyingDefault = false
 
     private var summaries: [NoteSummary] = []
@@ -241,6 +243,16 @@ public final class NotesModel {
         return true
     }
 
+    /// A new note's title: when recording started, in the phone's time zone (`11-23 14:05`). Sent with the
+    /// note, so the title is the same before and after it reaches the server.
+    public nonisolated static func defaultTitle(_ at: Date, timeZone: TimeZone = .current) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = timeZone
+        f.dateFormat = "MM-dd HH:mm"
+        return f.string(from: at)
+    }
+
     /// 「开始录音」 in the first-recording intro.
     public func finishIntro(autoExtract: Bool) async throws {
         self.autoExtract = autoExtract
@@ -250,10 +262,14 @@ public final class NotesModel {
 
     /// Creates the local note and starts the recorder. Segments are saved (and transcribed) as they finish.
     public func startRecording() async throws {
-        guard recording == nil else { return }
+        // Set before the first await: a second tap arriving meanwhile must not start another recording.
+        guard recording == nil, !starting else { return }
+        starting = true
+        defer { starting = false }
         notice = nil
         await recoverOnce()
-        let note = LocalNote(locale: locale)
+        let now = Date()
+        let note = LocalNote(title: Self.defaultTitle(now), locale: locale, createdAt: now)
         try await store.save(note)
         let id = note.id
         let store = store

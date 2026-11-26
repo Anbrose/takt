@@ -31,14 +31,9 @@ enum NoteLanguage {
         return h > 0 ? String(format: "%d:%02d:%02d", h, m, sec) : String(format: "%d:%02d", m, sec)
     }
 
-    /// A note not yet on the server shows the title the server will give it (`YYYY-MM-DD HH:mm`, UTC).
+    /// Notes recorded before titles were set on the phone fall back to the recording time, as new ones get.
     static func title(_ title: String, createdAt: Date) -> String {
-        guard title.isEmpty else { return title }
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone(identifier: "UTC")
-        f.dateFormat = "yyyy-MM-dd HH:mm"
-        return f.string(from: createdAt)
+        title.isEmpty ? NotesModel.defaultTitle(createdAt) : title
     }
 }
 
@@ -198,7 +193,7 @@ private struct NoteRow: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(title)
-            .accessibilityValue(chains > 0 && !busy ? "\(chains)" : "")
+            .accessibilityValue(busy ? "处理中" : chains > 0 ? "\(chains)" : "")
             .accessibilityIdentifier("note.\(title)")
 
             if swiped {
@@ -235,8 +230,8 @@ private struct NoteRow: View {
                 .contentTransition(.numericText())
                 .opacity(!busy && chains > 0 ? 1 : 0)
                 .scaleEffect(!busy && chains > 0 ? 1 : 0.6)
-            Spinner()
-                .opacity(busy ? 1 : 0)
+            // Only in the hierarchy while busy: a hidden spinner would still redraw every frame.
+            if busy { Spinner().transition(.opacity) }
             Image(systemName: "checkmark")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Palette.muted)
