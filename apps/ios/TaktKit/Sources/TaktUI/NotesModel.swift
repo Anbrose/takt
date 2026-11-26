@@ -57,6 +57,8 @@ public final class NotesModel {
     public private(set) var preparing: Set<String> = []
 
     public private(set) var items: [NoteItem] = []
+    /// Notes whose 自动生成任务 extract call is running now (the detail shows a spinner meanwhile).
+    public private(set) var autoExtracting: Set<UUID> = []
     public var locale: String {
         didSet { if !applyingDefault { defaults.set(locale, forKey: Self.localeKey) } }
     }
@@ -162,7 +164,12 @@ public final class NotesModel {
         guard !due.isEmpty else { return }
         let done = Set(due.map { $0.lowercased() })
         autoPending.removeAll { done.contains($0) }
-        for id in due { _ = try? await backend.extract(note: id) }
+        for id in due {
+            let uuid = UUID(uuidString: id)
+            if let uuid { autoExtracting.insert(uuid) }
+            _ = try? await backend.extract(note: id)
+            if let uuid { autoExtracting.remove(uuid) }
+        }
         if let fresh = try? await backend.notes() {
             summaries = fresh
             rebuild()
@@ -347,12 +354,20 @@ public final class NotesModel {
     // MARK: Opening and deleting
 
     public func open(_ id: UUID) async -> NoteDetailModel {
-        let detail = NoteDetailModel(id: id, backend: backend, store: store) { [weak self] in
+        let d = detail(id)
+        await d.load()
+        return d
+    }
+
+    /// The detail model for `id`, not loaded yet (the screen is pushed at once and shows its loading state).
+    public func detail(_ id: UUID) -> NoteDetailModel {
+        NoteDetailModel(id: id, backend: backend, store: store) { [weak self] in
             Task { await self?.fetchSummaries() }
         }
-        await detail.load()
-        return detail
     }
+
+    /// The 「加入到项目」 dock's model over the same backend.
+    public func importDock() -> ImportDockModel { ImportDockModel(backend: backend) }
 
     /// Optimistic: the row goes at once and comes back if the server refuses.
     public func delete(_ id: UUID) async {

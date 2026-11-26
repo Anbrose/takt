@@ -302,6 +302,24 @@ private func twoStepChain(_ b: InMemoryBackend) async throws -> Chain {
         #expect(try await r.backend.level(project.rootTaskId).children.isEmpty)
     }
 
+    @Test func importedRowsNameTheirTarget() async throws {
+        let r = Rig()
+        let project = try await r.backend.createProject(name: "京都")
+        let level = try await r.backend.level(project.rootTaskId)
+        try await serverNote(r.backend, lines: [line(0, "先去伏见稻荷"), line(6000, "我来订酒店")])
+        _ = try await r.backend.extract(note: noteId.uuidString)
+        let d = await r.model.open(noteId)
+        let chains = try #require(d.note?.extraction.chains)
+        let merged = Chain(id: chains[0].id, name: "第一天", steps: chains.flatMap(\.steps))
+        await d.edit([merged])
+        // Both steps go in as a group 「第一天」 at the Project's first level.
+        #expect(await d.importDragged(chain: merged.id, step: nil, to: .end(parent: level.task.id)) == "京都")
+        await d.loadTargets()
+        let parents = Set(d.note?.imported.map(\.parentTaskId) ?? [])
+        #expect(parents.count == 1)
+        #expect(parents.map { d.targets[$0] } == ["京都"], "the group's level, not the group")
+    }
+
     @Test func firstRecordingNeedsIntro() async throws {
         let r = Rig()
         #expect(r.model.introSeen == false)
@@ -382,10 +400,13 @@ private func twoStepChain(_ b: InMemoryBackend) async throws -> Chain {
         #expect(r.model.items.first?.id == id)
         #expect(r.model.items.first?.processing == false)
         #expect(r.model.items.first?.chainCount == 0)
+        for _ in 0..<1000 where await !r.backend.calls.contains("extract \(id.uuidString)") { await Task.yield() }
+        #expect(r.model.autoExtracting == [id], "the detail's spinner shows while the call runs")
         open.yield()
         open.finish()
         await r.model.autoExtractTask?.value
         #expect(r.model.items.first?.chainCount == 1)
+        #expect(r.model.autoExtracting.isEmpty)
     }
 
     @Test func missingModelDownloadsThenTranscribes() async throws {

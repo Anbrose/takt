@@ -11,6 +11,7 @@ import TaktAPI
         await m.load()
         #expect(m.projects.map(\.name) == ["搬家", "日本旅行"])
         let trip = m.projects[1]
+        #expect(m.counts == [other.id: 0, trip.id: 3])
         // Children come in their saved order.
         let root = try await backend.level(trip.rootTaskId)
         let ids = root.children.map(\.id)

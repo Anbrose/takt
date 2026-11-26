@@ -309,6 +309,13 @@ public actor InMemoryBackend: TaktBackend {
         }
         if r.extractedFrom == r.transcript { return note(r) }
         let last = r.transcript.map(\.endMs).max() ?? 0
+        if r.transcript.map(\.text) == Self.kyotoLines.map(\.2) {
+            r.chains = kyotoChains(r.transcript)
+            r.extractionVersion += 1
+            r.extractedFrom = r.transcript
+            noteRows[id] = r
+            return note(r)
+        }
         r.chains = r.transcript.filter { l in ["去", "订", "买"].contains { l.text.contains($0) } }.map { l in
             let text = String(l.text.trimmingCharacters(in: .whitespaces).prefix(200))
             let clause = text.split(whereSeparator: { "，。！？,.!?".contains($0) }).first.map(String.init) ?? text
@@ -578,6 +585,24 @@ extension InMemoryBackend {
         (38000, "1", "岚山放第二天吧。第二天上午小火车，下午去竹林和天龙寺。"),
         (44000, "2", "好，那小火车票我也一起买了，酒店和车票都交给我。"),
     ]
+
+    /// What the language model makes of the 京都 conversation (the canvas's `ntExtract`): (chain, [(step, place,
+    /// transcript line)]). Quotes point at those lines, wherever the recording put them.
+    static let kyotoDraft: [(String, [(String, String, Int)])] = [
+        ("京都第一天", [("伏见稻荷大社", "伏见稻荷大社", 0), ("清水寺", "清水寺", 3), ("二年坂吃午饭", "二年坂", 3)]),
+        ("京都第二天", [("岚山小火车", "嵯峨野观光小火车", 6), ("竹林", "嵯峨野竹林", 6), ("天龙寺", "天龙寺", 6)]),
+        ("订京都站附近的酒店", [("订京都站附近的酒店", "京都站", 1)]),
+        ("预约二年坂荞麦面店", [("预约二年坂荞麦面店", "二年坂", 4)]),
+    ]
+
+    func kyotoChains(_ transcript: [TranscriptLine]) -> [Chain] {
+        Self.kyotoDraft.map { name, steps in
+            Chain(id: newId(), name: name, steps: steps.map { step, place, line in
+                let l = transcript[line]
+                return ChainStep(id: newId(), name: step, place: place, quote: Quote(startMs: l.startMs, endMs: l.endMs))
+            })
+        }
+    }
 
     /// 京都讨论: the spike's 8-line, 3-speaker transcript (50.3 s), recorded in one segment.
     func seedKyotoNote() {

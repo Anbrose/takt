@@ -27,6 +27,9 @@ public final class NoteDetailModel {
     public private(set) var extracting = false
     /// The server doesn't have this note yet (recorded offline): shown from the device, read-only.
     public private(set) var isLocalOnly = false
+    /// 已导入 rows: where the steps went, by `ImportedStep.parentTaskId` — that level's name, or for steps
+    /// imported as a group (under a task named like their chain) the level the group sits in.
+    public private(set) var targets: [String: String] = [:]
 
     public init(id: UUID, backend: any TaktBackend, store: NoteStore, onChange: @escaping () -> Void = {}) {
         self.id = id; self.backend = backend; self.store = store; self.onChange = onChange
@@ -43,6 +46,17 @@ public final class NoteDetailModel {
             } else {
                 notice = "加载失败"
             }
+        }
+    }
+
+    /// Looks up the names `targets` doesn't know yet. A level that is gone leaves its rows without a name.
+    public func loadTargets() async {
+        guard let note else { return }
+        for (parent, steps) in Dictionary(grouping: note.imported, by: \.parentTaskId) where targets[parent] == nil {
+            guard let level = try? await backend.level(parent) else { continue }
+            let crumbs = level.breadcrumb
+            let group = steps.count >= 2 && level.task.name == steps[0].chainName && crumbs.count >= 2
+            targets[parent] = group ? crumbs[crumbs.count - 2].name : level.task.name
         }
     }
 

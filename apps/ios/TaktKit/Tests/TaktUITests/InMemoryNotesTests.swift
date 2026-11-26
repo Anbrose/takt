@@ -156,6 +156,9 @@ private func extracted() async throws -> (InMemoryBackend, Level, Note) {
         #expect(n.transcript.count == 8)
         #expect(n.speakers.count == 3)
         #expect(n.durationMs == 50340)
-        #expect(try await b.extract(note: n.id).extraction.chains.count == 6)
+        let chains = try await b.extract(note: n.id).extraction.chains
+        #expect(chains.map(\.name) == ["京都第一天", "京都第二天", "订京都站附近的酒店", "预约二年坂荞麦面店"])
+        #expect(chains[0].steps.map(\.name) == ["伏见稻荷大社", "清水寺", "二年坂吃午饭"])
+        #expect(chains[0].steps[1].quote == Quote(startMs: 19000, endMs: 24800))
     }
 }
