@@ -19,6 +19,7 @@
 - Closed sheets/bars are removed from the view hierarchy, not moved off-screen.
 - Contract first: Zod in `packages/contract`, `pnpm openapi` regenerates `packages/contract/openapi.json` and `apps/ios/TaktKit/Sources/TaktAPI/openapi.json`.
 - Every query is scoped by `owner_id`.
+- Moving or inserting tasks rewrites sibling `position` to `0..n-1` and bumps `children_version` on every touched level, in one transaction.
 - Audio never passes through the API; phone ↔ GCS directly. Bucket region `australia-southeast1`. Object path `notes/{ownerId}/{noteId}/{segmentIndex}.m4a`.
 - Only transcript text is sent to the LLM. The LLM may run outside Sydney.
 - AI output is a draft; nothing is written to a Project until the user confirms an import.
@@ -460,22 +461,144 @@ Speakers sent as `[{id:"1",name:"1"}, …]` (renames later go through `updateNot
 
 ---
 
-### Task 13: Notes screens (per Task 1 canvas)
+### Task 13: Move tasks and import position (backend)
 
-**Files:** Create `Sources/TaktUI/NotesListScreen.swift`, `RecordingView.swift`, `NoteDetailScreen.swift`, `ImportPicker.swift`; modify `RootView.swift` / `ProjectListScreen.swift` (entry per canvas), `AppRoot.swift` (`-demo` → in-memory notes + fake capture/transcriber/diarizer), `Takt.xcodeproj/project.pbxproj` (both configs: `INFOPLIST_KEY_NSMicrophoneUsageDescription = "录制笔记"`, `INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "把录音转成文字"`, `INFOPLIST_KEY_UIBackgroundModes = audio`); UI tests `TaktAppUITests/NotesUITests.swift`.
+Spec: 「第二版界面 › 调整任务从属关系」「新增接口」.
 
-Accessibility identifiers (tests rely on them): `notes.entry`, `notes.record` (+), `recording.stop`, `recording.locale`, `note.<title>` rows, `note.extract`, `chain.<name>`, `step.<name>`, `import.here`, `delete：<title>` like task rows.
+**Files:** Modify `packages/contract/src/schemas.ts`, `routes.ts`; `apps/api/src/routes/levels.ts`, `apps/api/src/routes/notes.ts`; regenerate both `openapi.json`; test `apps/api/test/move.test.ts`, extend `test/notes.test.ts`.
 
-- [ ] **Step 1:** Build the four screens exactly as approved in Task 1 (both themes, minimal text, interpolated transitions, removed-from-hierarchy sheets). Entire notes entry hidden below iOS 26 (`if #available`).
-- [ ] **Step 2: UI tests** (simulator, `-demo`): `testRecordStopShowsNote` (fake capture → new row with duration); `testExtractAndImportChain` (open `京都讨论` → 提取 → import first chain into 大阪 → `row.<chain name>` exists in 大阪 with `N 项`); `testImportPartOfChain`; `testSwipeDeleteNote`; `testLocaleChipRemembersChoice`. Screenshots attached like `PlanFlowUITests`.
-- [ ] **Step 3:** Run `xcodebuild test -project apps/ios/Takt.xcodeproj -scheme Takt -destination 'platform=iOS Simulator,OS=26.<x>,name=<iPhone>'` (use an iOS 26 simulator id) — all UI tests pass, old ones included. Compare screenshots with the canvas.
-- [ ] **Step 4:** Commit `iOS: notes screens`.
+**Interfaces — Produces:**
+- Contract: `MoveTask = { parentTaskId: uuid, beforeTaskId?: uuid }`; `MoveResult = { from: Level, to: Level }` (same level twice when the parent is unchanged); route `moveTask` `POST /tasks/{taskId}/move`. `ImportNote` gains `beforeTaskId?: uuid`.
+- `levels.ts`: `insertTask(tx, parentId, body, before?: string)` (shifts later siblings), `moveTask(tx, owner, id, parentId, before?)`. Every touched level gets `children_version + 1`; positions stay `0..n-1` on both sides.
+- Errors: 404 task/parent/before missing or another owner's; 400 `root_task` (moving a project's hidden root); 400 `move_into_self` (target is the task or one of its descendants); 400 `cross_project`; 400 `bad_before` (before is not a child of the target parent, or is the task itself).
+
+- [ ] **Step 1: Failing tests** (`move.test.ts`): `movesIntoSiblingAsLastChild`; `movesUpAfterParent` (before = the old parent's next sibling); `repositionsWithinSameParent`; `bumpsVersionOnBothLevels`; `rejectsMoveIntoDescendant` (400, nothing changed); `rejectsRoot`; `rejectsCrossProject`; `rejectsBadBefore`; `otherOwner404`. In `notes.test.ts`: `importBeforeTask` (chain lands before the given sibling, positions contiguous); `importBadBefore400` (nothing written, note unchanged).
+- [ ] **Step 2–4:** FAIL → implement → `pnpm test && pnpm typecheck && pnpm lint` PASS; `pnpm openapi` committed.
+- [ ] **Step 5:** Commit `API: move tasks, import before a sibling`.
 
 ---
 
-### Task 14: Wrap-up
+### Task 14: Search (backend)
 
-- [ ] **Step 1:** `docs/decisions.md` section `录音笔记（第六阶段，2026-11-24）`: data model, offline-first ids, audio path, model/region/price, limits and env vars, FluidAudio size, what's unverified.
+Spec: 「第二版界面 › 查找」.
+
+**Files:** Contract `schemas.ts`, `routes.ts`; create `apps/api/src/routes/search.ts` (register in `app.ts`); test `apps/api/test/search.test.ts`.
+
+**Interfaces — Produces:**
+- `SearchQuery = { q: string trim 1..100 }`; `SearchResult = { projects: {id, name}[], tasks: {id, name, projectId, parentTaskId, path: string[]}[], notes: {noteId, title, lineIndex: int | null, startMs: int | null, text: string}[] }`; route `search` `GET /search`.
+- Case-insensitive substring (`ILIKE`, with `%` `_` `\` escaped). `path` = project name, then ancestor names below the hidden root, ending at the parent. Note title hit → `lineIndex: null`; transcript hits via `jsonb_array_elements` → at most 2 lines per note, `text` = the whole line. Each group capped at 20, projects/tasks by name then position, notes newest first. Owner-scoped.
+
+- [ ] **Step 1: Failing tests:** `findsProjectTaskAndTranscript`; `taskPathSkipsHiddenRoot` (`['日本旅行','大阪']`); `twoLinesPerNote`; `escapesWildcards` (`q='%'` matches only a literal `%`); `caseInsensitive`; `capsAt20`; `ownerScoped`; `blankQuery400`.
+- [ ] **Step 2–4:** FAIL → implement → PASS (`pnpm test && pnpm typecheck && pnpm lint`, `pnpm openapi`).
+- [ ] **Step 5:** Commit `API: search`.
+
+---
+
+### Task 15: iOS — drop targets, client methods, in-memory backend
+
+**Files:** Modify `Sources/TaktCore/Order.swift` (+ tests `Tests/TaktCoreTests/OrderTests.swift`), `Sources/TaktAPI/Backend.swift`, `Sources/TaktUI/InMemoryBackend.swift`; tests in `Tests/TaktUITests/InMemoryBackendTests.swift` (create if missing).
+
+**Interfaces — Produces:**
+```swift
+public enum DropTarget: Equatable, Sendable { case reorder(to: Int), into(index: Int) }
+extension Order {
+    /// Same bands as the canvas: the middle 28%–72% of the next row (in the direction of travel) = into; past 72% = reorder past it.
+    public static func dropTarget(heights: [Double], gap: Double, from: Int, offset: Double) -> DropTarget
+}
+// TaktBackend
+func moveTask(_ id: String, to parent: String, before: String?) async throws -> (from: Level, to: Level)
+func search(_ q: String) async throws -> SearchResult
+func importNote(_ id: String, parent: String, picks: [ImportPick], before: String?) async throws -> (level: Level, note: Note)   // old 3-arg form forwards with nil
+```
+InMemoryBackend mirrors the API rules and errors (move into descendant / root / cross project throw `BackendError.badRequest`), and searches its seeded projects, tasks and notes the same way.
+
+- [ ] **Step 1: Failing tests:** `dropTargetIntoNextRow` (heights 60, gap 10, offset 40 → `.into(1)`); `dropTargetPastBand` (offset 60 → `.reorder(to: 1)`); `dropTargetUpward` (from 2, offset −40 → `.into(1)`); `dropTargetEdgesUnchanged` (first/last rows); in-memory `moveIntoAndBack`, `moveIntoDescendantThrows`, `importBefore`, `searchGroups`.
+- [ ] **Step 2–4:** FAIL → implement → `swift test` PASS.
+- [ ] **Step 5:** Commit `iOS: drop targets, move/search client`.
+
+---
+
+### Task 16: iOS models — nesting, auto extract, search, import dock
+
+**Files:** Modify `Sources/TaktUI/LevelModel.swift`, `NotesModel.swift`, `NoteDetailModel.swift`; create `Sources/TaktUI/SearchModel.swift`, `Sources/TaktUI/ImportDockModel.swift`; tests `Tests/TaktUITests/LevelModelTests.swift` (extend), `NotesModelTests.swift` (extend), `SearchModelTests.swift`, `ImportDockModelTests.swift`.
+
+**Interfaces — Produces:**
+```swift
+// LevelModel
+public private(set) var nestTarget: String?          // row highlighted while dragging into it
+public var upZoneHot: Bool                            // set by the view from the drag location
+public private(set) var pendingNest: (id: String, into: String)?
+public var parentCrumb: Crumb?                        // breadcrumb.last; nil on the first level
+public func endDrag()                                 // into → pendingNest; upZoneHot → promote; else draft as before
+public func confirmNest() async                       // backend.moveTask(id, to: into, before: nil); reload; drop id from draft
+public func cancelNest()
+public func promote(_ id: String) async               // to parentCrumb's parent, before the parent's next sibling (nil = end)
+// NotesModel
+public var autoExtract: Bool                          // "notes.autoExtract", default true
+public var introSeen: Bool                            // "notes.introSeen"
+public func requestRecording() async throws -> Bool   // false = show intro first
+public func finishIntro(autoExtract: Bool) async throws  // sets both flags, starts recording
+// after every sync: notes recorded while autoExtract was on ("notes.autoPending") get one extract call once hasTranscript; errors are dropped silently
+// NoteDetailModel
+public enum DropDestination: Equatable { case end(parent: String), before(parent: String, task: String), into(task: String) }
+public func importDragged(chain: String, step: String?, to: DropDestination) async -> String?   // returns target name for "✓ 名"
+// SearchModel: query (debounced 250 ms), groups: [SearchGroup] (Project / 任务 / 笔记), each hit split into pre/hit/post
+// ImportDockModel: projects, opened project's first level (ordered), open(_ projectId), back()
+```
+- [ ] **Step 1: Failing tests:** `dragIntoAsksThenMoves`; `cancelNestKeepsTree`; `promotePlacesAfterParent`; `moveDropsIdFromDraft`; `firstRecordingNeedsIntro`; `autoExtractRunsOncePerNote`; `autoExtractOffSkips`; `autoExtractFailureNotRetried`; `importDraggedStepBefore`; `importDraggedChainInto`; `searchDebouncesAndGroups`; `searchHighlightSplit`; `dockOpensProjectLevel`.
+- [ ] **Step 2–4:** FAIL → implement → `swift test` PASS.
+- [ ] **Step 5:** Commit `iOS: nesting, auto extract, search and import dock models`.
+
+---
+
+### Task 17: UI — home menu, notes list, first-recording intro, recording
+
+Canvas v40 (`design/takt-handoff/prototype/Phone*.dc.html`) is the source of truth; match it in both themes.
+
+**Files:** Modify `ProjectListScreen.swift` (悬浮按钮 menu: 查找 / 笔记 / 录音 / 新建 Project, scrim, staggered spring), `RootView.swift` (navigation to notes / search / note), `AppRoot.swift` (`-demo`: in-memory notes + `Sources/TaktUI/DemoNotes.swift` fakes for capture/transcriber/diarizer; at launch and when the network returns: `processor.recoverAfterLaunch()` then `sync.syncAll()`), `Takt.xcodeproj/project.pbxproj` (both configs: `INFOPLIST_KEY_NSMicrophoneUsageDescription = "录制笔记"`, `INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "把录音转成文字"`, `INFOPLIST_KEY_UIBackgroundModes = audio`); create `NotesListScreen.swift`, `RecordIntroSheet.swift`, `RecordingView.swift`; UI tests `TaktAppUITests/NotesUITests.swift`.
+
+Accessibility ids: `fab.menu`, `menu.search`, `menu.notes`, `menu.record`, `menu.new`, `notes.auto`, `notes.record`, `intro.auto`, `intro.start`, `recording.stop`, `recording.locale`, `note.<title>`, `delete：<title>`. Menu items, the notes entry and recording are hidden below iOS 26 (`if #available`); on iOS 17–25 the menu shows only 查找 and 新建 Project.
+
+- [ ] **Step 1:** Build the screens as on the canvas (minimal text, interpolated motion, closed sheets removed from the hierarchy).
+- [ ] **Step 2: UI tests** (`-demo`, iOS 26 simulator): `testMenuOpensAndCloses`; `testFirstRecordShowsIntroThenRecords`; `testSecondRecordSkipsIntro`; `testAutoExtractProducesChains` (stop → row gets a chain count); `testAutoOffLeavesExtractButton`; `testSwipeDeleteNote`; `testLocaleChipRemembersChoice`. Screenshots attached like `PlanFlowUITests`.
+- [ ] **Step 3:** `xcodebuild test … -destination 'platform=iOS Simulator,OS=26.<x>,name=<iPhone>'` — new and old UI tests pass. Compare screenshots with the canvas.
+- [ ] **Step 4:** Commit `iOS: home menu, notes list, recording intro`.
+
+---
+
+### Task 18: UI — note detail and drag-to-project
+
+**Files:** Create `NoteDetailScreen.swift`, `ImportDock.swift` (dock, ghost, confirm), `ImportPicker.swift` (VoiceOver path: step-by-step picker, same destinations); UI tests in `NotesUITests.swift`.
+
+Behaviour per spec 「拖动导入」: long press (≈0.4 s, small-move tolerance) lifts a chain (header) or a step; dock peeks → opens on enter → project dwell ≈0.5 s opens its first level → row edges = before/after (after = before the next sibling, or end), row middle = into (confirm 「放入「X」？」), dashed end zone = end, project row = end of that project, elsewhere = cancel with fly-back. Success shows 「✓ 名」 ~1 s. Tip pill 「长按拖到项目」 until the first successful drag (`notes.dragTipDone`). Each chain/step has accessibility action 「加入到项目」 → `ImportPicker`.
+
+Accessibility ids: `note.extract`, `chain.<name>`, `step.<name>`, `dock`, `dock.project.<name>`, `dock.task.<name>`, `dock.end`, `confirm.nest`.
+
+- [ ] **Step 1:** Build per canvas.
+- [ ] **Step 2: UI tests:** `testDragChainIntoTask` (京都讨论 → 提取 → drag 「京都第一天」 onto 日本旅行 → onto 东京 middle → 放入 → open 东京 shows the chain with `3 项`); `testDragStepBeforeTask`; `testDragCancelFliesBack` (nothing imported); `testVoiceOverImportPicker` (accessibility action path). Use `XCUICoordinate.press(forDuration:thenDragTo:)`.
+- [ ] **Step 3:** Run the UI test suite; compare screenshots with the canvas.
+- [ ] **Step 4:** Commit `iOS: note detail and drag import`.
+
+---
+
+### Task 19: UI — nesting in the plan, deep levels, search screen
+
+**Files:** Modify `PlanScreen.swift`, `TaskRow.swift` (into highlight, leave animation, flash), create `SearchScreen.swift`; UI tests `TaktAppUITests/NestingUITests.swift`, `SearchUITests.swift`.
+
+Behaviour per spec 「调整任务从属关系」「查找」: drag handle → `Order.dropTarget`; into → row highlight, release → confirm → row fades/scales out, target shows `N 项` and flashes; top zone 「移到「父任务名」」 on non-first levels; back goes up one level with the parent name as overline. Search: autofocus field, grouped results with highlighted match, open project / task level (+ flash) / note line (player paused there); back returns to search.
+
+Accessibility ids: `up.zone`, `confirm.nest`, `search.field`, `search.hit.<text>`.
+
+- [ ] **Step 1:** Build per canvas.
+- [ ] **Step 2: UI tests:** `testDragTaskIntoSibling` (大阪城天守阁 into 日本环球影城 → confirm → `1 项`); `testCancelNestKeepsOrder`; `testPromoteFromChildLevel`; `testBackGoesUpOneLevel`; `testSearchOpensTaskLevel`; `testSearchOpensTranscriptLine`.
+- [ ] **Step 3:** Full UI test suite passes; screenshots compared with the canvas.
+- [ ] **Step 4:** Commit `iOS: nesting and search screens`.
+
+---
+
+### Task 20: Wrap-up
+
+- [ ] **Step 1:** `docs/decisions.md` section `录音笔记（第六阶段，2026-11-24）`: data model, offline-first ids, audio path, model/region/price, limits and env vars, FluidAudio size, the second-version UI (menu, auto extract, drag import, nesting, search scope), what's unverified.
 - [ ] **Step 2:** Full verification: `pnpm test && pnpm typecheck && pnpm lint && pnpm openapi` (no diff), `swift test`, UI tests on iOS 26 simulator.
-- [ ] **Step 3:** Real-device checklist for the user (not automatable): 1–2 h background recording (lock screen, incoming call), battery/heat, Chinese accuracy with a real conversation, `SpeechTranscriber` availability on their phone, GCS upload over cellular, playback seek from a step.
+- [ ] **Step 3:** Real-device checklist for the user (not automatable): 1–2 h background recording (lock screen, incoming call), battery/heat, Chinese accuracy with a real conversation, `SpeechTranscriber` availability on their phone, GCS upload over cellular, playback seek from a step, long-press drag feel on a real screen.
 - [ ] **Step 4:** Commit `Docs: note taker decisions`, push the branch, open a PR (merge only when the user says so).
