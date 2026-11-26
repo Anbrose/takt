@@ -106,7 +106,8 @@ final class NotePlayer {
         playing = false
         at = nil
         if sessionActive {
-            session?.deactivate()
+            // A recording started meanwhile (录音 tapped while this screen was popping) owns the session now.
+            if !isRecording() { session?.deactivate() }
             sessionActive = false
         }
     }

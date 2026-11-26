@@ -99,4 +99,17 @@ private final class Opener {
         p.close()
         #expect(session.log == ["on", "off"], "a recording's session is left alone")
     }
+
+    @Test func closeLeavesARecordingStartedWhilePlayingAlone() {
+        let session = FakeSession()
+        var recording = false
+        let p = NotePlayer(makeTrack: { _, _, _ in nil }, session: session, isRecording: { recording })
+        p.play(from: 0, duration: 1000) { _ in nil }
+        recording = true // 录音 tapped while the detail screen was still popping
+        p.close()
+        #expect(session.log == ["on"], "the recorder now owns the session")
+        recording = false
+        p.play(from: 0, duration: 1000) { _ in nil }
+        #expect(session.log == ["on", "on"], "the player activates again next time")
+    }
 }
