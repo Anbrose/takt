@@ -514,6 +514,7 @@ a{color:#C2185B}a:hover{color:#E6397C}
             <span aria-hidden="true" style="position: relative; flex: 0 0 28px; height: 28px">
               <span style="position: absolute; inset: 0; border-radius: 14px; background: var(--soft); color: var(--accent-text); font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; opacity: {{n.badgeO}}; transform: scale({{n.badgeS}}); transition: opacity 240ms ease, transform 240ms ease">{{n.badge}}</span>
               <svg width="28" height="28" viewBox="0 0 28 28" fill="none" style="position: absolute; inset: 0; opacity: {{n.spinO}}; transition: opacity 240ms ease; animation: spin 900ms linear infinite"><circle cx="14" cy="14" r="9" stroke="var(--line)" stroke-width="2.5"></circle><path d="M14 5a9 9 0 0 1 9 9" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"></path></svg>
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; inset: 0; opacity: {{n.dlO}}; transition: opacity 240ms ease-in-out"><path d="M14 7.5v9M10.2 12.8L14 16.6l3.8-3.8M9 20.5h10"></path></svg>
               <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; inset: 0; opacity: {{n.doneO}}; transition: opacity 240ms ease"><path d="M8.5 14.5l3.5 3.5 7.5-8"></path></svg>
             </span>
             <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 auto; color: var(--muted)"><path d="M5 3l4 4-4 4"></path></svg>
@@ -592,6 +593,9 @@ a{color:#C2185B}a:hover{color:#E6397C}
   <div aria-hidden="true" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: {{nd.busyO}}; transition: opacity 260ms ease">
     <svg width="36" height="36" viewBox="0 0 28 28" fill="none" style="animation: spin 900ms linear infinite"><circle cx="14" cy="14" r="9" stroke="var(--line)" stroke-width="2.5"></circle><path d="M14 5a9 9 0 0 1 9 9" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"></path></svg>
   </div>
+  <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: {{nd.unrec.o}}; visibility: {{nd.unrec.vis}}; transition: opacity 260ms ease-in-out, {{nd.unrec.visTr}}">
+    <button type="button" data-ax="note.unrecognized" onClick="{{nd.unrec.play}}" disabled="{{nd.unrec.off}}" aria-description="播放" style="pointer-events: auto; min-width: 44px; min-height: 44px; padding: 0; border: none; background: transparent; color: var(--muted); font-size: 15px; font-weight: 600; cursor: pointer">无法识别</button>
+  </div>
 </div>
 
 <div style="position: relative; flex: 0 0 50%; min-width: 0; height: 100%; box-sizing: border-box; overflow-y: auto; padding: 4px 16px 104px; display: flex; flex-direction: column; visibility: {{nd.chainPane.vis}}; transition: {{nd.chainPane.tr}}">
@@ -621,6 +625,7 @@ a{color:#C2185B}a:hover{color:#E6397C}
         <div class="card" style="border-radius: 14px; border: 1.5px solid var(--line); background: var(--surface); padding: 2px 4px 6px; display: flex; flex-direction: column">
           <div onPointerDown="{{ch.down}}" onPointerMove="{{ch.move}}" onPointerUp="{{ch.up}}" onPointerCancel="{{ch.up}}" style="display: flex; align-items: center; gap: 2px; padding-left: 12px; min-height: 48px; touch-action: pan-y">
             <button type="button" onClick="{{ch.rename}}" aria-label="{{ch.renameAria}}" style="flex: 1; min-width: 0; min-height: 44px; padding: 0; border: none; background: transparent; color: var(--text); text-align: left; font-size: 16px; font-weight: 700; cursor: grab; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ch.name}}</button>
+            <button type="button" onClick="{{ch.pick}}" aria-label="加入到项目" style="flex: 0 0 32px; height: 44px; padding: 0; border: none; background: transparent; color: var(--muted); opacity: 0.55; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="7"></circle><circle cx="8" cy="4.4" r="0.9" fill="currentColor" stroke="none"></circle><path d="M4.6 6.4h6.8M8 6.4v3.2M8 9.6l-1.7 2.6M8 9.6l1.7 2.6"></path></svg></button>
             <button type="button" onClick="{{ch.del}}" aria-label="{{ch.delAria}}" style="flex: 0 0 44px; height: 44px; border: none; background: transparent; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 5.5h13M8 5.5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M5.5 5.5l.8 10.6a1 1 0 0 0 1 .9h5.4a1 1 0 0 0 1-.9l.8-10.6"></path></svg></button>
           </div>
           <sc-for list="{{ch.steps}}" as="sp" hint-placeholder-count="3">
@@ -713,6 +718,46 @@ a{color:#C2185B}a:hover{color:#E6397C}
   <span style="flex: 0 0 auto; min-width: 24px; height: 24px; padding: 0 6px; box-sizing: border-box; border-radius: 12px; background: var(--fill); color: var(--onfill); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; opacity: {{nd.ghost.countO}}">{{nd.ghost.count}}</span>
 </div>
 
+<button type="button" aria-label="关闭" onClick="{{nd.pick.close}}" disabled="{{nd.pick.off}}" style="position: absolute; inset: 0; z-index: 10; border: none; padding: 0; background: rgba(0, 0, 0, 0.4); opacity: {{nd.pick.scrimO}}; visibility: {{nd.pick.vis}}; transition: opacity 300ms ease-in-out, {{nd.pick.visTr}}"></button>
+<div role="dialog" aria-modal="true" aria-label="{{nd.pick.title}}" style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 11; box-sizing: border-box; border-radius: 20px 20px 0 0; display: flex; flex-direction: column; gap: 12px; padding: 20px; background: var(--surface); box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18); transform: {{nd.pick.y}}; visibility: {{nd.pick.vis}}; transition: transform 300ms ease-in-out, {{nd.pick.visTr}}">
+  <div style="display: flex; align-items: center; min-height: 44px">
+    <button type="button" onClick="{{nd.pick.back}}" disabled="{{nd.pick.backOff}}" aria-label="返回" style="flex: 0 0 auto; width: {{nd.pick.backW}}; height: 44px; margin: 0 {{nd.pick.backMr}} 0 {{nd.pick.backMl}}; padding: 0; border: none; background: transparent; color: var(--text); overflow: hidden; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: {{nd.pick.backO}}; visibility: {{nd.pick.backVis}}; transition: width 280ms ease-out, margin 280ms ease-out, opacity 280ms ease-out, {{nd.pick.backVisTr}}"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 20px"><path d="M12.5 4.5L7 10l5.5 5.5"></path></svg></button>
+    <h2 style="flex: 1; min-width: 0; margin: 0; font-size: 18px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; animation: {{nd.pick.anim}}">{{nd.pick.title}}</h2>
+  </div>
+  <span style="font-size: 14px; font-weight: 600; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{nd.pick.item}}</span>
+  <div style="max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; animation: {{nd.pick.anim}}">
+    <sc-for list="{{nd.pick.projRows}}" as="pr" hint-placeholder-count="3">
+      <button type="button" onClick="{{pr.open}}" disabled="{{nd.pick.off}}" style="flex: 0 0 52px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--bg); color: var(--text); text-align: left; cursor: pointer">
+        <span style="flex: 1; min-width: 0; font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{pr.name}}</span>
+        <span style="font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums">{{pr.count}}</span>
+        <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 auto; color: var(--muted)"><path d="M5 3l4 4-4 4"></path></svg>
+      </button>
+    </sc-for>
+    <sc-for list="{{nd.pick.taskRows}}" as="tr" hint-placeholder-count="0">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <button type="button" onClick="{{tr.before}}" disabled="{{nd.pick.off}}" aria-label="{{tr.slotAria}}" style="flex: 0 0 28px; box-sizing: border-box; display: flex; align-items: center; gap: 6px; padding: 0 8px; border: none; background: transparent; color: var(--accent-text); cursor: pointer">
+          <span aria-hidden="true" style="flex: 1; height: 3px; border-radius: 2px; background: var(--accent)"></span>
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="flex: 0 0 16px"><circle cx="8" cy="8" r="7.5" fill="currentColor"></circle><path d="M8 4.6v6.8M4.6 8h6.8" stroke="var(--surface)" stroke-width="1.7" stroke-linecap="round"></path></svg>
+          <span aria-hidden="true" style="flex: 1; height: 3px; border-radius: 2px; background: var(--accent)"></span>
+        </button>
+        <button type="button" onClick="{{tr.into}}" disabled="{{nd.pick.off}}" aria-label="{{tr.aria}}" style="flex: 0 0 52px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--bg); color: var(--text); text-align: left; cursor: pointer">
+          <span style="flex: 1; min-width: 0; font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{tr.name}}</span>
+          <span style="font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums">{{tr.count}}</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="flex: 0 0 auto; color: var(--muted)"><path d="M8 3.5v9M3.5 8h9"></path></svg>
+        </button>
+      </div>
+    </sc-for>
+    <sc-for list="{{nd.pick.here}}" as="hr" hint-placeholder-count="0">
+      <button type="button" onClick="{{hr.put}}" disabled="{{nd.pick.off}}" style="flex: 0 0 52px; box-sizing: border-box; margin-top: 4px; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-radius: 14px; border: 1.5px solid var(--accent); background: var(--soft); color: var(--accent-text); text-align: left; cursor: pointer">
+        <span style="flex: 1; min-width: 0; font-size: 16px; font-weight: 700">放这里</span>
+        <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 auto"><path d="M7 2.5v6.5M4.2 6.2L7 9l2.8-2.8M3 11.5h8"></path></svg>
+      </button>
+    </sc-for>
+  </div>
+  <button type="button" onClick="{{nd.pick.close}}" disabled="{{nd.pick.off}}" style="min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 15px; font-weight: 600; cursor: pointer">取消</button>
+</div>
+
+
 <div style="position: absolute; inset: 0; z-index: 12; display: flex; align-items: center; justify-content: center; padding: 0 40px; background: rgba(0, 0, 0, 0.4); opacity: {{nd.ask.o}}; visibility: {{nd.ask.vis}}; transition: opacity 220ms ease, {{nd.ask.visTr}}">
   <div role="alertdialog" aria-label="{{nd.ask.title}}" style="width: 100%; border-radius: 16px; background: var(--surface); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28); display: flex; flex-direction: column; gap: 16px; padding: 22px 16px 16px; transform: {{nd.ask.tf}}; transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1)">
     <h2 style="margin: 0; font-size: 17px; font-weight: 700; text-align: center">{{nd.ask.title}}</h2>
@@ -746,15 +791,19 @@ a{color:#C2185B}a:hover{color:#E6397C}
       <span style="position: relative; width: 16px; height: 16px">
         <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="position: absolute; inset: 0; color: var(--muted); opacity: {{rec.chevO}}; transition: opacity 200ms ease"><path d="M3.5 5.5L7 9l3.5-3.5"></path></svg>
         <svg width="16" height="16" viewBox="0 0 28 28" fill="none" aria-hidden="true" style="position: absolute; inset: 0; opacity: {{rec.dlO}}; transition: opacity 200ms ease; animation: spin 900ms linear infinite"><circle cx="14" cy="14" r="10" stroke="var(--line)" stroke-width="3.5"></circle><path d="M14 4a10 10 0 0 1 10 10" stroke="var(--accent)" stroke-width="3.5" stroke-linecap="round"></path></svg>
+        <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="position: absolute; inset: 0; color: var(--muted); opacity: {{rec.failO}}; transition: opacity 200ms ease-in-out"><path d="M7 2.5v6.5M4.2 6.2L7 9l2.8-2.8M3 11.5h8"></path></svg>
       </span>
     </button>
   </div>
   <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px">
-    <span role="timer" aria-label="{{rec.timeAria}}" style="font-size: 60px; font-weight: 700; letter-spacing: -1px; font-variant-numeric: tabular-nums">{{rec.time}}</span>
-    <div aria-hidden="true" style="display: flex; gap: 5px; align-items: center; height: 56px">
-      <sc-for list="{{rec.bars}}" as="b" hint-placeholder-count="12">
-        <span style="width: 4px; height: {{b.h}}; border-radius: 2px; background: var(--accent); animation: lvl {{b.d}} ease-in-out {{b.delay}} infinite alternate"></span>
-      </sc-for>
+    <span role="timer" aria-label="{{rec.timeAria}}" onPointerDown="{{rec.clockDown}}" onPointerMove="{{rec.clockMove}}" onPointerUp="{{rec.clockUp}}" onPointerCancel="{{rec.clockUp}}" onPointerLeave="{{rec.clockUp}}" style="font-size: 60px; font-weight: 700; letter-spacing: -1px; font-variant-numeric: tabular-nums; color: {{rec.timeFg}}; transition: color 280ms ease-in-out; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none">{{rec.time}}</span>
+    <div style="position: relative; height: 56px; display: flex; align-items: center; justify-content: center">
+      <div aria-hidden="true" style="display: flex; gap: 5px; align-items: center; height: 56px; opacity: {{rec.barsO}}; transition: opacity 280ms ease-in-out">
+        <sc-for list="{{rec.bars}}" as="b" hint-placeholder-count="12">
+          <span style="width: 4px; height: {{b.h}}; border-radius: 2px; background: var(--accent); animation: lvl {{b.d}} ease-in-out {{b.delay}} infinite alternate; animation-play-state: {{rec.barsPlay}}"></span>
+        </sc-for>
+      </div>
+      <button type="button" data-ax="recording.resume" onClick="{{rec.resume.tap}}" disabled="{{rec.resume.off}}" aria-label="继续录音" style="position: absolute; left: 50%; top: 0; width: 56px; height: 56px; margin-left: -28px; padding: 0; border-radius: 50%; border: none; background: var(--fill); color: var(--onfill); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: {{rec.resume.o}}; visibility: {{rec.resume.vis}}; transition: opacity 280ms ease-in-out, {{rec.resume.visTr}}"><svg width="20" height="20" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true" style="margin-left: 2px"><path d="M5 3.2v11.6a.8.8 0 0 0 1.2.7l9-5.8a.8.8 0 0 0 0-1.4l-9-5.8A.8.8 0 0 0 5 3.2z"></path></svg></button>
     </div>
   </div>
   <button type="button" onClick="{{rec.stop}}" disabled="{{rec.off}}" aria-label="停止" style="width: 80px; height: 80px; box-sizing: border-box; border-radius: 50%; border: 4px solid var(--line); background: var(--surface); cursor: pointer; display: flex; align-items: center; justify-content: center"><span style="width: 30px; height: 30px; border-radius: 8px; background: var(--danger)"></span></button>
@@ -1189,6 +1238,16 @@ class Component extends DCLogic {
     ].map(function (l) { return { t: l[0], s: l[1], text: l[2] }; });
     return [
       { id: 'n1', title: '11-23 14:05', dur: 768, lang: 'zh_CN', state: 'ready', speakers: { '1': '我', '2': '小林', '3': '3' }, lines: kyoto, chains: null, imported: [] },
+      { id: 'n5', title: '11-22 16:48', dur: 312, lang: 'ja_JP', state: 'processing', speakers: {}, lines: [], chains: null, imported: [],
+        later: { speakers: { '1': '1', '2': '2' },
+          lines: [
+            { t: 0, s: '1', text: '奈良公園で鹿せんべいを買いましょう。' },
+            { t: 6, s: '2', text: 'そのあと東大寺の大仏を見に行きたいです。' }
+          ],
+          chains: [{ id: 'c51', name: '奈良', steps: [
+            { id: 's511', name: '鹿せんべいを買う', place: '奈良公園', t: 0 },
+            { id: 's512', name: '東大寺', place: '東大寺', t: 6 }
+          ] }] } },
       { id: 'n2', title: '11-21 09:30', dur: 1082, lang: 'ja_JP', state: 'ready', speakers: { '1': '1', '2': '2' },
         lines: [
           { t: 0, s: '1', text: '東京に着いたら、まずSuicaを買いましょう。' },
@@ -1204,7 +1263,8 @@ class Component extends DCLogic {
       { id: 'n3', title: '11-20 20:15', dur: 3761, lang: 'zh_CN', state: 'ready', speakers: { '1': '我' },
         lines: [{ t: 0, s: '1', text: '论文这周要把第三章的实验数据整理完，周五前发给导师。' }],
         chains: [],
-        imported: [{ name: '整理第三章实验数据', target: '毕业论文' }, { name: '周五前发给导师', target: '毕业论文' }] }
+        imported: [{ name: '整理第三章实验数据', target: '毕业论文' }, { name: '周五前发给导师', target: '毕业论文' }] },
+      { id: 'n4', title: '11-19 18:40', dur: 42, lang: 'zh_CN', state: 'ready', speakers: {}, lines: [], chains: [], imported: [] }
     ];
   }
 
@@ -1357,7 +1417,7 @@ class Component extends DCLogic {
   beginRec() {
     var self = this;
     clearInterval(self._recTimer);
-    self.setState({ recOn: true, recStart: Date.now(), recTick: 0, recLangOpen: false });
+    self.setState({ recOn: true, recStart: Date.now(), recAcc: 0, recPaused: false, recTick: 0, recLangOpen: false });
     self._recTimer = setInterval(function () { self.setState({ recTick: (self.state.recTick || 0) + 1 }); }, 1000);
   }
 
@@ -1389,6 +1449,7 @@ class Component extends DCLogic {
     var notes = this.ntNotes(st);
     var leaving = st.ntLeaving || null, entering = st.ntEntering || null;
     var auto = st.autoX !== false;
+    var fails = this.recFails(st);
     var sw = this.switchVals(auto);
     sw.toggle = function () { self.setState({ autoX: !auto }); };
     function swJust() { return Date.now() - (self._ntSwAt || 0) < 450; }
@@ -1403,6 +1464,7 @@ class Component extends DCLogic {
         var gone = n.id === leaving || n.id === entering;
         var left = (n.chains || []).reduce(function (a, c) { return a + c.steps.length; }, 0);
         var busy = n.state === 'processing' || n.state === 'extracting';
+        var waiting = n.state === 'processing' && !!fails[n.lang] && !n.lines.length;
         var done = !busy && n.chains && left === 0 && n.imported.length > 0;
         var sw2 = st.ntSwiped === n.id;
         return {
@@ -1410,11 +1472,11 @@ class Component extends DCLogic {
           meta: self.mmss(n.dur) + ' · ' + self.langShort(n.lang),
           rows: gone ? '0fr' : '1fr', mb: gone ? '0px' : '10px', o: gone ? '0' : '1',
           badge: left || '', badgeO: !busy && left ? '1' : '0', badgeS: !busy && left ? '1' : '0.6',
-          spinO: busy ? '1' : '0', doneO: done ? '1' : '0',
+          spinO: busy && !waiting ? '1' : '0', dlO: waiting ? '1' : '0', doneO: done ? '1' : '0',
           open: function () {
             if (swJust()) return;
             if (st.ntSwiped) { self.setState({ ntSwiped: null }); return; }
-            self.setState({ screen: 'note', noteFrom: 'notes', noteId: n.id, noteTab: n.chains && n.chains.length ? 'chains' : 'text', playAt: null, playing: false, ndName: null });
+            self.setState({ screen: 'note', noteFrom: 'notes', noteId: n.id, noteTab: n.chains && n.chains.length ? 'chains' : 'text', playAt: n.state === 'ready' && !n.lines.length ? 0 : null, playSec: 0, playing: false, ndName: null, ndPick: null });
           },
           sw: {
             down: function (e) { self._ntSw = { id: n.id, x: e.clientX, y: e.clientY, fired: false }; },
@@ -1448,7 +1510,11 @@ class Component extends DCLogic {
     var have = st.recHave || { zh_CN: true, en_US: true };
     var dl = st.recDl || null;
     var langOn = on && !!st.recLangOpen;
-    var sec = on ? Math.floor((Date.now() - (st.recStart || Date.now())) / 1000) : 0;
+    var sec = on ? Math.floor(this.recMs(st) / 1000) : 0;
+    var paused = on && !!st.recPaused;
+    var fails = this.recFails(st);
+    var dlNow = dl === lang;
+    var failed = !dlNow && !!fails[lang];
     var heights = [18, 34, 52, 28, 44, 56, 38, 22, 48, 30, 42, 20];
     var name = this.langList().filter(function (l) { return l.id === lang; })[0];
     return {
@@ -1456,7 +1522,22 @@ class Component extends DCLogic {
       tf: on ? 'translateY(0%)' : 'translateY(100%)', vis: on ? 'visible' : 'hidden', visTr: this.vt(on, 420),
       time: this.mmss(sec), timeAria: this.mmss(sec),
       lang: this.langShort(lang), langAria: '识别语言：' + (name ? name.name : lang),
-      chevO: dl ? '0' : '1', dlO: dl ? '1' : '0',
+      chevO: dlNow || failed ? '0' : '1', dlO: dlNow ? '1' : '0', failO: failed ? '1' : '0',
+      timeFg: paused ? 'var(--muted)' : 'var(--text)',
+      barsO: paused ? '0' : '1', barsPlay: paused ? 'paused' : 'running',
+      resume: { o: paused ? '1' : '0', vis: paused ? 'visible' : 'hidden', visTr: this.vt(paused, 280), off: !paused,
+        tap: function () { self.resumeRec(); } },
+      clockDown: function (e) {
+        if (!on || (e && e.button) || self.state.recPaused) return;
+        clearTimeout(self._clkT);
+        self._clk = { x: e.clientX, y: e.clientY };
+        self._clkT = setTimeout(function () { if (!self._clk) return; self._clk = null; self.pauseRec(); }, 420);
+      },
+      clockMove: function (e) {
+        var k = self._clk;
+        if (k && (Math.abs(e.clientX - k.x) > 8 || Math.abs(e.clientY - k.y) > 8)) { clearTimeout(self._clkT); self._clk = null; }
+      },
+      clockUp: function () { clearTimeout(self._clkT); self._clk = null; },
       bars: heights.map(function (h, i) { return { h: h + 'px', d: (420 + (i * 137) % 380) + 'ms', delay: (-(i * 173) % 600) + 'ms' }; }),
       openLang: function () { self.setState({ recLangOpen: true }); },
       closeLang: function () { self.setState({ recLangOpen: false }); },
@@ -1468,12 +1549,22 @@ class Component extends DCLogic {
           dlO: have[l.id] ? '0' : '1',
           pick: function () {
             var next = { recLang: l.id, recLangOpen: false };
-            if (!have[l.id]) {
+            if (!have[l.id] && self.state.recDl !== l.id) {
               next.recDl = l.id;
               setTimeout(function () {
-                var h = self.cp(self.state.recHave || { zh_CN: true, en_US: true });
-                h[l.id] = true;
-                self.setState({ recHave: h, recDl: self.state.recDl === l.id ? null : self.state.recDl });
+                var s0 = self.state;
+                var tries = self.cp(s0.recTries); tries[l.id] = (tries[l.id] || 0) + 1;
+                // 示例：日本語 第一次下载失败，再选一次就成功。
+                var ok = !(l.id === 'ja_JP' && tries[l.id] === 1);
+                var f = self.cp(self.recFails(s0));
+                var up = { recTries: tries, recDl: s0.recDl === l.id ? null : s0.recDl };
+                if (ok) {
+                  var h = self.cp(s0.recHave || { zh_CN: true, en_US: true });
+                  h[l.id] = true; up.recHave = h; delete f[l.id];
+                } else f[l.id] = true;
+                up.recFailed = f;
+                self.setState(up);
+                if (ok) self.ntResume(l.id);
               }, 2600);
             }
             self.setState(next);
@@ -1481,30 +1572,17 @@ class Component extends DCLogic {
       }),
       stop: function () {
         clearInterval(self._recTimer);
-        var dur = Math.max(1, Math.floor((Date.now() - (self.state.recStart || Date.now())) / 1000));
+        clearTimeout(self._clkT); self._clk = null;
+        var dur = Math.max(1, Math.floor(self.recMs(self.state) / 1000));
         var d = new Date();
         var p = function (x) { return (x < 10 ? '0' : '') + x; };
         var id = 'r' + Date.now();
         var note = { id: id, title: p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()), dur: dur,
           lang: self.state.recLang || 'zh_CN', state: 'processing', speakers: {}, lines: [], chains: null, imported: [] };
-        self.setState({ recOn: false, recLangOpen: false, screen: self.state.screen === 'note' ? 'note' : 'notes', ntNotes: [note].concat(self.ntNotes(self.state)), ntEntering: id });
+        self.setState({ recOn: false, recPaused: false, recLangOpen: false, screen: self.state.screen === 'note' ? 'note' : 'notes', ntNotes: [note].concat(self.ntNotes(self.state)), ntEntering: id });
         setTimeout(function () { self.setState({ ntEntering: null }); }, 40);
-        setTimeout(function () {
-          var auto = self.state.autoX !== false;
-          self.ntSet(id, function (c) {
-            c.state = auto ? 'extracting' : 'ready';
-            c.speakers = { '1': '1', '2': '2' };
-            c.lines = [
-              { t: 0, s: '1', text: '周六先去超市买露营要用的食材，再去取帐篷。' },
-              { t: Math.min(8, dur), s: '2', text: '帐篷我来取，你记得订营地。' }
-            ];
-          });
-          if (!auto) return;
-          setTimeout(function () {
-            self.ntSet(id, function (c) { c.state = 'ready'; c.chains = self.campExtract(); });
-            self.setState({ ndEnterSeq: (self.state.ndEnterSeq || 0) + 1 });
-          }, 1800);
-        }, 2600);
+        // 这门语言的模型没下好：笔记等着（列表里是下载标记），下好后再处理。
+        if (!self.recFails(self.state)[note.lang]) self.ntProcess(id, dur, null);
       }
     };
   }
@@ -1527,8 +1605,22 @@ class Component extends DCLogic {
     var spkCls = [['var(--soft)', 'var(--accent-text)'], ['var(--sp2bg)', 'var(--sp2fg)'], ['var(--sp3bg)', 'var(--sp3fg)']];
     function pane(on) { return { vis: on ? 'visible' : 'hidden', tr: on ? 'visibility 0s' : 'visibility 0s linear 320ms' }; }
     function lpJust() { return Date.now() - (self._lpAt || 0) < 450; }
-    function play(i) {
+    function play(i, keep) {
       clearInterval(self._playTimer);
+      if (!n.lines.length) {
+        // 没有文字稿：按录音时间走（「无法识别」的笔记照样能听）。
+        var s0 = self.state.playSec || 0;
+        if (!keep || s0 >= n.dur) s0 = 0;
+        self.setState({ playAt: 0, playSec: s0, playing: true });
+        self._playTimer = setInterval(function () {
+          var s = self.state;
+          if (!s.playing || s.playAt == null) return;
+          var nx = (s.playSec || 0) + 0.5;
+          if (nx >= n.dur) { clearInterval(self._playTimer); self.setState({ playSec: n.dur, playing: false }); return; }
+          self.setState({ playSec: nx });
+        }, 500);
+        return;
+      }
       self.setState({ playAt: i, playing: true });
       self._playTimer = setInterval(function () {
         var s = self.state;
@@ -1702,9 +1794,53 @@ class Component extends DCLogic {
     var overIn = !!(over && /:in$/.test(over));
     var askNode = ask ? (function () { var lv = levelOf(ask.pid); return self.findNode(lv, ask.ref); })() : null;
 
+
+    // 「加入到项目」 without dragging (ImportPicker.swift): Projects → one Project's first level.
+    var pk = st.ndPick || null, pkShow = pk || st.ndPickKeep || null, pkOn = !!pk;
+    var pkPid = st.ndPickProj || null;
+    var pkProj = pkPid ? projects.filter(function (p) { return p.id === pkPid; })[0] : null;
+    var pkLvl = pkProj ? levelOf(pkProj.id) : null;
+    var pkKids = pkLvl ? (pkProj.id === curProj ? self.orderedKids(st, pkLvl) : (pkLvl.children || [])) : [];
+    function pkOpen(c, s) {
+      if (lpJust()) return;
+      var it = { chainId: c.id, stepId: s ? s.id : null, name: s ? s.name : c.name };
+      self.setState({ ndPick: it, ndPickKeep: it, ndPickProj: null, ndPickSeq: 0 });
+    }
+    function pkPlace(mode, ref) {
+      var s0 = self.state, it = s0.ndPick, pid = s0.ndPickProj;
+      if (!it || !pid || s0.ndDrag) return;
+      var d = { kind: it.stepId ? 'step' : 'chain', chainId: it.chainId, stepId: it.stepId, label: it.name, count: 0, x: 0, y: 0, ox: 0, oy: 0, back: false, hide: true };
+      if (mode === 'in') { self.setState({ ndPick: null, ndAsk: { d: d, pid: pid, ref: ref } }); return; }
+      self.setState({ ndPick: null });
+      commit(d, pid, mode, ref);
+    }
+    var pickV = {
+      off: !pkOn, scrimO: pkOn ? '1' : '0', y: pkOn ? 'translateY(0%)' : 'translateY(110%)',
+      vis: pkOn ? 'visible' : 'hidden', visTr: self.vt(pkOn, 300),
+      title: pkProj ? pkProj.name : '加入到项目', item: pkShow ? pkShow.name : '',
+      backOff: !pkOn || !pkProj, backW: pkProj ? '44px' : '0px', backMl: pkProj ? '-8px' : '0px', backMr: pkProj ? '4px' : '0px',
+      backO: pkProj ? '1' : '0', backVis: pkProj ? 'visible' : 'hidden', backVisTr: self.vt(!!pkProj, 280),
+      anim: st.ndPickSeq ? 'in' + (st.ndPickDir || 'R') + (st.ndPickSeq % 2 ? 'A' : 'B') + ' 260ms ease' : 'none',
+      close: function () { self.setState({ ndPick: null }); },
+      back: function () { self.setState({ ndPickProj: null, ndPickSeq: (self.state.ndPickSeq || 0) + 1, ndPickDir: 'L' }); },
+      projRows: pkProj ? [] : projects.map(function (p) {
+        var kids = levelOf(p.id).children || [];
+        return { name: p.name, count: kids.length ? kids.length + ' 项' : '',
+          open: function () { self.setState({ ndPickProj: p.id, ndPickSeq: (self.state.ndPickSeq || 0) + 1, ndPickDir: 'R' }); } };
+      }),
+      taskRows: pkKids.map(function (t) {
+        var k = (t.children || []).length;
+        return { name: t.name, count: k ? k + ' 项' : '', slotAria: '放在「' + t.name + '」前面', aria: '放入「' + t.name + '」',
+          before: function () { pkPlace('before', t.id); }, into: function () { pkPlace('in', t.id); } };
+      }),
+      here: pkProj ? [{ put: function () { pkPlace('end', null); } }] : []
+    };
+    var unrec = !!n.id && n.state === 'ready' && !n.lines.length;
+    var unrecOn = unrec && !chainsTab;
+
     return {
       title: n.title, meta: this.mmss(n.dur) + ' · ' + this.langShort(n.lang),
-      back: function () { clearInterval(self._playTimer); self.setState({ screen: st.noteFrom || 'notes', playAt: null, playing: false }); },
+      back: function () { clearInterval(self._playTimer); self.setState({ screen: st.noteFrom || 'notes', playAt: null, playing: false, ndPick: null }); },
       segX: chainsTab ? '100%' : '0%',
       segs: [['text', '文字稿', ''], ['chains', '任务链', left || '']].map(function (g) {
         var on = tab === g[0];
@@ -1755,6 +1891,7 @@ class Component extends DCLogic {
           enter: st.ndEnterSeq ? 'inRA 320ms ease ' + (ci * 60) + 'ms both' : 'none',
           down: h.down, move: h.move, up: h.up,
           rename: function () { if (lpJust()) return; self.setState({ ndName: { kind: 'chain', id: c.id }, ndNameDraft: c.name }); },
+          pick: function () { pkOpen(c, null); },
           del: function () {
             if (lpJust()) return;
             self.setState({ ndLeaving: c.id });
@@ -1773,15 +1910,18 @@ class Component extends DCLogic {
           })
         };
       }),
+      pick: pickV,
+      unrec: { o: unrecOn ? '1' : '0', vis: unrecOn ? 'visible' : 'hidden', visTr: self.vt(unrecOn, 260), off: !unrecOn,
+        play: function () { play(0); } },
       imported: n.imported.map(function (im) { return { name: im.name, target: '→ ' + im.target, enter: im.fresh ? 'inRA 320ms ease both' : 'none' }; }),
       player: (function () {
         var on = playAt != null && !busy && !dockShown;
         var l = on ? n.lines[playAt] : null;
-        var t = l ? l.t : 0;
+        var t = !n.lines.length ? (st.playSec || 0) : l ? l.t : 0;
         return { off: !on, o: on ? '1' : '0', tf: on ? 'translateY(0px)' : 'translateY(24px)', vis: on ? 'visible' : 'hidden', visTr: self.vt(on, 320),
           pauseO: playing ? '1' : '0', playO: playing ? '0' : '1', aria: playing ? '暂停' : '播放',
-          pct: (n.dur ? Math.min(100, (t / n.dur) * 100 * 12) : 0) + '%', time: self.mmss(t) + ' / ' + self.mmss(n.dur),
-          toggle: function () { if (playing) { self.setState({ playing: false }); } else { play(playAt || 0); } },
+          pct: (n.dur ? Math.min(100, (t / n.dur) * 100 * (n.lines.length ? 12 : 1)) : 0) + '%', time: self.mmss(t) + ' / ' + self.mmss(n.dur),
+          toggle: function () { if (playing) { self.setState({ playing: false }); } else { play(playAt || 0, true); } },
           close: function () { clearInterval(self._playTimer); self.setState({ playAt: null, playing: false }); } };
       })(),
       ghost: {
@@ -1925,6 +2065,57 @@ class Component extends DCLogic {
       clear: function (e) { var app = e.currentTarget.closest('.app'); self.setState({ q: '' }); try { app.querySelector('[data-q]').focus(); } catch (err) {} },
       back: function () { self.setState({ screen: 'list' }); }
     };
+  }
+
+  // ---------- v3：模型下载失败 / 录音暂停 / 等模型的笔记 ----------
+  // 下载失败的语言（NotesModel.downloadFailed）。示例：日本語 的模型上次没下好，所以 11-22 那条在等它。
+  recFails(st) { return st.recFailed || { ja_JP: true }; }
+
+  // 只算录到的时间（NotesModel.recordedMs）：暂停时停住，继续后接着走。
+  recMs(st) { return (st.recAcc || 0) + (st.recPaused ? 0 : Date.now() - (st.recStart || Date.now())); }
+
+  pauseRec() {
+    var s = this.state || {};
+    if (!s.recOn || s.recPaused) return;
+    this.setState({ recPaused: true, recAcc: this.recMs(s) });
+  }
+
+  resumeRec() {
+    var s = this.state || {};
+    if (!s.recPaused) return;
+    this.setState({ recPaused: false, recStart: Date.now() });
+  }
+
+  // 转写 → (自动生成任务) 提取。录音停止后，或者等的模型下好以后。
+  ntProcess(id, dur, later) {
+    var self = this;
+    self._proc = self._proc || {};
+    if (self._proc[id]) return;
+    self._proc[id] = true;
+    setTimeout(function () {
+      var auto = self.state.autoX !== false;
+      self.ntSet(id, function (c) {
+        c.state = auto ? 'extracting' : 'ready';
+        c.speakers = later ? later.speakers : { '1': '1', '2': '2' };
+        c.lines = later ? later.lines : [
+          { t: 0, s: '1', text: '周六先去超市买露营要用的食材，再去取帐篷。' },
+          { t: Math.min(8, dur), s: '2', text: '帐篷我来取，你记得订营地。' }
+        ];
+      });
+      if (!auto) return;
+      setTimeout(function () {
+        self.ntSet(id, function (c) { c.state = 'ready'; c.chains = later ? later.chains : self.campExtract(); });
+        self.setState({ ndEnterSeq: (self.state.ndEnterSeq || 0) + 1 });
+      }, 1800);
+    }, 2600);
+  }
+
+  // 模型下好了：在等它的笔记开始处理（NotesModel.prepare → resume）。
+  ntResume(lang) {
+    var self = this;
+    this.ntNotes(this.state || {}).forEach(function (n) {
+      if (n.state === 'processing' && n.lang === lang && !n.lines.length) self.ntProcess(n.id, n.dur, n.later || null);
+    });
   }
 
   renderVals() {
